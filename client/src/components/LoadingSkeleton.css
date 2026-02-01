@@ -1,0 +1,43 @@
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--hover-bg) 25%,
+    var(--border) 50%,
+    var(--hover-bg) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.card-skeleton {
+  height: 100px;
+}
+
+.list-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.list-row-skeleton {
+  height: 60px;
+}
+
+.chart-skeleton {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  height: 200px;
+  padding: 20px;
+}
+
+.chart-skeleton .chart-bar {
+  flex: 1;
+  min-height: 40px;
+}

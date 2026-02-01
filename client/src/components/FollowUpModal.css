@@ -1,0 +1,9 @@
+.follow-up-modal {
+  max-width: 420px;
+}
+
+.follow-up-member {
+  padding: 0 24px 16px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}

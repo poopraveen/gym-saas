@@ -1,0 +1,832 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { format, differenceInDays, isValid } from 'date-fns';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from 'recharts';
+import { api, storage } from '../api/client';
+import { downloadMonthlyReportPDF } from '../utils/downloadMonthlyReport';
+import Layout from '../components/Layout';
+import AddMemberModal from '../components/AddMemberModal';
+import FollowUpModal from '../components/FollowUpModal';
+import PayFeesModal from '../components/PayFeesModal';
+import WhatsAppButton from '../components/WhatsAppButton';
+import { CardSkeleton, ListSkeleton, ChartSkeleton } from '../components/LoadingSkeleton';
+import './Dashboard.css';
+
+type Member = Record<string, unknown>;
+type StatusType = 'expired' | 'soon' | 'valid' | 'new';
+
+function safeFormat(d: Date | string | null | undefined, fmt: string): string {
+  const dt = d ? new Date(d as string | number) : null;
+  return dt && isValid(dt) ? format(dt, fmt) : '—';
+}
+
+function getStatus(dueDate: Date | null, joinDate: Date | null): StatusType {
+  if (!dueDate) return 'new';
+  const daysDiff = differenceInDays(dueDate, new Date());
+  if (daysDiff < 0) return 'expired';
+  if (daysDiff <= 30) return 'soon';
+  const daysSinceJoin = joinDate ? differenceInDays(new Date(), joinDate) : 999;
+  return daysSinceJoin <= 30 ? 'new' : 'valid';
+}
+
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const [allMembers, setAllMembers] = useState<Member[]>([]);
+  const [checkinTable, setCheckinTable] = useState<Member[]>([]);
+  const [finance, setFinance] = useState<{
+    monthlyFees: number;
+    overallFees: number;
+    totalMembers: number;
+    activeMembers: number;
+    pendingFees: number;
+    monthlyGrowth?: { month: string; count: number; cumulative: number }[];
+    monthlyCollections?: { month: string; monthKey: string; amount: number; count: number }[];
+  } | null>(null);
+  const [followUps, setFollowUps] = useState<Record<string, { comment: string; nextFollowUpDate?: string; createdAt: string }>>({});
+  const [loading, setLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [regNoInput, setRegNoInput] = useState('');
+  const [activeNav, setActiveNav] = useState<'dashboard' | 'main' | 'add' | 'checkin' | 'finance'>('main');
+  const [filter, setFilter] = useState<'all' | 'men' | 'women'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusType | 'all'>('all');
+  const [sortBy, setSortBy] = useState<'default' | 'expired' | 'soon' | 'valid' | 'new'>('default');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState<Member | null>(null);
+  const [showPayFeesModal, setShowPayFeesModal] = useState<Member | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [expandedMember, setExpandedMember] = useState<string | null>(null);
+  const [followUpHistory, setFollowUpHistory] = useState<Array<{ comment: string; nextFollowUpDate?: string; createdAt: string }>>([]);
+  const stickyTopRef = useRef<HTMLDivElement>(null);
+
+  const loadList = async () => {
+    try {
+      setError(null);
+      const data = (await api.legacy.list()) as Member[];
+      const processed = data.map((row) => {
+        const dueRaw = row['DUE DATE'] ? new Date(row['DUE DATE'] as number) : null;
+        const joinRaw = row['Date of Joining'] ? new Date(row['Date of Joining'] as string | number) : null;
+        const due = dueRaw && isValid(dueRaw) ? dueRaw : null;
+        const join = joinRaw && isValid(joinRaw) ? joinRaw : null;
+        const status = getStatus(due, join);
+        const memberId = (row as Record<string, unknown>).memberId as string || `GYM-${new Date().getFullYear()}-${String(row['Reg No:']).padStart(5, '0')}`;
+        return { ...row, status, dueDate: due, joinDate: join, memberId };
+      });
+      setAllMembers(processed);
+      const ids = processed.map((m) => (m as Record<string, unknown>).memberId as string).filter(Boolean);
+      if (ids.length > 0) {
+        try {
+          const batch = await api.followUps.getBatch(ids);
+          setFollowUps(batch);
+        } catch {
+          setFollowUps({});
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load members');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statusOrder = { expired: 0, soon: 1, valid: 2, new: 3 };
+
+  const listForCounts =
+    filter === 'men'
+      ? allMembers.filter((r) => (r.Gender as string) === 'Male')
+      : filter === 'women'
+      ? allMembers.filter((r) => (r.Gender as string) === 'Female')
+      : allMembers;
+
+  const statusCounts = {
+    all: listForCounts.length,
+    expired: listForCounts.filter((r) => (r.status as StatusType) === 'expired').length,
+    soon: listForCounts.filter((r) => (r.status as StatusType) === 'soon').length,
+    valid: listForCounts.filter((r) => (r.status as StatusType) === 'valid').length,
+    new: listForCounts.filter((r) => (r.status as StatusType) === 'new').length,
+  };
+
+  const filteredMembers = (() => {
+    let list = listForCounts;
+    if (statusFilter !== 'all') {
+      list = list.filter((r) => (r.status as StatusType) === statusFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(
+        (r) =>
+          (r.NAME as string)?.toLowerCase().includes(q) ||
+          String(r['Phone Number'] || '').includes(q) ||
+          String(r['Reg No:'] || '').includes(q) ||
+          ((r as Record<string, unknown>).memberId as string)?.toLowerCase().includes(q),
+      );
+    }
+    if (sortBy !== 'default') {
+      list = [...list].sort((a, b) => {
+        const statusA = a.status as StatusType;
+        const statusB = b.status as StatusType;
+        if (sortBy === 'expired') return (statusOrder[statusA] ?? 4) - (statusOrder[statusB] ?? 4);
+        if (sortBy === 'valid') return (statusOrder[statusB] ?? 4) - (statusOrder[statusA] ?? 4);
+        const orderA = statusA === sortBy ? 0 : 1;
+        const orderB = statusB === sortBy ? 0 : 1;
+        return orderA - orderB;
+      });
+    }
+    return list;
+  })();
+
+  const loadFinance = async () => {
+    if (activeNav === 'dashboard') setDashboardLoading(true);
+    try {
+      const data = await api.legacy.finance();
+      setFinance(data);
+    } catch {
+      setFinance({
+        monthlyFees: 0,
+        overallFees: 0,
+        totalMembers: 0,
+        activeMembers: 0,
+        pendingFees: 0,
+        monthlyGrowth: [],
+        monthlyCollections: [],
+      });
+    } finally {
+      if (activeNav === 'dashboard') setDashboardLoading(false);
+    }
+  };
+
+  const loadCheckIn = async () => {
+    try {
+      const data = (await api.legacy.checkInList()) as Member[];
+      const today = new Date().toLocaleDateString();
+      const filtered = data
+        .filter((r) => r.lastCheckInTime && String(r.lastCheckInTime).split(',')[0] === today)
+        .sort((a, b) => new Date(b.lastCheckInTime as string).getTime() - new Date(a.lastCheckInTime as string).getTime());
+      setCheckinTable(filtered);
+    } catch {}
+  };
+
+  const loadFollowUpHistory = async (memberId: string) => {
+    try {
+      const list = await api.followUps.getByMember(memberId) as Array<{ comment: string; nextFollowUpDate?: string; createdAt: string }>;
+      setFollowUpHistory(list || []);
+    } catch {
+      setFollowUpHistory([]);
+    }
+  };
+
+  const nextRegNo = Math.max(0, ...allMembers.map((r) => Number(r['Reg No:']) || 0)) + 1;
+
+  useEffect(() => {
+    loadList();
+  }, []);
+
+  useEffect(() => {
+    if (activeNav === 'checkin') loadCheckIn();
+    if (activeNav === 'finance') {
+      setDashboardLoading(false);
+      loadFinance();
+    }
+    if (activeNav === 'dashboard') loadFinance();
+  }, [activeNav]);
+
+  useEffect(() => {
+    if (expandedMember) loadFollowUpHistory(expandedMember);
+  }, [expandedMember]);
+
+  const peopleViewRef = useRef<HTMLDivElement>(null);
+  const memberDetailRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (selectedMember && window.innerWidth < 900) {
+      setTimeout(() => {
+        memberDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [selectedMember]);
+
+  useEffect(() => {
+    const el = stickyTopRef.current;
+    const container = peopleViewRef.current;
+    if (!el || !container || activeNav !== 'main') return;
+    const setHeight = () => {
+      const h = el.offsetHeight;
+      container.style.setProperty('--sticky-top-height', `${h}px`);
+    };
+    setHeight();
+    const ro = new ResizeObserver(setHeight);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [activeNav, filter, statusFilter, searchQuery, loading, filteredMembers.length]);
+
+  const handleCheckIn = async () => {
+    const regNo = parseInt(regNoInput, 10);
+    if (isNaN(regNo)) return;
+    try {
+      await api.legacy.checkIn({ 'Reg No:': regNo });
+      setRegNoInput('');
+      loadList();
+      loadCheckIn();
+    } catch (err) {
+      alert('Check-in failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+    }
+  };
+
+  const handleAddMember = async (data: Record<string, unknown>) => {
+    await api.legacy.upsert(data, false);
+    loadList();
+    loadFinance();
+  };
+
+  const handlePayFees = async (data: Record<string, unknown>) => {
+    await api.legacy.upsert(data, false);
+    loadList();
+    loadFinance();
+  };
+
+  const handleWhatsAppClick = (member: Member) => {
+    setShowFollowUpModal(member);
+  };
+
+  const handleSaveFollowUp = async (comment: string, nextFollowUpDate?: string) => {
+    if (!showFollowUpModal) return;
+    const memberId = (showFollowUpModal as Record<string, unknown>).memberId as string;
+    const regNo = Number(showFollowUpModal['Reg No:']) || 0;
+    await api.followUps.create({ memberId, regNo, comment, nextFollowUpDate });
+    setShowFollowUpModal(null);
+    loadList();
+    if (expandedMember === memberId) loadFollowUpHistory(memberId);
+  };
+
+  const handleLogout = () => {
+    storage.clear();
+    navigate('/login');
+  };
+
+  const handleNavChange = (id: string) => {
+    if (id === 'add') {
+      setActiveNav('add');
+      setShowAddModal(true);
+    } else {
+      setActiveNav(id as 'dashboard' | 'main' | 'checkin' | 'finance');
+    }
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setActiveNav('main');
+  };
+
+  const feesChartData = finance
+    ? [
+        { name: 'Fees Paid', value: finance.overallFees, fill: 'var(--primary)' },
+        { name: 'Pending', value: finance.pendingFees, fill: 'var(--pill-soon)' },
+      ]
+    : [];
+
+  return (
+    <Layout activeNav={activeNav} onNavChange={handleNavChange} onLogout={handleLogout}>
+      {showAddModal && (
+        <AddMemberModal onClose={closeAddModal} onSubmit={handleAddMember} nextRegNo={nextRegNo} />
+      )}
+      {showPayFeesModal && (
+        <PayFeesModal
+          member={showPayFeesModal}
+          onClose={() => setShowPayFeesModal(null)}
+          onSave={handlePayFees}
+        />
+      )}
+      {showFollowUpModal && (
+        <FollowUpModal
+          memberId={(showFollowUpModal as Record<string, unknown>).memberId as string}
+          regNo={Number(showFollowUpModal['Reg No:']) || 0}
+          memberName={(showFollowUpModal.NAME as string) || '—'}
+          onClose={() => setShowFollowUpModal(null)}
+          onSave={handleSaveFollowUp}
+        />
+      )}
+
+      {activeNav === 'dashboard' && (
+        <div className="people-view dashboard-view">
+          <h1 className="page-title">Dashboard</h1>
+          {dashboardLoading ? (
+            <div className="dashboard-cards">
+              {[1, 2, 3, 4].map((i) => (
+                <CardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="dashboard-cards">
+                <div className="dash-card dash-card-1">
+                  <span className="dc-label">Total Members</span>
+                  <span className="dc-value">{(finance?.totalMembers ?? 0).toLocaleString()}</span>
+                </div>
+                <div className="dash-card dash-card-2">
+                  <span className="dc-label">Active Members</span>
+                  <span className="dc-value">{(finance?.activeMembers ?? 0).toLocaleString()}</span>
+                </div>
+                <div className="dash-card dash-card-3">
+                  <span className="dc-label">Fees Collected</span>
+                  <span className="dc-value">₹{(finance?.overallFees ?? 0).toLocaleString()}</span>
+                </div>
+                <div className="dash-card dash-card-4">
+                  <span className="dc-label">Pending Fees</span>
+                  <span className="dc-value">₹{(finance?.pendingFees ?? 0).toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="dashboard-charts">
+                <div className="chart-card">
+                  <h4>Fees Paid vs Pending</h4>
+                  {dashboardLoading ? (
+                    <ChartSkeleton />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={feesChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="name" stroke="var(--text-secondary)" />
+                        <YAxis stroke="var(--text-secondary)" />
+                        <Tooltip
+                          contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+                          formatter={(v: number) => [`₹${v.toLocaleString()}`, '']}
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+                <div className="chart-card">
+                  <h4>Monthly Member Growth</h4>
+                  {dashboardLoading ? (
+                    <ChartSkeleton />
+                  ) : (finance?.monthlyGrowth?.length ?? 0) > 0 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart data={finance?.monthlyGrowth || []}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="month" stroke="var(--text-secondary)" />
+                        <YAxis stroke="var(--text-secondary)" />
+                        <Tooltip
+                          contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+                        />
+                        <Line type="monotone" dataKey="cumulative" stroke="var(--primary)" strokeWidth={2} dot={{ fill: 'var(--primary)' }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="empty-state">No growth data yet</div>
+                  )}
+                </div>
+              </div>
+              <div className="monthly-collections-section">
+                <div className="mc-header">
+                  <div>
+                    <h3>Monthly Collection Details</h3>
+                    <p className="mc-subtitle">Fees collected per month (based on member join date)</p>
+                  </div>
+                  {finance?.monthlyCollections && finance.monthlyCollections.length > 0 && (
+                    <button
+                      className="btn-pdf"
+                      onClick={() =>
+                        downloadMonthlyReportPDF(finance.monthlyCollections!, {
+                          totalMembers: finance?.totalMembers,
+                          overallFees: finance?.overallFees,
+                          monthlyFees: finance?.monthlyFees,
+                        })
+                      }
+                      type="button"
+                    >
+                      📥 Download PDF
+                    </button>
+                  )}
+                </div>
+                {finance?.monthlyCollections && finance.monthlyCollections.length > 0 ? (
+                  <>
+                    <div className="mc-chart">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={finance.monthlyCollections} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                          <XAxis dataKey="month" stroke="var(--text-secondary)" tick={{ fontSize: 11 }} />
+                          <YAxis stroke="var(--text-secondary)" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                          <Tooltip
+                            contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+                            formatter={(v: number) => [`₹${Number(v).toLocaleString()}`, 'Collection']}
+                            labelFormatter={(l) => l}
+                          />
+                          <Bar dataKey="amount" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mc-table-wrapper">
+                      <table className="mc-table">
+                        <thead>
+                          <tr>
+                            <th>Month</th>
+                            <th>New Members</th>
+                            <th>Collection</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {finance.monthlyCollections.map((row) => (
+                            <tr key={row.monthKey}>
+                              <td>{row.month}</td>
+                              <td>{row.count}</td>
+                              <td>₹{row.amount.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <div className="empty-state">No monthly collection data yet</div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {activeNav === 'finance' && (
+        <div className="people-view">
+          <h1 className="page-title">Finance</h1>
+          <div className="finance-cards">
+            <div className="finance-card">
+              <span className="fc-label">This Month</span>
+              <span className="fc-value">₹{(finance?.monthlyFees ?? 0).toLocaleString()}</span>
+            </div>
+            <div className="finance-card">
+              <span className="fc-label">Overall</span>
+              <span className="fc-value">₹{(finance?.overallFees ?? 0).toLocaleString()}</span>
+            </div>
+            <div className="finance-card">
+              <span className="fc-label">Total Members</span>
+              <span className="fc-value">{(finance?.totalMembers ?? 0)}</span>
+            </div>
+          </div>
+          <div className="monthly-collections-section">
+            <div className="mc-header">
+              <div>
+                <h3>Monthly Collection Details</h3>
+                <p className="mc-subtitle">Fees collected per month (based on member join date)</p>
+              </div>
+              {finance?.monthlyCollections && finance.monthlyCollections.length > 0 && (
+                <button
+                  className="btn-pdf"
+                  onClick={() =>
+                    downloadMonthlyReportPDF(finance.monthlyCollections!, {
+                      totalMembers: finance?.totalMembers,
+                      overallFees: finance?.overallFees,
+                      monthlyFees: finance?.monthlyFees,
+                    })
+                  }
+                  type="button"
+                >
+                  📥 Download PDF
+                </button>
+              )}
+            </div>
+            {finance?.monthlyCollections && finance.monthlyCollections.length > 0 ? (
+              <>
+                <div className="mc-chart">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={finance.monthlyCollections} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="month" stroke="var(--text-secondary)" tick={{ fontSize: 11 }} />
+                      <YAxis stroke="var(--text-secondary)" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
+                        formatter={(v: number) => [`₹${Number(v).toLocaleString()}`, 'Collection']}
+                        labelFormatter={(l) => l}
+                      />
+                      <Bar dataKey="amount" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mc-table-wrapper">
+                  <table className="mc-table">
+                    <thead>
+                      <tr>
+                        <th>Month</th>
+                        <th>New Members</th>
+                        <th>Collection</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {finance.monthlyCollections.map((row) => (
+                        <tr key={row.monthKey}>
+                          <td>{row.month}</td>
+                          <td>{row.count}</td>
+                          <td>₹{row.amount.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">No monthly collection data yet</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeNav === 'checkin' && (
+        <div className="people-view">
+          <h1 className="page-title">Attendance</h1>
+          <div className="checkin-section">
+            <div className="checkin-row">
+              <input
+                placeholder="Registration ID"
+                value={regNoInput}
+                onChange={(e) => setRegNoInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCheckIn()}
+              />
+              <button onClick={handleCheckIn} className="btn-primary">
+                Check In
+              </button>
+            </div>
+            <div className="chips">
+              {checkinTable.length === 0 ? (
+                <div className="empty-state">No check-ins today</div>
+              ) : (
+                checkinTable.map((row) => (
+                  <span key={String(row['Reg No:'])} className="chip">
+                    #{row['Reg No:']} {row.NAME}
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeNav === 'main' && (
+        <div ref={peopleViewRef} className="people-view people-view-sticky">
+          <div ref={stickyTopRef} className="people-sticky-top">
+            <div className="people-header">
+              <h1 className="page-title">People</h1>
+              <div className="people-actions">
+                <button onClick={() => handleNavChange('add')} className="btn-add" aria-label="Add member">
+                  +
+                </button>
+              </div>
+            </div>
+            <div className="search-and-status-row">
+              <div className="search-row">
+                <input
+                  type="search"
+                  placeholder="Search by name, phone, Reg No, Member ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input"
+                />
+              </div>
+              <div className="status-filter-pills">
+                {(['all', 'expired', 'soon', 'valid', 'new'] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`status-pill status-pill-${s} ${statusFilter === s ? 'active' : ''}`}
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    <span className="status-pill-label">
+                      {s === 'all' ? 'All' : s === 'expired' ? 'Expired' : s === 'soon' ? 'Soon' : s === 'valid' ? 'Valid' : 'New'}
+                    </span>
+                    <span className="status-pill-count">{statusCounts[s]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="filter-row">
+              <div className="filter-tabs">
+                {(['all', 'men', 'women'] as const).map((f) => (
+                  <button
+                    key={f}
+                    className={`filter-tab ${filter === f ? 'active' : ''}`}
+                    onClick={() => setFilter(f)}
+                  >
+                    {f === 'all' ? 'All' : f === 'men' ? 'Men' : 'Women'}
+                  </button>
+                ))}
+              </div>
+              <div className="filter-row-right">
+              <div className="sort-by-wrap">
+                <label htmlFor="sort-status">Sort by status:</label>
+                <select
+                  id="sort-status"
+                  className="sort-select"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                >
+                  <option value="default">Default</option>
+                  <option value="expired">Expired first</option>
+                  <option value="soon">Soon expires first</option>
+                  <option value="valid">Valid first</option>
+                  <option value="new">New first</option>
+                </select>
+              </div>
+              {(filter !== 'all' || statusFilter !== 'all' || sortBy !== 'default' || searchQuery.trim()) && (
+                <button type="button" className="btn-clear-all" onClick={() => { setFilter('all'); setStatusFilter('all'); setSortBy('default'); setSearchQuery(''); }}>
+                  Clear all
+                </button>
+              )}
+            </div>
+            </div>
+            {error && <div className="error-banner">{error}</div>}
+          </div>
+          {loading ? (
+            <div className="people-list-scroll">
+              <ListSkeleton rows={6} />
+            </div>
+          ) : filteredMembers.length === 0 ? (
+            <div className="people-list-scroll">
+              <div className="empty-state large">
+                {statusFilter !== 'all' || filter !== 'all' || searchQuery.trim()
+                  ? 'No members match your filters'
+                  : 'No members yet. Add your first member!'}
+              </div>
+            </div>
+          ) : (
+            <div className={`people-layout ${selectedMember ? 'has-detail' : ''}`}>
+              <div className="people-list">
+                <div className="people-list-body">
+                  <div className="people-list-header">
+                    <span></span>
+                    <span>Member</span>
+                    <span>Phone</span>
+                    <span>Subscription</span>
+                    <span>Status</span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                {filteredMembers.map((row) => {
+                  const mid = (row as Record<string, unknown>).memberId as string;
+                  const fu = followUps[mid];
+                  const isExpanded = expandedMember === mid;
+                  return (
+                    <div key={String(row['Reg No:'])} className="people-item-wrapper">
+                      <div
+                        className={`people-item ${selectedMember?.['Reg No:'] === row['Reg No:'] ? 'selected' : ''}`}
+                        onClick={() => setSelectedMember(row)}
+                      >
+                        <div className="pi-avatar">
+                          {(row.NAME as string)?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div className="pi-info">
+                          <span className="pi-name">{row.NAME || '—'}</span>
+                          <span className="pi-gymid">{mid || '—'}</span>
+                          {fu && (
+                            <span className="pi-followup">
+                              Last: {safeFormat(fu.createdAt, 'MMM d')} — {fu.comment.slice(0, 35)}
+                              {fu.comment.length > 35 ? '...' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div className="pi-phone">
+                          {(row['Phone Number'] as string) || '—'}
+                          {(row['Phone Number'] as string) && (
+                            <WhatsAppButton
+                              phone={row['Phone Number'] as string}
+                              onClick={() => handleWhatsAppClick(row)}
+                            />
+                          )}
+                        </div>
+                        <span className="pi-dates">
+                          {(() => {
+                            const j = safeFormat(row.joinDate as Date, 'MMM d');
+                            const d = safeFormat(row.dueDate as Date, 'MMM d');
+                            return j !== '—' || d !== '—' ? `${j} – ${d}` : '—';
+                          })()}
+                        </span>
+                        <span className={`pill pill-${row.status}`}>
+                          {row.status === 'expired'
+                            ? 'Expired'
+                            : row.status === 'soon'
+                            ? 'Soon'
+                            : row.status === 'new'
+                            ? 'New'
+                            : 'Valid'}
+                        </span>
+                        <button
+                          type="button"
+                          className="pi-pay-btn"
+                          onClick={(e) => { e.stopPropagation(); setShowPayFeesModal(row); setSelectedMember(row); }}
+                          title="Pay fees"
+                        >
+                          ₹
+                        </button>
+                        <button
+                          className="expand-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedMember(isExpanded ? null : mid);
+                          }}
+                          aria-label="Toggle history"
+                        >
+                          {isExpanded ? '▼' : '▶'}
+                        </button>
+                      </div>
+                      {isExpanded && (
+                        <div className="follow-up-history">
+                          <h5>Follow-up History</h5>
+                          {followUpHistory.length === 0 ? (
+                            <p className="empty-text">No follow-ups yet</p>
+                          ) : (
+                            followUpHistory.map((item, i) => (
+                              <div key={i} className="history-item">
+                                <span className="hi-date">{safeFormat(item.createdAt, 'MMM d, yyyy')}</span>
+                                {item.nextFollowUpDate && (
+                                  <span className="hi-next">
+                                    Next: {safeFormat(item.nextFollowUpDate, 'MMM d')}
+                                  </span>
+                                )}
+                                <p>{item.comment}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                </div>
+              </div>
+              {selectedMember && (
+                <aside ref={memberDetailRef} className="member-detail">
+                  <div className="md-avatar">
+                    {(selectedMember.NAME as string)?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <h3>{selectedMember.NAME}</h3>
+                  <p className="md-meta">
+                    Member ID:{(selectedMember as Record<string, unknown>).memberId ||
+                      `GYM-${new Date().getFullYear()}-${String(selectedMember['Reg No:']).padStart(5, '0')}`}
+                  </p>
+                  <p className="md-meta">
+                    Client since {safeFormat(selectedMember.joinDate as Date, 'MMM yyyy')}
+                  </p>
+                  <div className="md-section">
+                    <h4>Contact</h4>
+                    <p className="md-phone-row">
+                      {(selectedMember['Phone Number'] as string) || '—'}
+                      {(selectedMember['Phone Number'] as string) && (
+                        <WhatsAppButton
+                          phone={selectedMember['Phone Number'] as string}
+                          onClick={() => handleWhatsAppClick(selectedMember)}
+                        />
+                      )}
+                    </p>
+                  </div>
+                  <div className="md-section">
+                    <h4>Subscription</h4>
+                    <p>
+                      {selectedMember.joinDate || selectedMember.dueDate
+                        ? `${safeFormat(selectedMember.joinDate as Date, 'MMM d, yyyy')} – ${safeFormat(selectedMember.dueDate as Date, 'MMM d, yyyy')}`
+                        : '—'}
+                    </p>
+                    <span className={`pill pill-${selectedMember.status}`}>
+                      {selectedMember.status === 'expired'
+                        ? 'Expired'
+                        : selectedMember.status === 'soon'
+                        ? 'Soon expires'
+                        : selectedMember.status === 'new'
+                        ? 'New'
+                        : 'Valid'}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-pay-fees"
+                      onClick={(e) => { e.stopPropagation(); setShowPayFeesModal(selectedMember); }}
+                    >
+                      Pay fees
+                    </button>
+                  </div>
+                  {followUps[(selectedMember as Record<string, unknown>).memberId as string] && (
+                    <div className="md-section">
+                      <h4>Last Follow-up</h4>
+                      <p>
+                        {
+                          followUps[(selectedMember as Record<string, unknown>).memberId as string]
+                            .comment
+                        }
+                      </p>
+                    </div>
+                  )}
+                </aside>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </Layout>
+  );
+}

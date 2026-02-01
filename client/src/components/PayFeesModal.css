@@ -1,0 +1,72 @@
+.pay-fees-modal {
+  max-width: 420px;
+}
+
+.pf-member {
+  padding: 0 24px 16px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.pf-current-due {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.pf-receipt-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  margin: 0 24px 16px;
+  background: var(--hover-bg);
+  border-radius: 10px;
+}
+
+.pf-receipt-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.pf-receipt-value {
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+.pf-start-from {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.pf-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.pf-checkbox-label input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.pf-hint {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.pf-new-due {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pf-due-value {
+  font-weight: 600;
+  color: var(--primary);
+}
