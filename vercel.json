@@ -1,5 +1,5 @@
 {
-  "name": "gym-saas",
+  "name": "gymservice",
   "buildCommand": "cd client && npm install && npm run build",
   "outputDirectory": "client/dist",
   "framework": null,
