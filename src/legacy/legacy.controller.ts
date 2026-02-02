@@ -48,6 +48,15 @@ export class LegacyController {
     return this.membersService.list(this.tenantId(req));
   }
 
+  /** Lookup a single member by gym ID (e.g. GYM-2025-00001) or Reg No. Only onboarded members. */
+  @Get('lookup')
+  async lookup(@Req() req: any, @Query('gymId') gymId: string, @Query('regNo') regNo: string) {
+    const tenantId = this.tenantId(req);
+    if (!tenantId) throw new Error('X-Tenant-ID required');
+    const query = gymId || regNo || '';
+    return this.membersService.findByGymIdOrRegNo(tenantId, query);
+  }
+
   @Get('checkinlist')
   async checkInList(@Req() req: any) {
     return this.attendanceService.checkInList(this.tenantId(req));

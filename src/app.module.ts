@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import * as path from 'path';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -12,11 +13,15 @@ import { FollowUpsModule } from './follow-ups/follow-ups.module';
 import { AtlasMembersModule } from './atlas-members/atlas-members.module';
 import { PlatformModule } from './platform/platform.module';
 import { EnquiriesModule } from './enquiries/enquiries.module';
+import { CaloriesModule } from './calories/calories.module';
 
 @Module({
   controllers: [AppController],
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: path.resolve(process.cwd(), '.env'),
+    }),
     MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017/gym-saas'),
     AuthModule,
     TenantsModule,
@@ -28,6 +33,7 @@ import { EnquiriesModule } from './enquiries/enquiries.module';
     AtlasMembersModule,
     PlatformModule,
     EnquiriesModule,
+    CaloriesModule,
   ],
 })
 export class AppModule {}

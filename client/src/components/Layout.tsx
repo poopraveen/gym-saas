@@ -17,7 +17,7 @@ export default function Layout({
   onLogout,
 }: {
   children: React.ReactNode;
-  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries';
+  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries' | 'onboarding' | 'nutrition-ai';
   onNavChange: (id: string) => void;
   onLogout: () => void;
 }) {
@@ -49,14 +49,19 @@ export default function Layout({
       .catch(() => setTenantConfig(null));
   }, []);
 
-  const navItems: NavItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'main', label: 'People', icon: '👥' },
-    { id: 'add', label: 'Add Member', icon: '➕' },
-    { id: 'enquiries', label: 'Enquiry Members', icon: '📋' },
-    { id: 'checkin', label: 'Attendance', icon: '✓' },
-    { id: 'finance', label: 'Finance', icon: '💰' },
-  ];
+  const isMember = storage.getRole() === 'MEMBER';
+  const navItems: NavItem[] = isMember
+    ? [{ id: 'nutrition-ai', label: 'Nutrition AI', icon: '🥗' }]
+    : [
+        { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+        { id: 'main', label: 'People', icon: '👥' },
+        { id: 'add', label: 'Add Member', icon: '➕' },
+        { id: 'enquiries', label: 'Enquiry Members', icon: '📋' },
+        { id: 'checkin', label: 'Attendance', icon: '✓' },
+        { id: 'finance', label: 'Finance', icon: '💰' },
+        { id: 'onboarding', label: 'Onboarding', icon: '👋' },
+        { id: 'nutrition-ai', label: 'Nutrition AI', icon: '🥗' },
+      ];
 
   const closeDrawer = () => setDrawerOpen(false);
   const toggleDrawer = () => setDrawerOpen((o) => !o);
@@ -105,33 +110,37 @@ export default function Layout({
           ))}
         </nav>
         <div className="drawer-footer">
-          {isSuperAdmin && (
+          {!isMember && isSuperAdmin && (
             <button className="nav-item" onClick={() => { closeDrawer(); navigate('/platform'); }}>
               <span className="nav-icon">⚙️</span>
               <span className="nav-label">Platform Admin</span>
             </button>
           )}
-          <button
-            type="button"
-            className="nav-item"
-            onClick={() => {
-              closeDrawer();
-              if (location.pathname === '/enquiries') {
-                runEnquiriesTour();
-              } else {
-                onNavChange('main');
-                setTimeout(() => runDashboardTour(), 500);
-              }
-            }}
-            data-tour="tour-trigger"
-          >
-            <span className="nav-icon">📖</span>
-            <span className="nav-label">Guide</span>
-          </button>
-          <button type="button" className="nav-item" onClick={toggleTheme} data-tour="theme-toggle">
+          {!isMember && (
+            <button
+              type="button"
+              className="nav-item"
+              onClick={() => {
+                closeDrawer();
+                if (location.pathname === '/enquiries') {
+                  runEnquiriesTour();
+                } else {
+                  onNavChange('main');
+                  setTimeout(() => runDashboardTour(), 500);
+                }
+              }}
+              data-tour="tour-trigger"
+            >
+              <span className="nav-icon">📖</span>
+              <span className="nav-label">Guide</span>
+            </button>
+          )}
+          {!isMember && (
+            <button type="button" className="nav-item" onClick={toggleTheme} data-tour="theme-toggle">
             <span className="nav-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
             <span className="nav-label">{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
           </button>
+          )}
           <button className="nav-item logout" onClick={onLogout}>
             <span className="nav-icon">🚪</span>
             <span className="nav-label">Logout</span>
@@ -139,8 +148,34 @@ export default function Layout({
         </div>
       </aside>
 
-      <main ref={mainRef} className="main-content">{children}</main>
+      <main ref={mainRef} className="main-content">
+        <div className="motivation-bg" aria-hidden="true">
+          {/* Real human images - fitness / motivation; theme-matched via CSS */}
+          <div className="motivation-figure motivation-figure-left">
+            <img
+              src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=85"
+              alt=""
+              width={800}
+              height={1200}
+              decoding="async"
+              className="motivation-img"
+            />
+          </div>
+          <div className="motivation-figure motivation-figure-right">
+            <img
+              src="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=85"
+              alt=""
+              width={800}
+              height={1200}
+              decoding="async"
+              className="motivation-img"
+            />
+          </div>
+        </div>
+        <div className="main-content-inner">{children}</div>
+      </main>
 
+      {!isMember && (
       <nav className="bottom-nav">
         <button className={`bn-item ${activeNav === 'main' ? 'active' : ''}`} onClick={() => handleNav('main')} title="People">
           <span className="bn-icon">👥</span>
@@ -152,6 +187,7 @@ export default function Layout({
           <span className="bn-icon">💰</span>
         </button>
       </nav>
+      )}
 
       {showScrollTop && (
         <button

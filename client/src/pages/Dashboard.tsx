@@ -297,6 +297,14 @@ export default function Dashboard() {
       navigate('/enquiries');
       return;
     }
+    if (id === 'onboarding') {
+      navigate('/onboarding');
+      return;
+    }
+    if (id === 'nutrition-ai') {
+      navigate('/nutrition-ai');
+      return;
+    }
     if (id === 'add') {
       setActiveNav('add');
       setShowAddModal(true);

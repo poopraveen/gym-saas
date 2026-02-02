@@ -21,6 +21,10 @@ export class User extends Document {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  /** For MEMBER role: gym member Reg No this login is linked to */
+  @Prop()
+  linkedRegNo?: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -1,0 +1,175 @@
+.onboarding-page {
+  padding: 1rem 1.25rem;
+  max-width: 720px;
+}
+
+.onboarding-intro {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.onboarding-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.onboarding-section h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.section-desc {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0 0 1rem 0;
+}
+
+.lookup-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.lookup-input {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.lookup-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.lookup-loading {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.lookup-error {
+  margin-top: 0.5rem;
+  color: var(--error);
+  font-size: 0.9rem;
+}
+
+.member-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.member-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.member-card-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.member-card-id {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.member-card-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.member-card-dl dt {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.member-card-dl dd {
+  margin: 0;
+}
+
+.member-login-form {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.member-login-form h3 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.member-login-form label {
+  display: block;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.member-login-form input {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.onboard-user-form label {
+  display: block;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.onboard-user-form input,
+.onboard-user-form select {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.form-actions {
+  margin-top: 1rem;
+}
+
+.message-ok {
+  margin-top: 0.75rem;
+  color: var(--pill-valid);
+  font-size: 0.9rem;
+}
+
+.message-err {
+  margin-top: 0.75rem;
+  color: var(--error);
+  font-size: 0.9rem;
+}

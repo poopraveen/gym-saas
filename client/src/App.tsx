@@ -5,10 +5,22 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PlatformAdmin from './pages/PlatformAdmin';
 import Enquiries from './pages/Enquiries';
+import Onboarding from './pages/Onboarding';
+import NutritionAI from './pages/NutritionAI';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!storage.getToken() || !storage.getTenantId()) {
     return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+function MemberRoute({ children }: { children: React.ReactNode }) {
+  if (!storage.getToken() || !storage.getTenantId()) {
+    return <Navigate to="/login" replace />;
+  }
+  if (storage.getRole() === 'MEMBER') {
+    return <Navigate to="/nutrition-ai" replace />;
   }
   return <>{children}</>;
 }
@@ -41,10 +53,28 @@ export default function App() {
           }
         />
         <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <Onboarding />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/nutrition-ai"
+          element={
+            <ProtectedRoute>
+              <NutritionAI />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <MemberRoute>
+                <Dashboard />
+              </MemberRoute>
             </ProtectedRoute>
           }
         />

@@ -41,6 +41,19 @@ async function request<T>(
   return res.json();
 }
 
+/** Parse API error response (e.g. { message: "Please describe what you ate.", error: "Bad Request" }) for display. */
+export function getApiErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  try {
+    const obj = JSON.parse(raw) as { message?: string; error?: string };
+    if (typeof obj.message === 'string' && obj.message.trim()) return obj.message.trim();
+    if (typeof obj.error === 'string' && obj.error.trim()) return obj.error.trim();
+  } catch {
+    // not JSON
+  }
+  return raw || 'Something went wrong.';
+}
+
 export const api = {
   tenant: {
     getConfig: (host?: string, tenantId?: string) => {
@@ -61,8 +74,31 @@ export const api = {
       }),
     register: (data: { email: string; password: string; name: string }) =>
       request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    onboardUser: (data: { email: string; password: string; name: string; role?: 'STAFF' | 'MANAGER' }) =>
+      request<{ _id: string; email: string; name: string; role: string }>('/auth/onboard-user', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onboardMember: (data: { email: string; password: string; name?: string; regNo: number }) =>
+      request<{ _id: string; email: string; name: string; role: string }>('/auth/onboard-member', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    getMe: () =>
+      request<{ id: string; email: string; name?: string; role: string; tenantId: string; createdAt?: string; linkedRegNo?: number }>('/auth/me'),
+    getAiMembers: (search?: string) => {
+      const q = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
+      return request<AiMember[]>(`/auth/ai-members${q}`);
+    },
   },
   legacy: {
+    lookup: (gymId?: string, regNo?: string) => {
+      const params = new URLSearchParams();
+      if (gymId) params.set('gymId', gymId);
+      if (regNo) params.set('regNo', regNo);
+      const q = params.toString();
+      return request<Record<string, unknown> | null>(q ? `/legacy/lookup?${q}` : '/legacy/lookup');
+    },
     list: () => request<unknown[]>('/legacy/list'),
     upsert: (newUserData: Record<string, unknown>, deleteFlag = false) =>
       request('/legacy', {
@@ -158,7 +194,91 @@ export const api = {
     convert: (id: string, memberData: Record<string, unknown>) =>
       request<{ member: unknown; enquiry: EnquiryListItem }>(`/enquiries/${id}/convert`, { method: 'POST', body: JSON.stringify(memberData) }),
   },
+  calories: {
+    chat: (
+      message: string,
+      date?: string,
+      existingItems?: { name: string; quantity?: string; estimatedCalories: number }[],
+    ) =>
+      request<CalorieChatResult>('/calories/chat', {
+        method: 'POST',
+        body: JSON.stringify({ message, date, existingItems }),
+      }),
+    setEntry: (date: string, items: { name: string; quantity?: string; estimatedCalories: number }[]) =>
+      request<CalorieEntry>('/calories/entry', {
+        method: 'PATCH',
+        body: JSON.stringify({ date, items }),
+      }),
+    getToday: () => request<CalorieEntry | null>('/calories/today'),
+    getLast7Days: () => request<CalorieDaySummary[]>('/calories/last-7-days'),
+    getHistory: (from: string, to: string) => {
+      const params = new URLSearchParams();
+      params.set('from', from);
+      params.set('to', to);
+      return request<CalorieHistoryEntry[]>(`/calories/history?${params.toString()}`);
+    },
+    acceptDefault: (date: string, gender?: 'male' | 'female') =>
+      request<CalorieEntry>('/calories/accept-default', {
+        method: 'POST',
+        body: JSON.stringify({ date, gender }),
+      }),
+    getMemberToday: (memberUserId: string) =>
+      request<CalorieEntry | null>(`/calories/member/${encodeURIComponent(memberUserId)}/today`),
+    getMemberLast7Days: (memberUserId: string) =>
+      request<CalorieDaySummary[]>(`/calories/member/${encodeURIComponent(memberUserId)}/last-7-days`),
+    getMemberHistory: (memberUserId: string, from: string, to: string) => {
+      const params = new URLSearchParams();
+      params.set('from', from);
+      params.set('to', to);
+      return request<CalorieHistoryEntry[]>(
+        `/calories/member/${encodeURIComponent(memberUserId)}/history?${params.toString()}`,
+      );
+    },
+  },
 };
+
+export interface AiMember {
+  id: string;
+  email: string;
+  name?: string;
+  linkedRegNo?: number;
+  createdAt?: string;
+}
+
+export interface CalorieHistoryEntry {
+  date: string;
+  totalCalories: number;
+  source: 'user' | 'system';
+  isSystemEstimated: boolean;
+  detailsJson?: { items?: { name: string; quantity?: string; estimatedCalories: number }[]; rawMessage?: string };
+}
+
+export interface CalorieEntry {
+  _id?: string;
+  tenantId: string;
+  userId: string;
+  date: string;
+  source: 'user' | 'system';
+  totalCalories: number;
+  detailsJson?: { items?: { name: string; quantity?: string; estimatedCalories: number }[]; rawMessage?: string };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CalorieChatResult {
+  date: string;
+  items: { name: string; quantity?: string; estimatedCalories: number }[];
+  totalCalories: number;
+  source: 'user';
+}
+
+export interface CalorieDaySummary {
+  date: string;
+  totalCalories: number;
+  source: 'user' | 'system';
+  isSystemEstimated: boolean;
+  hasEntry: boolean;
+}
 
 export type EnquirySource = 'Walk-in' | 'Phone' | 'Website' | 'Referral' | 'Social Media';
 export type EnquiryStatus = 'New' | 'Follow-up' | 'Converted' | 'Lost';

@@ -187,4 +187,27 @@ export class MembersService {
     const m = await this.memberModel.findOne({ tenantId, phoneNumber: normalized }).lean();
     return m ? (m as unknown as Record<string, unknown>) : null;
   }
+
+  /**
+   * Lookup member by gym ID (e.g. GYM-2025-00001) or Reg No.
+   * Returns legacy-format row with memberId. Only onboarded members can be found.
+   */
+  async findByGymIdOrRegNo(tenantId: string, query: string): Promise<Record<string, unknown> | null> {
+    const q = String(query || '').trim();
+    if (!q) return null;
+    const year = new Date().getFullYear();
+    let regNo: number | null = null;
+    const match = q.match(/^GYM-(\d{4})-(\d+)$/i);
+    if (match) {
+      regNo = parseInt(match[2], 10);
+    } else if (/^\d+$/.test(q)) {
+      regNo = parseInt(q, 10);
+    }
+    if (regNo == null || isNaN(regNo)) return null;
+    const m = await this.memberModel.findOne({ tenantId, regNo }).lean();
+    if (!m) return null;
+    const row = mapToLegacy(m as unknown as Member);
+    (row as Record<string, unknown>).memberId = `GYM-${year}-${String(regNo).padStart(5, '0')}`;
+    return row;
+  }
 }

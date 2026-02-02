@@ -167,6 +167,14 @@ export default function Enquiries() {
 
   const handleNavChange = (id: string) => {
     if (id === 'enquiries') return;
+    if (id === 'onboarding') {
+      navigate('/onboarding');
+      return;
+    }
+    if (id === 'nutrition-ai') {
+      navigate('/nutrition-ai');
+      return;
+    }
     navigate('/');
   };
 
