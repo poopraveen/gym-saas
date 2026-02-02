@@ -490,15 +490,15 @@ export default function Dashboard() {
         <div className="people-view">
           <h1 className="page-title">Finance</h1>
           <div className="finance-cards">
-            <div className="finance-card">
+            <div className="finance-card finance-card-1">
               <span className="fc-label">This Month</span>
               <span className="fc-value">₹{(finance?.monthlyFees ?? 0).toLocaleString()}</span>
             </div>
-            <div className="finance-card">
+            <div className="finance-card finance-card-2">
               <span className="fc-label">Overall</span>
               <span className="fc-value">₹{(finance?.overallFees ?? 0).toLocaleString()}</span>
             </div>
-            <div className="finance-card">
+            <div className="finance-card finance-card-3">
               <span className="fc-label">Total Members</span>
               <span className="fc-value">{(finance?.totalMembers ?? 0)}</span>
             </div>

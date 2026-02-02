@@ -150,27 +150,15 @@ export default function Layout({
 
       <main ref={mainRef} className="main-content">
         <div className="motivation-bg" aria-hidden="true">
-          {/* Real human images - fitness / motivation; theme-matched via CSS */}
-          <div className="motivation-figure motivation-figure-left">
-            <img
-              src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=85"
-              alt=""
-              width={800}
-              height={1200}
-              decoding="async"
-              className="motivation-img"
-            />
-          </div>
-          <div className="motivation-figure motivation-figure-right">
-            <img
-              src="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=85"
-              alt=""
-              width={800}
-              height={1200}
-              decoding="async"
-              className="motivation-img"
-            />
-          </div>
+          {/* Single full background image - fitness / motivation */}
+          <img
+            src="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1600&q=85"
+            alt=""
+            width={1600}
+            height={1200}
+            decoding="async"
+            className="motivation-img-single"
+          />
         </div>
         <div className="main-content-inner">{children}</div>
       </main>

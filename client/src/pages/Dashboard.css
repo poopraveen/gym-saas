@@ -7,26 +7,32 @@
 .people-view {
   max-width: 1200px;
   margin: 0 auto;
+  width: 100%;
+  min-height: 100%;
+  background: transparent;
 }
 
 .people-view-sticky {
   display: flex;
   flex-direction: column;
+  min-height: 100%;
 }
 
 .people-sticky-top {
   flex-shrink: 0;
-  background: var(--bg);
-  padding-bottom: 4px;
+  background: transparent;
+  padding: 0 0 12px 0;
   position: sticky;
   top: 0;
   z-index: 10;
+  border-bottom: 1px solid transparent;
 }
 
 .people-list-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  background: transparent;
 }
 
 .page-title {
@@ -300,10 +306,13 @@
 .people-list {
   display: flex;
   flex-direction: column;
-  background: var(--card-bg);
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  overflow: visible;
+  background: rgba(43, 46, 50, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
 }
 
 .people-list-body {
@@ -316,14 +325,15 @@
   display: grid;
   grid-template-columns: 48px 1fr 120px 100px 80px 44px 40px;
   gap: 12px;
-  padding: 12px 20px;
-  background: var(--hover-bg);
+  padding: 14px 20px;
+  background: rgba(55, 65, 81, 0.6);
+  backdrop-filter: blur(8px);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   position: sticky;
   top: var(--sticky-top-height, 180px);
   z-index: 5;
@@ -335,11 +345,12 @@
   grid-template-columns: 48px 1fr 120px 100px 80px 44px 40px;
   gap: 12px;
   align-items: center;
-  padding: 12px 20px;
+  padding: 14px 20px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-left: 3px solid transparent;
+  background: transparent;
 }
 
 .people-item-wrapper:last-child .people-item {
@@ -347,12 +358,16 @@
 }
 
 .people-item:hover {
-  background: var(--hover-bg);
+  background: rgba(55, 65, 81, 0.5);
 }
 
 .people-item.selected {
-  background: var(--active-bg);
+  background: rgba(59, 130, 246, 0.25);
   border-left-color: var(--primary);
+}
+
+.people-list-body {
+  background: transparent;
 }
 
 .people-item.selected .pi-name {
@@ -434,6 +449,29 @@
   color: var(--primary);
 }
 
+/* Light theme: glass card so girl image shows through */
+[data-theme='light'] .people-list {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .people-list-header {
+  background: rgba(241, 245, 249, 0.85);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .people-item {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .people-item:hover {
+  background: rgba(241, 245, 249, 0.7);
+}
+
+[data-theme='light'] .people-item.selected {
+  background: rgba(59, 130, 246, 0.15);
+}
+
 .member-detail {
   background: var(--card-bg);
   border-radius: 12px;
@@ -485,7 +523,7 @@
   font-size: 0.95rem;
 }
 
-/* Finance */
+/* Finance - same gradient card style as dashboard */
 .finance-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -495,12 +533,17 @@
 .finance-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 24px;
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+
+.finance-card-1 { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(59, 130, 246, 0.1) 100%); }
+.finance-card-2 { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(5, 150, 105, 0.1) 100%); }
+.finance-card-3 { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(234, 88, 12, 0.1) 100%); }
 
 .fc-label {
   font-size: 0.9rem;
