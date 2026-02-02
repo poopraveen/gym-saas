@@ -187,6 +187,25 @@ export class CaloriesController {
   }
 
   /**
+   * Staff only: get a member's saved nutrition analysis for a date.
+   * GET /calories/member/:memberUserId/analysis?date=YYYY-MM-DD
+   */
+  @Get('member/:memberUserId/analysis')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  async getMemberAnalysis(
+    @Req() req: any,
+    @Param('memberUserId') memberUserId: string,
+    @Query('date') date: string,
+  ) {
+    const tenantId = this.tenantId(req);
+    if (!tenantId) throw new Error('Unauthorized');
+    await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    const dateStr = date || new Date().toISOString().slice(0, 10);
+    return this.caloriesService.getAnalysis(tenantId, memberUserId, dateStr);
+  }
+
+  /**
    * GET /calories/reference-foods
    * List reference foods for food input (tenant-agnostic, shared).
    */

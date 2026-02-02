@@ -244,6 +244,13 @@ export const api = {
       params.set('date', date);
       return request<NutritionAnalysisResult | null>(`/calories/analysis?${params.toString()}`);
     },
+    getMemberAnalysis: (memberUserId: string, date: string) => {
+      const params = new URLSearchParams();
+      params.set('date', date);
+      return request<NutritionAnalysisResult | null>(
+        `/calories/member/${encodeURIComponent(memberUserId)}/analysis?${params.toString()}`,
+      );
+    },
     getReferenceFoods: () => request<ReferenceFood[]>('/calories/reference-foods'),
   },
 };

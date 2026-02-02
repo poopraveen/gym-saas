@@ -85,6 +85,10 @@ export default function NutritionAI() {
     history: CalorieHistoryEntry[];
   } | null>(null);
   const [memberProgressLoading, setMemberProgressLoading] = useState(false);
+  /** Staff: selected member's nutrition report (saved in DB). */
+  const [memberReportDate, setMemberReportDate] = useState<string>(() => toDateOnly(new Date()));
+  const [memberAnalysisResult, setMemberAnalysisResult] = useState<NutritionAnalysisResult | null>(null);
+  const [memberAnalysisLoading, setMemberAnalysisLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyRefreshInProgressRef = useRef(false);
 
@@ -194,6 +198,8 @@ export default function NutritionAI() {
     setSelectedMember(member);
     setMemberProgressLoading(true);
     setMemberProgress(null);
+    setMemberReportDate(toDateOnly(new Date()));
+    setMemberAnalysisResult(null);
     try {
       const from = member.createdAt
         ? member.createdAt.slice(0, 10)
@@ -215,6 +221,17 @@ export default function NutritionAI() {
       setMemberProgressLoading(false);
     }
   };
+
+  /** Load selected member's saved nutrition report for a date (staff only). */
+  useEffect(() => {
+    if (!selectedMember?.id || isMember) return;
+    setMemberAnalysisLoading(true);
+    api.calories
+      .getMemberAnalysis(selectedMember.id, memberReportDate)
+      .then((r) => setMemberAnalysisResult(r ?? null))
+      .catch(() => setMemberAnalysisResult(null))
+      .finally(() => setMemberAnalysisLoading(false));
+  }, [selectedMember?.id, memberReportDate, isMember]);
 
   // When on today and todayEntry has items, pre-fill editable list so user can remove or add more
   useEffect(() => {
@@ -536,6 +553,171 @@ export default function NutritionAI() {
                             </tbody>
                           </table>
                         </div>
+                      )}
+                    </div>
+                    {/* Member's saved nutrition report (from DB) */}
+                    <div className="staff-report-block">
+                      <h3 className="staff-report-title">Nutrition report</h3>
+                      <p className="staff-report-desc">Saved report for the selected date (generated when the member ran &quot;Analyze my day&quot;).</p>
+                      <div className="analysis-date-row">
+                        <label>Report date</label>
+                        <input
+                          type="date"
+                          value={memberReportDate}
+                          onChange={(e) => setMemberReportDate(e.target.value)}
+                          max={todayStr}
+                          className="analysis-date-input"
+                        />
+                      </div>
+                      {memberAnalysisLoading ? (
+                        <div className="nutrition-loading">Loading report…</div>
+                      ) : memberAnalysisResult ? (
+                        <section className="analysis-result-widget staff-analysis-result">
+                          <h2 className="staff-report-heading">Nutrition report — {safeDateStr(memberReportDate)}</h2>
+                          <div className="daily-summary">
+                            <h3>Daily total</h3>
+                            <div className="daily-summary-grid">
+                              <div className="summary-item">
+                                <span className="summary-label">Calories</span>
+                                <span className="summary-value">{memberAnalysisResult.dailyTotal.calories} kcal</span>
+                                {typeof memberAnalysisResult.rdiPercentage?.calories === 'number' && (
+                                  <div className="progress-wrap">
+                                    <div className="progress-bar" style={{ width: `${Math.min(100, memberAnalysisResult.rdiPercentage.calories)}%` }} />
+                                    <span className="progress-pct">{Math.round(memberAnalysisResult.rdiPercentage.calories)}% of RDI</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="summary-item">
+                                <span className="summary-label">Protein</span>
+                                <span className="summary-value">{memberAnalysisResult.dailyTotal.protein}g</span>
+                                {typeof memberAnalysisResult.rdiPercentage?.protein === 'number' && (
+                                  <div className="progress-wrap">
+                                    <div className="progress-bar" style={{ width: `${Math.min(100, memberAnalysisResult.rdiPercentage.protein)}%` }} />
+                                    <span className="progress-pct">{Math.round(memberAnalysisResult.rdiPercentage.protein)}% of RDI</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="summary-item">
+                                <span className="summary-label">Carbs</span>
+                                <span className="summary-value">{memberAnalysisResult.dailyTotal.carbohydrates}g</span>
+                                {typeof memberAnalysisResult.rdiPercentage?.carbohydrates === 'number' && (
+                                  <div className="progress-wrap">
+                                    <div className="progress-bar" style={{ width: `${Math.min(100, memberAnalysisResult.rdiPercentage.carbohydrates)}%` }} />
+                                    <span className="progress-pct">{Math.round(memberAnalysisResult.rdiPercentage.carbohydrates)}% of RDI</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="summary-item">
+                                <span className="summary-label">Fat</span>
+                                <span className="summary-value">{memberAnalysisResult.dailyTotal.fat}g</span>
+                                {typeof memberAnalysisResult.rdiPercentage?.fat === 'number' && (
+                                  <div className="progress-wrap">
+                                    <div className="progress-bar" style={{ width: `${Math.min(100, memberAnalysisResult.rdiPercentage.fat)}%` }} />
+                                    <span className="progress-pct">{Math.round(memberAnalysisResult.rdiPercentage.fat)}% of RDI</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="summary-item">
+                                <span className="summary-label">Fiber</span>
+                                <span className="summary-value">{memberAnalysisResult.dailyTotal.fiber}g</span>
+                                {typeof memberAnalysisResult.rdiPercentage?.fiber === 'number' && (
+                                  <div className="progress-wrap">
+                                    <div className="progress-bar" style={{ width: `${Math.min(100, memberAnalysisResult.rdiPercentage.fiber)}%` }} />
+                                    <span className="progress-pct">{Math.round(memberAnalysisResult.rdiPercentage.fiber)}% of RDI</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {memberAnalysisResult.perFood?.length > 0 && (
+                            <div className="per-food-section">
+                              <h3>Per food</h3>
+                              <ul className="per-food-list">
+                                {memberAnalysisResult.perFood.map((food, idx) => (
+                                  <li key={idx} className="per-food-item">
+                                    <button
+                                      type="button"
+                                      className="per-food-btn"
+                                      onClick={() => setFoodPopupItem(foodPopupItem?.name === food.name ? null : food)}
+                                      aria-expanded={foodPopupItem?.name === food.name}
+                                    >
+                                      <span className="per-food-name">{food.name}</span>
+                                      <span className="per-food-qty">{food.quantity} {food.unit}</span>
+                                      <span className="per-food-kcal">{food.calories} kcal</span>
+                                    </button>
+                                    {foodPopupItem?.name === food.name && (
+                                      <div className="per-food-popup">
+                                        <div className="per-food-macros">
+                                          <span>Protein {food.protein}g</span>
+                                          <span>Carbs {food.carbohydrates}g</span>
+                                          <span>Fat {food.fat}g</span>
+                                          <span>Fiber {food.fiber}g</span>
+                                        </div>
+                                        {food.vitamins && Object.keys(food.vitamins).length > 0 && (
+                                          <div className="per-food-micros">
+                                            <strong>Vitamins</strong>
+                                            <ul>{Object.entries(food.vitamins).map(([k, v]) => <li key={k}>{k}: {v}</li>)}</ul>
+                                          </div>
+                                        )}
+                                        {food.minerals && Object.keys(food.minerals).length > 0 && (
+                                          <div className="per-food-micros">
+                                            <strong>Minerals</strong>
+                                            <ul>{Object.entries(food.minerals).map(([k, v]) => <li key={k}>{k}: {v}</li>)}</ul>
+                                          </div>
+                                        )}
+                                        <button type="button" className="btn-sm btn-close-popup" onClick={() => setFoodPopupItem(null)}>Close</button>
+                                      </div>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {memberAnalysisResult.deficiencies?.length > 0 && (
+                            <div className="deficiencies-section">
+                              <h3>Nutrient status</h3>
+                              <ul className="deficiencies-list">
+                                {memberAnalysisResult.deficiencies.map((d, i) => (
+                                  <li key={i} className={`deficiency-item ${nutrientStatusClass(d.status)}`}>
+                                    <span className="deficiency-label">{nutrientStatusLabel(d.status)}</span>
+                                    <span className="deficiency-nutrient">{d.nutrient}</span>
+                                    {d.message && <span className="deficiency-msg">{d.message}</span>}
+                                    {d.current != null && d.recommended != null && (
+                                      <span className="deficiency-values">{d.current} / {d.recommended} {d.unit ?? ''}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {memberAnalysisResult.suggestions?.length > 0 && (
+                            <div className="suggestions-section">
+                              <h3>Smart suggestions</h3>
+                              <ul className="suggestions-list">
+                                {memberAnalysisResult.suggestions.map((s, i) => (
+                                  <li key={i}>{s}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {memberAnalysisResult.improvements?.length > 0 && (
+                            <div className="improvements-section">
+                              <h3>How to improve today&apos;s diet</h3>
+                              <ul className="improvements-list">
+                                {memberAnalysisResult.improvements.map((rec, i) => (
+                                  <li key={i} className="improvement-card">
+                                    {rec.title && <strong className="improvement-title">{rec.title}</strong>}
+                                    {rec.foods?.length > 0 && <p className="improvement-foods">Foods: {rec.foods.join(', ')}</p>}
+                                    {rec.portions?.length > 0 && <p className="improvement-portions">Portions: {rec.portions.join('; ')}</p>}
+                                    {rec.swaps?.length > 0 && <p className="improvement-swaps">Swaps: {rec.swaps.join('; ')}</p>}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </section>
+                      ) : (
+                        <p className="staff-report-empty">No saved report for this date. The member can run &quot;Analyze my day&quot; from their Nutrition AI page to generate one.</p>
                       )}
                     </div>
                   </>

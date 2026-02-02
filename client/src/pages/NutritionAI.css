@@ -1009,3 +1009,42 @@
   color: var(--text-secondary);
   font-size: 0.85rem;
 }
+
+/* Staff: member's nutrition report (saved in DB) */
+.staff-report-block {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.staff-report-title {
+  font-size: 1rem;
+  margin: 0 0 0.35rem 0;
+  color: var(--text-primary);
+}
+
+.staff-report-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem 0;
+}
+
+.staff-report-heading {
+  font-size: 1.05rem;
+  margin: 0 0 0.75rem 0;
+  color: var(--text-primary);
+}
+
+.staff-analysis-result {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.staff-report-empty {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0 0;
+}
