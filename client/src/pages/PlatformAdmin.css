@@ -88,6 +88,20 @@
   opacity: 0.95;
 }
 
+.btn-outline {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.btn-outline:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
 .platform-table {
   width: 100%;
   border-collapse: collapse;

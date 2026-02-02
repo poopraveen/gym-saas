@@ -175,7 +175,7 @@ export default function Enquiries() {
       <div className="enquiries-page">
         <div className="enquiries-header">
           <h1 className="page-title">Enquiry Members</h1>
-          <button type="button" className="btn-primary" onClick={() => setShowAdd(true)}>
+          <button type="button" className="btn-primary" onClick={() => setShowAdd(true)} data-tour="enquiries-add">
             + Add Enquiry
           </button>
         </div>
@@ -187,8 +187,9 @@ export default function Enquiries() {
             placeholder="Search by name, phone, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            data-tour="enquiries-search"
           />
-          <div className="enquiries-quick-filters">
+          <div className="enquiries-quick-filters" data-tour="enquiries-quick-filters">
             <button
               type="button"
               className={quickFilter === 'all' ? 'active' : ''}
@@ -222,6 +223,7 @@ export default function Enquiries() {
             className="enquiries-status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as EnquiryStatus | 'all')}
+            data-tour="enquiries-status-filter"
           >
             <option value="all">All statuses</option>
             {STATUSES.map((s) => (
@@ -237,11 +239,11 @@ export default function Enquiries() {
             <ListSkeleton rows={8} />
           </div>
         ) : list.length === 0 ? (
-          <div className="enquiries-empty">No enquiries found. Add your first enquiry.</div>
+          <div className="enquiries-empty" data-tour="enquiries-list">No enquiries found. Add your first enquiry.</div>
         ) : (
           <>
-            <div className="enquiries-list">
-              <div className="enquiries-table-wrap">
+            <div className="enquiries-list" data-tour="enquiries-list">
+              <div className="enquiries-table-wrap" data-tour="enquiries-table-wrap">
                 <table className="enquiries-table">
                   <thead>
                     <tr>
@@ -255,7 +257,7 @@ export default function Enquiries() {
                     </tr>
                   </thead>
                   <tbody>
-                    {list.map((row) => {
+                    {list.map((row, rowIndex) => {
                       const highlight = getRowHighlight(row);
                       const badge = getBadge(row);
                       const fuText = row.followUpRequired
@@ -266,6 +268,7 @@ export default function Enquiries() {
                           key={row._id}
                           className={`enquiry-row highlight-${highlight}`}
                           onClick={() => setDetailEnquiry(row)}
+                          data-tour={rowIndex === 0 ? 'enquiries-first-row' : undefined}
                         >
                           <td className="col-name">
                             <span className="enq-name">{row.name}</span>

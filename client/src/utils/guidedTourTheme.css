@@ -1,0 +1,62 @@
+/* Tour popover & overlay: match app theme (light/dark) via CSS variables */
+
+.driver-popover,
+.driver-popover * {
+  font-family: var(--font-sans) !important;
+}
+
+.driver-popover {
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow) !important;
+  border: 1px solid var(--border);
+}
+
+.driver-popover-title {
+  color: var(--text-primary) !important;
+}
+
+.driver-popover-description {
+  color: var(--text-secondary) !important;
+}
+
+.driver-popover-close-btn {
+  color: var(--text-secondary) !important;
+}
+
+.driver-popover-close-btn:hover,
+.driver-popover-close-btn:focus {
+  color: var(--text-primary) !important;
+}
+
+.driver-popover-progress-text {
+  color: var(--text-secondary) !important;
+}
+
+.driver-popover-footer button {
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+.driver-popover-footer button:hover,
+.driver-popover-footer button:focus {
+  background-color: var(--hover-bg) !important;
+}
+
+/* Arrow color matches popover background (only the visible border per side) */
+.driver-popover-arrow-side-left {
+  border-left-color: var(--card-bg) !important;
+}
+
+.driver-popover-arrow-side-right {
+  border-right-color: var(--card-bg) !important;
+}
+
+.driver-popover-arrow-side-top {
+  border-top-color: var(--card-bg) !important;
+}
+
+.driver-popover-arrow-side-bottom {
+  border-bottom-color: var(--card-bg) !important;
+}

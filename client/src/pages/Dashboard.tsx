@@ -598,22 +598,23 @@ export default function Dashboard() {
             <div className="people-header">
               <h1 className="page-title">People</h1>
               <div className="people-actions">
-                <button onClick={() => handleNavChange('add')} className="btn-add" aria-label="Add member">
+                <button onClick={() => handleNavChange('add')} className="btn-add" aria-label="Add member" data-tour="people-add-member">
                   +
                 </button>
               </div>
             </div>
             <div className="search-and-status-row">
-              <div className="search-row">
+              <div className="search-row" data-tour="people-search-wrap">
                 <input
                   type="search"
                   placeholder="Search by name, phone, Reg No, Member ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="search-input"
+                  data-tour="people-search"
                 />
               </div>
-              <div className="status-filter-pills">
+              <div className="status-filter-pills" data-tour="people-filter-status">
                 {(['all', 'expired', 'soon', 'valid', 'new'] as const).map((s) => (
                   <button
                     key={s}
@@ -630,10 +631,11 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="filter-row">
-              <div className="filter-tabs">
+              <div className="filter-tabs" data-tour="people-filter-gender">
                 {(['all', 'men', 'women'] as const).map((f) => (
                   <button
                     key={f}
+                    type="button"
                     className={`filter-tab ${filter === f ? 'active' : ''}`}
                     onClick={() => setFilter(f)}
                   >
@@ -642,7 +644,7 @@ export default function Dashboard() {
                 ))}
               </div>
               <div className="filter-row-right">
-              <div className="sort-by-wrap">
+              <div className="sort-by-wrap" data-tour="people-sort">
                 <label htmlFor="sort-status">Sort by status:</label>
                 <select
                   id="sort-status"
@@ -671,7 +673,7 @@ export default function Dashboard() {
               <ListSkeleton rows={6} />
             </div>
           ) : filteredMembers.length === 0 ? (
-            <div className="people-list-scroll">
+            <div className="people-list-scroll" data-tour="people-list">
               <div className="empty-state large">
                 {statusFilter !== 'all' || filter !== 'all' || searchQuery.trim()
                   ? 'No members match your filters'
@@ -681,7 +683,7 @@ export default function Dashboard() {
           ) : (
             <>
             <div className={`people-layout ${selectedMember ? 'has-detail' : ''}`}>
-              <div className="people-list">
+              <div className="people-list" data-tour="people-list">
                 <div className="people-list-body">
                   <div className="people-list-header">
                     <span></span>
@@ -692,12 +694,12 @@ export default function Dashboard() {
                     <span></span>
                     <span></span>
                   </div>
-                {paginatedMembers.map((row) => {
+                {paginatedMembers.map((row, rowIndex) => {
                   const mid = (row as Record<string, unknown>).memberId as string;
                   const fu = followUps[mid];
                   const isExpanded = expandedMember === mid;
                   return (
-                    <div key={String(row['Reg No:'])} className="people-item-wrapper">
+                    <div key={String(row['Reg No:'])} className="people-item-wrapper" data-tour={rowIndex === 0 ? 'people-first-row' : undefined}>
                       <div
                         className={`people-item ${selectedMember?.['Reg No:'] === row['Reg No:'] ? 'selected' : ''}`}
                         onClick={() => setSelectedMember(row)}

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { storage, api } from '../api/client';
-import { runDashboardTour } from '../utils/guidedTour';
+import { runDashboardTour, runEnquiriesTour } from '../utils/guidedTour';
 import Logo from './Logo';
 import './Layout.css';
 
@@ -22,6 +22,7 @@ export default function Layout({
   onLogout: () => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isSuperAdmin = storage.getRole() === 'SUPER_ADMIN';
@@ -110,7 +111,20 @@ export default function Layout({
               <span className="nav-label">Platform Admin</span>
             </button>
           )}
-          <button type="button" className="nav-item" onClick={() => { closeDrawer(); runDashboardTour(); }} data-tour="tour-trigger">
+          <button
+            type="button"
+            className="nav-item"
+            onClick={() => {
+              closeDrawer();
+              if (location.pathname === '/enquiries') {
+                runEnquiriesTour();
+              } else {
+                onNavChange('main');
+                setTimeout(() => runDashboardTour(), 500);
+              }
+            }}
+            data-tour="tour-trigger"
+          >
             <span className="nav-icon">📖</span>
             <span className="nav-label">Guide</span>
           </button>
