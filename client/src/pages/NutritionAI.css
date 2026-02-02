@@ -545,3 +545,467 @@
 .chat-result-items li {
   margin-bottom: 0.25rem;
 }
+
+/* ---------- Nutrition Analysis (log food + one-shot AI) ---------- */
+.analysis-widget .analysis-intro {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0 0 1rem 0;
+}
+
+.analysis-date-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.analysis-date-row label {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.analysis-date-input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.add-food-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.add-food-row label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.add-food-select {
+  min-width: 140px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.add-food-qty-label,
+.add-food-unit-label {
+  margin-left: 0.25rem;
+}
+
+.add-food-qty {
+  width: 4rem;
+  padding: 0.5rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.add-food-unit-select {
+  min-width: 90px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.btn-add-food {
+  flex-shrink: 0;
+}
+
+.analysis-meals-list {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.analysis-meals-list strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.analysis-meals-list ul {
+  list-style: none;
+  margin: 0 0 0.75rem 0;
+  padding: 0;
+}
+
+.analysis-meal-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.35rem;
+  background: var(--hover-bg);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.analysis-meal-item span {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-remove-meal {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--error, #c53030);
+  background: transparent;
+  color: var(--error, #c53030);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-remove-meal:hover {
+  background: rgba(197, 48, 48, 0.1);
+}
+
+.analysis-profile-toggle {
+  margin: 0.75rem 0;
+}
+
+.profile-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.analysis-profile-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.analysis-profile-fields input,
+.analysis-profile-fields select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  min-width: 80px;
+}
+
+.btn-analyze {
+  margin-top: 0.5rem;
+  width: 100%;
+  max-width: 280px;
+}
+
+.analysis-error {
+  color: var(--error, #c53030);
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+/* ---------- Analysis result ---------- */
+.analysis-result-widget h2 {
+  margin-bottom: 0.75rem;
+}
+
+.daily-summary {
+  margin-bottom: 1.25rem;
+}
+
+.daily-summary h3,
+.per-food-section h3,
+.deficiencies-section h3,
+.suggestions-section h3,
+.improvements-section h3 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem 0;
+  color: var(--text-primary);
+}
+
+.daily-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+}
+
+@media (min-width: 480px) {
+  .daily-summary-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.summary-item {
+  padding: 0.75rem;
+  background: var(--hover-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.summary-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.summary-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.progress-wrap {
+  position: relative;
+  margin-top: 0.5rem;
+  height: 1.25rem;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--primary);
+  border-radius: 4px;
+  min-width: 2px;
+  transition: width 0.2s ease;
+}
+
+.progress-pct {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-shadow: 0 0 2px var(--card-bg);
+  z-index: 1;
+}
+
+.per-food-section {
+  margin-bottom: 1.25rem;
+}
+
+.per-food-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.per-food-item {
+  margin-bottom: 0.5rem;
+}
+
+.per-food-btn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.per-food-btn:hover {
+  background: var(--hover-bg);
+  border-color: var(--primary);
+}
+
+.per-food-name {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+
+.per-food-qty {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.per-food-kcal {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.per-food-popup {
+  margin-top: 0.5rem;
+  padding: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.per-food-macros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.per-food-micros {
+  margin-bottom: 0.5rem;
+}
+
+.per-food-micros strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.per-food-micros ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.btn-close-popup {
+  margin-top: 0.5rem;
+}
+
+.deficiencies-section {
+  margin-bottom: 1.25rem;
+}
+
+.deficiencies-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.deficiency-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.35rem;
+  border-radius: 8px;
+  border-left: 4px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.deficiency-label {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.deficiency-nutrient {
+  font-weight: 500;
+}
+
+.deficiency-msg {
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+}
+
+.deficiency-values {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.status-deficient {
+  background: rgba(197, 48, 48, 0.12);
+  border-left-color: var(--error, #c53030);
+}
+
+.status-slightly-low {
+  background: rgba(210, 158, 0, 0.15);
+  border-left-color: #d29e00;
+}
+
+.status-optimal {
+  background: rgba(72, 187, 120, 0.12);
+  border-left-color: var(--pill-valid, #48bb78);
+}
+
+.status-excess {
+  background: rgba(210, 158, 0, 0.12);
+  border-left-color: #d29e00;
+}
+
+.suggestions-section {
+  margin-bottom: 1.25rem;
+}
+
+.suggestions-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.suggestions-list li {
+  margin-bottom: 0.5rem;
+}
+
+.improvements-section {
+  margin-bottom: 0;
+}
+
+.improvements-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.improvement-card {
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--hover-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.improvement-card:last-child {
+  margin-bottom: 0;
+}
+
+.improvement-title {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--primary);
+}
+
+.improvement-foods,
+.improvement-portions,
+.improvement-swaps {
+  margin: 0.35rem 0 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}

@@ -4,6 +4,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import OpenAI from 'openai';
 import { CalorieEntry } from './schemas/calorie-entry.schema';
+import {
+  NutritionAnalysis,
+  FoodNutritionBreakdown,
+  DailyNutritionTotal,
+  RdiPercentage,
+  NutrientStatus,
+  ImprovementRecommendation,
+} from './schemas/nutrition-analysis.schema';
+import { NUTRITION_REFERENCE } from './data/nutrition-reference';
 
 /** Default Indian average calorie intake when day is missing (ICMR-style). */
 export const DEFAULT_CALORIES_MALE = 2400;
@@ -49,12 +58,68 @@ export interface DaySummary {
   hasEntry: boolean;
 }
 
+const ANALYZE_SYSTEM_PROMPT = `You are a world-class nutritionist and dietitian specializing in Indian diets (ICMR-style).
+Given a list of meals (food + quantity + unit), return ONE JSON object with full nutrition analysis. No markdown, no code block.
+
+Reference foods (per 100g or standard serving): Dosa ~133 kcal, 3.6g protein, 22g carbs; Chicken boiled ~165 kcal, 31g protein; Scrambled egg ~196 kcal/100g; Tea with milk/sugar ~35 kcal/100g; Rice white ~130 kcal, brown ~112 kcal; Guava ~68 kcal, 228mg Vitamin C; Idli ~106 kcal; Paneer ~265 kcal, 18g protein; Orange ~47 kcal, 53mg Vitamin C.
+
+Output JSON format (use exact keys):
+{
+  "perFood": [
+    {
+      "name": "food name",
+      "quantity": "2",
+      "unit": "pieces",
+      "calories": number,
+      "protein": number,
+      "carbohydrates": number,
+      "fat": number,
+      "fiber": number,
+      "vitamins": { "vitaminA": number, "vitaminBComplex": number, "vitaminC": number, "vitaminD": number, "vitaminE": number },
+      "minerals": { "calcium": number, "iron": number, "magnesium": number, "potassium": number, "sodium": number, "zinc": number }
+    }
+  ],
+  "dailyTotal": {
+    "calories": number,
+    "protein": number,
+    "carbohydrates": number,
+    "fat": number,
+    "fiber": number,
+    "vitamins": { "vitaminA": number, ... },
+    "minerals": { "calcium": number, ... }
+  },
+  "rdiPercentage": {
+    "calories": number,
+    "protein": number,
+    "carbohydrates": number,
+    "fat": number,
+    "fiber": number,
+    "vitamins": { "vitaminA": number, ... },
+    "minerals": { "calcium": number, ... }
+  },
+  "deficiencies": [
+    { "nutrient": "string", "status": "deficient" | "slightly_low" | "optimal" | "excess", "message": "short message", "current": number, "recommended": number, "unit": "g" | "mg" | "mcg" | "kcal" }
+  ],
+  "suggestions": [
+    "Your protein intake is low — consider adding eggs, paneer, or chicken",
+    "Vitamin C is low — add fruits like guava or orange"
+  ],
+  "improvements": [
+    { "title": "How to Improve Today's Diet", "foods": ["eggs", "paneer"], "portions": ["2 eggs", "50g paneer"], "swaps": ["white rice → brown rice"] }
+  ]
+}
+
+RDI (Indian adult, 2000 kcal baseline): Protein 50-60g, Carbs 250-300g, Fat 50-65g, Fiber 25-30g. Vitamin C 40mg, Calcium 1000mg, Iron 19mg (F)/29mg (M), etc.
+Scale values by quantity (pieces/cups/grams/serving). For status: deficient <70% RDI, slightly_low 70-90%, optimal 90-110%, excess >110%.
+Suggestions: simple, food-based, culturally relevant (Indian foods). 2-4 suggestions. Improvements: 2-4 items with foods, portions, optional swaps.`;
+
 @Injectable()
 export class CaloriesService {
   private openai: OpenAI | null = null;
 
   constructor(
     @InjectModel(CalorieEntry.name) private readonly calorieModel: Model<CalorieEntry>,
+    @InjectModel(NutritionAnalysis.name) private readonly nutritionAnalysisModel: Model<NutritionAnalysis>,
     private config: ConfigService,
   ) {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
@@ -292,6 +357,132 @@ export class CaloriesService {
       items: [],
       rawMessage: 'System-estimated default (Indian average)',
     });
+  }
+
+  /**
+   * One-shot AI nutrition analysis: meals + optional userProfile → full breakdown,
+   * daily total, RDI %, deficiencies, suggestions, improvements. Saved by date for tenant/user.
+   */
+  async analyze(
+    tenantId: string,
+    userId: string,
+    meals: Array<{ food: string; quantity: string; unit: string }>,
+    options?: { date?: string; userProfile?: { age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string } },
+  ): Promise<{
+    perFood: FoodNutritionBreakdown[];
+    dailyTotal: DailyNutritionTotal;
+    rdiPercentage: RdiPercentage;
+    deficiencies: NutrientStatus[];
+    suggestions: string[];
+    improvements: ImprovementRecommendation[];
+  }> {
+    if (!this.openai) {
+      throw new BadRequestException('Nutrition analysis is not configured (missing OPENAI_API_KEY)');
+    }
+    const dateStr = options?.date || this.todayDate();
+    const normalizedDate = this.normalizeDate(dateStr);
+
+    const refSummary = NUTRITION_REFERENCE.map(
+      (f) => `${f.name}: ${f.per100g.calories} kcal, P ${f.per100g.protein}g, C ${f.per100g.carbohydrates}g, F ${f.per100g.fat}g, Fiber ${f.per100g.fiber}g`,
+    ).join('; ');
+
+    const userContent = `Today's date: ${normalizedDate}.
+Reference foods (per 100g): ${refSummary}
+
+User meals to analyze:
+${JSON.stringify(meals)}
+${options?.userProfile ? `User profile (for RDI): ${JSON.stringify(options.userProfile)}` : 'No user profile — use Indian adult baseline RDI (2000 kcal, protein 55g, etc.).'}
+
+Return the single JSON object with perFood, dailyTotal, rdiPercentage, deficiencies, suggestions, improvements. All numbers must be numeric (no strings).`;
+
+    const completion = await this.openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: ANALYZE_SYSTEM_PROMPT },
+        { role: 'user', content: userContent },
+      ],
+      temperature: 0.2,
+      max_tokens: 4000,
+    });
+
+    const content = completion.choices[0]?.message?.content?.trim() || '';
+    let parsed: {
+      perFood?: FoodNutritionBreakdown[];
+      dailyTotal?: DailyNutritionTotal;
+      rdiPercentage?: RdiPercentage;
+      deficiencies?: NutrientStatus[];
+      suggestions?: string[];
+      improvements?: ImprovementRecommendation[];
+    };
+
+    try {
+      const jsonStr = content.replace(/^```json?\s*|\s*```$/g, '').trim();
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      throw new BadRequestException('Could not parse nutrition analysis. Please try again.');
+    }
+
+    const perFood = Array.isArray(parsed.perFood) ? parsed.perFood : [];
+    const dailyTotal = parsed.dailyTotal || {
+      calories: 0,
+      protein: 0,
+      carbohydrates: 0,
+      fat: 0,
+      fiber: 0,
+    };
+    const rdiPercentage = parsed.rdiPercentage || {};
+    const deficiencies = Array.isArray(parsed.deficiencies) ? parsed.deficiencies : [];
+    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    const improvements = Array.isArray(parsed.improvements) ? parsed.improvements : [];
+
+    await this.nutritionAnalysisModel.findOneAndUpdate(
+      { tenantId, userId, date: normalizedDate },
+      {
+        $set: {
+          meals,
+          userProfile: options?.userProfile,
+          perFood,
+          dailyTotal,
+          rdiPercentage,
+          deficiencies,
+          suggestions,
+          improvements,
+          updatedAt: new Date(),
+        },
+      },
+      { new: true, upsert: true },
+    );
+
+    return { perFood, dailyTotal, rdiPercentage, deficiencies, suggestions, improvements };
+  }
+
+  /** Get saved nutrition analysis for a date (tenant/user scoped). */
+  async getAnalysis(
+    tenantId: string,
+    userId: string,
+    date: string,
+  ): Promise<{
+    perFood: FoodNutritionBreakdown[];
+    dailyTotal?: DailyNutritionTotal;
+    rdiPercentage?: RdiPercentage;
+    deficiencies: NutrientStatus[];
+    suggestions: string[];
+    improvements: ImprovementRecommendation[];
+  } | null> {
+    const normalized = this.normalizeDate(date);
+    const doc = await this.nutritionAnalysisModel
+      .findOne({ tenantId, userId, date: normalized })
+      .lean();
+    if (!doc) return null;
+    const d = doc as unknown as NutritionAnalysis;
+    return {
+      perFood: d.perFood || [],
+      dailyTotal: d.dailyTotal,
+      rdiPercentage: d.rdiPercentage,
+      deficiencies: d.deficiencies || [],
+      suggestions: d.suggestions || [],
+      improvements: d.improvements || [],
+    };
   }
 
   private todayDate(): string {

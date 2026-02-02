@@ -8,6 +8,7 @@ import { CaloriesService, ChatCalorieResult, DaySummary } from './calories.servi
 import { ChatCalorieDto } from './dto/chat-calorie.dto';
 import { AcceptDefaultDto } from './dto/accept-default.dto';
 import { SetEntryDto } from './dto/set-entry.dto';
+import { AnalyzeDto } from './dto/analyze.dto';
 
 /**
  * Member-facing calorie tracking.
@@ -153,5 +154,50 @@ export class CaloriesController {
     const fromStr = from || new Date().toISOString().slice(0, 10);
     const toStr = to || new Date().toISOString().slice(0, 10);
     return this.caloriesService.getHistory(tenantId, memberUserId, fromStr, toStr);
+  }
+
+  /**
+   * POST /calories/analyze
+   * One-shot AI nutrition analysis: meals + optional userProfile → full breakdown,
+   * daily total, RDI %, deficiencies, suggestions, improvements.
+   */
+  @Post('analyze')
+  async analyze(@Req() req: any, @Body() body: AnalyzeDto) {
+    const tenantId = this.tenantId(req);
+    const userId = this.userId(req);
+    if (!tenantId || !userId) throw new Error('Unauthorized');
+    if (!body.meals?.length) throw new Error('At least one meal is required');
+    return this.caloriesService.analyze(tenantId, userId, body.meals, {
+      date: body.date,
+      userProfile: body.userProfile,
+    });
+  }
+
+  /**
+   * GET /calories/analysis?date=YYYY-MM-DD
+   * Get saved nutrition analysis for a date (tenant/user scoped).
+   */
+  @Get('analysis')
+  async getAnalysis(@Req() req: any, @Query('date') date: string) {
+    const tenantId = this.tenantId(req);
+    const userId = this.userId(req);
+    if (!tenantId || !userId) throw new Error('Unauthorized');
+    const dateStr = date || new Date().toISOString().slice(0, 10);
+    return this.caloriesService.getAnalysis(tenantId, userId, dateStr);
+  }
+
+  /**
+   * GET /calories/reference-foods
+   * List reference foods for food input (tenant-agnostic, shared).
+   */
+  @Get('reference-foods')
+  async getReferenceFoods() {
+    const { NUTRITION_REFERENCE } = await import('./data/nutrition-reference');
+    return NUTRITION_REFERENCE.map((f) => ({
+      id: f.id,
+      name: f.name,
+      defaultUnit: f.defaultUnit,
+      units: ['pieces', 'cups', 'grams', 'serving'],
+    }));
   }
 }

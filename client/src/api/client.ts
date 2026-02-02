@@ -234,8 +234,64 @@ export const api = {
         `/calories/member/${encodeURIComponent(memberUserId)}/history?${params.toString()}`,
       );
     },
+    analyze: (meals: { food: string; quantity: string; unit: string }[], date?: string, userProfile?: { age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }) =>
+      request<NutritionAnalysisResult>('/calories/analyze', {
+        method: 'POST',
+        body: JSON.stringify({ meals, date, userProfile }),
+      }),
+    getAnalysis: (date: string) => {
+      const params = new URLSearchParams();
+      params.set('date', date);
+      return request<NutritionAnalysisResult | null>(`/calories/analysis?${params.toString()}`);
+    },
+    getReferenceFoods: () => request<ReferenceFood[]>('/calories/reference-foods'),
   },
 };
+
+export interface ReferenceFood {
+  id: string;
+  name: string;
+  defaultUnit: string;
+  units: string[];
+}
+
+export interface FoodNutritionBreakdown {
+  name: string;
+  quantity: string;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbohydrates: number;
+  fat: number;
+  fiber: number;
+  vitamins?: Record<string, number>;
+  minerals?: Record<string, number>;
+}
+
+export interface NutrientStatus {
+  nutrient: string;
+  status: 'deficient' | 'slightly_low' | 'optimal' | 'excess';
+  message?: string;
+  current?: number;
+  recommended?: number;
+  unit?: string;
+}
+
+export interface ImprovementRecommendation {
+  title?: string;
+  foods: string[];
+  portions?: string[];
+  swaps?: string[];
+}
+
+export interface NutritionAnalysisResult {
+  perFood: FoodNutritionBreakdown[];
+  dailyTotal: { calories: number; protein: number; carbohydrates: number; fat: number; fiber: number; vitamins?: Record<string, number>; minerals?: Record<string, number> };
+  rdiPercentage: Record<string, number | Record<string, number>>;
+  deficiencies: NutrientStatus[];
+  suggestions: string[];
+  improvements: ImprovementRecommendation[];
+}
 
 export interface AiMember {
   id: string;

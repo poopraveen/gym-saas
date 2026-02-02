@@ -18,6 +18,11 @@ import type {
   CalorieDaySummary,
   CalorieHistoryEntry,
   AiMember,
+  ReferenceFood,
+  NutritionAnalysisResult,
+  FoodNutritionBreakdown,
+  NutrientStatus,
+  ImprovementRecommendation,
 } from '../api/client';
 import Layout from '../components/Layout';
 import './NutritionAI.css';
@@ -82,6 +87,21 @@ export default function NutritionAI() {
   const [memberProgressLoading, setMemberProgressLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyRefreshInProgressRef = useRef(false);
+
+  /** Nutrition Analysis (one-shot AI): reference foods, meal list, result */
+  const [referenceFoods, setReferenceFoods] = useState<ReferenceFood[]>([]);
+  const [analysisMeals, setAnalysisMeals] = useState<{ food: string; quantity: string; unit: string }[]>([]);
+  const [analysisDate, setAnalysisDate] = useState<string>(() => toDateOnly(new Date()));
+  const [analysisResult, setAnalysisResult] = useState<NutritionAnalysisResult | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState('');
+  const [foodPopupItem, setFoodPopupItem] = useState<FoodNutritionBreakdown | null>(null);
+  /** Optional profile sent to analyze (age, gender, height, weight, goal) */
+  const [userProfile, setUserProfile] = useState<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }>({});
+  /** Add-food form: selected food, quantity, unit */
+  const [addFoodName, setAddFoodName] = useState('');
+  const [addFoodQty, setAddFoodQty] = useState('1');
+  const [addFoodUnit, setAddFoodUnit] = useState('');
 
   const todayStr = toDateOnly(new Date());
 
@@ -157,6 +177,18 @@ export default function NutritionAI() {
       api.auth.getAiMembers().then((list) => setAiMembers(list || [])).catch(() => setAiMembers([]));
     }
   }, [isMember]);
+
+  /** Load reference foods for nutrition analysis (members only) */
+  useEffect(() => {
+    if (!isMember) return;
+    api.calories.getReferenceFoods().then(setReferenceFoods).catch(() => setReferenceFoods([]));
+  }, [isMember]);
+
+  /** Load saved analysis when analysis date changes (members only) */
+  useEffect(() => {
+    if (!isMember || !analysisDate) return;
+    api.calories.getAnalysis(analysisDate).then((r) => setAnalysisResult(r ?? null)).catch(() => setAnalysisResult(null));
+  }, [isMember, analysisDate]);
 
   const loadMemberProgress = async (member: AiMember) => {
     setSelectedMember(member);
@@ -326,6 +358,69 @@ export default function NutritionAI() {
     navigate('/');
   };
 
+  /** Add one meal item to analysis list (from reference food + quantity + unit) */
+  const handleAddAnalysisMeal = () => {
+    const name = addFoodName.trim();
+    const qty = addFoodQty.trim() || '1';
+    const unit = addFoodUnit.trim() || 'serving';
+    if (!name) return;
+    const ref = referenceFoods.find((f) => f.name.toLowerCase() === name.toLowerCase());
+    const defaultUnit = ref?.defaultUnit ?? 'serving';
+    setAnalysisMeals((prev) => [...prev, { food: name, quantity: qty, unit: unit || defaultUnit }]);
+    setAddFoodName('');
+    setAddFoodQty('1');
+    setAddFoodUnit(ref?.defaultUnit ?? '');
+  };
+
+  const removeAnalysisMealAt = (index: number) => {
+    setAnalysisMeals((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  /** Run full nutrition analysis (one AI call), then show result and save */
+  const handleRunAnalysis = async () => {
+    if (analysisMeals.length === 0 || analysisLoading) return;
+    setAnalysisError('');
+    setAnalysisLoading(true);
+    try {
+      const result = await api.calories.analyze(analysisMeals, analysisDate, Object.keys(userProfile).length ? userProfile : undefined);
+      setAnalysisResult(result);
+    } catch (err) {
+      setAnalysisError(getApiErrorMessage(err));
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
+  /** When user selects a reference food, set default unit */
+  const onSelectReferenceFood = (name: string) => {
+    setAddFoodName(name);
+    const ref = referenceFoods.find((f) => f.name === name);
+    if (ref) {
+      setAddFoodUnit(ref.defaultUnit);
+      if (!addFoodQty || addFoodQty === '0') setAddFoodQty('1');
+    }
+  };
+
+  /** Status label/color for deficiency display */
+  const nutrientStatusClass = (status: NutrientStatus['status']) => {
+    switch (status) {
+      case 'deficient': return 'status-deficient';
+      case 'slightly_low': return 'status-slightly-low';
+      case 'optimal': return 'status-optimal';
+      case 'excess': return 'status-excess';
+      default: return '';
+    }
+  };
+  const nutrientStatusLabel = (status: NutrientStatus['status']) => {
+    switch (status) {
+      case 'deficient': return '🔴 Deficient';
+      case 'slightly_low': return '🟡 Slightly low';
+      case 'optimal': return '🟢 Optimal';
+      case 'excess': return 'Excess';
+      default: return status;
+    }
+  };
+
   return (
     <Layout activeNav="nutrition-ai" onNavChange={handleNavChange} onLogout={handleLogout}>
       <div className="nutrition-ai-page">
@@ -480,6 +575,263 @@ export default function NutritionAI() {
             ) : null;
           })()}
         </section>
+
+        {/* Nutrition Analysis: log foods, one-shot AI analysis, full breakdown + suggestions */}
+        <section className="nutrition-widget analysis-widget">
+          <h2>Log food &amp; get full analysis</h2>
+          <p className="analysis-intro">
+            Select foods and quantities below. Then tap &quot;Analyze my day&quot; to get calories, macros, vitamins, minerals, and personalised suggestions in one go.
+          </p>
+          <div className="analysis-date-row">
+            <label>Date</label>
+            <input
+              type="date"
+              value={analysisDate}
+              onChange={(e) => setAnalysisDate(e.target.value)}
+              max={todayStr}
+              className="analysis-date-input"
+            />
+          </div>
+          <div className="add-food-row">
+            <label>Food</label>
+            <select
+              value={addFoodName}
+              onChange={(e) => onSelectReferenceFood(e.target.value)}
+              className="add-food-select"
+              aria-label="Select food"
+            >
+              <option value="">— Select food —</option>
+              {referenceFoods.map((f) => (
+                <option key={f.id} value={f.name}>{f.name}</option>
+              ))}
+            </select>
+            <label className="add-food-qty-label">Qty</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={addFoodQty}
+              onChange={(e) => setAddFoodQty(e.target.value)}
+              placeholder="1"
+              className="add-food-qty"
+            />
+            <label className="add-food-unit-label">Unit</label>
+            <select
+              value={addFoodUnit || (referenceFoods.find((f) => f.name === addFoodName)?.defaultUnit ?? 'serving')}
+              onChange={(e) => setAddFoodUnit(e.target.value)}
+              className="add-food-unit-select"
+            >
+              {(referenceFoods.find((f) => f.name === addFoodName)?.units ?? ['serving', 'piece', 'cup', 'grams']).map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn-primary btn-add-food"
+              onClick={handleAddAnalysisMeal}
+              disabled={!addFoodName.trim()}
+            >
+              Add
+            </button>
+          </div>
+          {analysisMeals.length > 0 && (
+            <div className="analysis-meals-list">
+              <strong>Meals for this day</strong>
+              <ul>
+                {analysisMeals.map((m, i) => (
+                  <li key={i} className="analysis-meal-item">
+                    <span>{m.food} — {m.quantity} {m.unit}</span>
+                    <button type="button" className="btn-sm btn-remove-meal" onClick={() => removeAnalysisMealAt(i)} aria-label="Remove">Remove</button>
+                  </li>
+                ))}
+              </ul>
+              <div className="analysis-profile-toggle">
+                <label className="profile-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={Object.keys(userProfile).length > 0}
+                    onChange={(e) => { if (!e.target.checked) setUserProfile({}); }}
+                  />
+                  Add profile for better RDI (age, gender, height, weight, goal)
+                </label>
+                {Object.keys(userProfile).length > 0 && (
+                  <div className="analysis-profile-fields">
+                    <input type="number" placeholder="Age" min={1} max={120} value={userProfile.age ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, age: e.target.value ? Number(e.target.value) : undefined }))} />
+                    <select value={userProfile.gender ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, gender: e.target.value || undefined }))}>
+                      <option value="">Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                    <input type="number" placeholder="Height (cm)" min={50} max={250} value={userProfile.heightCm ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, heightCm: e.target.value ? Number(e.target.value) : undefined }))} />
+                    <input type="number" placeholder="Weight (kg)" min={20} max={300} value={userProfile.weightKg ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, weightKg: e.target.value ? Number(e.target.value) : undefined }))} />
+                    <select value={userProfile.goal ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, goal: e.target.value || undefined }))}>
+                      <option value="">Goal</option>
+                      <option value="weight_loss">Weight loss</option>
+                      <option value="muscle_gain">Muscle gain</option>
+                      <option value="maintenance">Maintenance</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn-primary btn-analyze"
+                onClick={handleRunAnalysis}
+                disabled={analysisLoading}
+              >
+                {analysisLoading ? 'Analyzing…' : 'Analyze my day'}
+              </button>
+            </div>
+          )}
+          {analysisError && <div className="analysis-error">{analysisError}</div>}
+        </section>
+
+        {/* Analysis result: daily summary, per-food breakdown, deficiencies, suggestions, improvements */}
+        {analysisResult && (
+          <section className="nutrition-widget analysis-result-widget">
+            <h2>Your nutrition report — {safeDateStr(analysisDate)}</h2>
+            <div className="daily-summary">
+              <h3>Daily total</h3>
+              <div className="daily-summary-grid">
+                <div className="summary-item">
+                  <span className="summary-label">Calories</span>
+                  <span className="summary-value">{analysisResult.dailyTotal.calories} kcal</span>
+                  {typeof analysisResult.rdiPercentage?.calories === 'number' && (
+                    <div className="progress-wrap">
+                      <div className="progress-bar" style={{ width: `${Math.min(100, analysisResult.rdiPercentage.calories)}%` }} />
+                      <span className="progress-pct">{Math.round(analysisResult.rdiPercentage.calories)}% of RDI</span>
+                    </div>
+                  )}
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Protein</span>
+                  <span className="summary-value">{analysisResult.dailyTotal.protein}g</span>
+                  {typeof analysisResult.rdiPercentage?.protein === 'number' && (
+                    <div className="progress-wrap">
+                      <div className="progress-bar" style={{ width: `${Math.min(100, analysisResult.rdiPercentage.protein)}%` }} />
+                      <span className="progress-pct">{Math.round(analysisResult.rdiPercentage.protein)}% of RDI</span>
+                    </div>
+                  )}
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Carbs</span>
+                  <span className="summary-value">{analysisResult.dailyTotal.carbohydrates}g</span>
+                  {typeof analysisResult.rdiPercentage?.carbohydrates === 'number' && (
+                    <div className="progress-wrap">
+                      <div className="progress-bar" style={{ width: `${Math.min(100, analysisResult.rdiPercentage.carbohydrates)}%` }} />
+                      <span className="progress-pct">{Math.round(analysisResult.rdiPercentage.carbohydrates)}% of RDI</span>
+                    </div>
+                  )}
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Fat</span>
+                  <span className="summary-value">{analysisResult.dailyTotal.fat}g</span>
+                  {typeof analysisResult.rdiPercentage?.fat === 'number' && (
+                    <div className="progress-wrap">
+                      <div className="progress-bar" style={{ width: `${Math.min(100, analysisResult.rdiPercentage.fat)}%` }} />
+                      <span className="progress-pct">{Math.round(analysisResult.rdiPercentage.fat)}% of RDI</span>
+                    </div>
+                  )}
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Fiber</span>
+                  <span className="summary-value">{analysisResult.dailyTotal.fiber}g</span>
+                  {typeof analysisResult.rdiPercentage?.fiber === 'number' && (
+                    <div className="progress-wrap">
+                      <div className="progress-bar" style={{ width: `${Math.min(100, analysisResult.rdiPercentage.fiber)}%` }} />
+                      <span className="progress-pct">{Math.round(analysisResult.rdiPercentage.fiber)}% of RDI</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {analysisResult.perFood?.length > 0 && (
+              <div className="per-food-section">
+                <h3>Per food</h3>
+                <ul className="per-food-list">
+                  {analysisResult.perFood.map((food, idx) => (
+                    <li key={idx} className="per-food-item">
+                      <button
+                        type="button"
+                        className="per-food-btn"
+                        onClick={() => setFoodPopupItem(foodPopupItem?.name === food.name ? null : food)}
+                        aria-expanded={foodPopupItem?.name === food.name}
+                      >
+                        <span className="per-food-name">{food.name}</span>
+                        <span className="per-food-qty">{food.quantity} {food.unit}</span>
+                        <span className="per-food-kcal">{food.calories} kcal</span>
+                      </button>
+                      {foodPopupItem?.name === food.name && (
+                        <div className="per-food-popup">
+                          <div className="per-food-macros">
+                            <span>Protein {food.protein}g</span>
+                            <span>Carbs {food.carbohydrates}g</span>
+                            <span>Fat {food.fat}g</span>
+                            <span>Fiber {food.fiber}g</span>
+                          </div>
+                          {(food.vitamins && Object.keys(food.vitamins).length > 0) && (
+                            <div className="per-food-micros">
+                              <strong>Vitamins</strong>
+                              <ul>{Object.entries(food.vitamins).map(([k, v]) => <li key={k}>{k}: {v}</li>)}</ul>
+                            </div>
+                          )}
+                          {(food.minerals && Object.keys(food.minerals).length > 0) && (
+                            <div className="per-food-micros">
+                              <strong>Minerals</strong>
+                              <ul>{Object.entries(food.minerals).map(([k, v]) => <li key={k}>{k}: {v}</li>)}</ul>
+                            </div>
+                          )}
+                          <button type="button" className="btn-sm btn-close-popup" onClick={() => setFoodPopupItem(null)}>Close</button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {analysisResult.deficiencies?.length > 0 && (
+              <div className="deficiencies-section">
+                <h3>Nutrient status</h3>
+                <ul className="deficiencies-list">
+                  {analysisResult.deficiencies.map((d, i) => (
+                    <li key={i} className={`deficiency-item ${nutrientStatusClass(d.status)}`}>
+                      <span className="deficiency-label">{nutrientStatusLabel(d.status)}</span>
+                      <span className="deficiency-nutrient">{d.nutrient}</span>
+                      {d.message && <span className="deficiency-msg">{d.message}</span>}
+                      {d.current != null && d.recommended != null && (
+                        <span className="deficiency-values">{d.current} / {d.recommended} {d.unit ?? ''}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {analysisResult.suggestions?.length > 0 && (
+              <div className="suggestions-section">
+                <h3>Smart suggestions</h3>
+                <ul className="suggestions-list">
+                  {analysisResult.suggestions.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {analysisResult.improvements?.length > 0 && (
+              <div className="improvements-section">
+                <h3>How to improve today&apos;s diet</h3>
+                <ul className="improvements-list">
+                  {analysisResult.improvements.map((rec, i) => (
+                    <li key={i} className="improvement-card">
+                      {rec.title && <strong className="improvement-title">{rec.title}</strong>}
+                      {rec.foods?.length > 0 && <p className="improvement-foods">Foods: {rec.foods.join(', ')}</p>}
+                      {rec.portions?.length > 0 && <p className="improvement-portions">Portions: {rec.portions.join('; ')}</p>}
+                      {rec.swaps?.length > 0 && <p className="improvement-swaps">Swaps: {rec.swaps.join('; ')}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Missing days alert */}
         {missingCount > 0 && (

@@ -1,19 +1,20 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CalorieEntry, CalorieEntrySchema } from './schemas/calorie-entry.schema';
+import { NutritionAnalysis, NutritionAnalysisSchema } from './schemas/nutrition-analysis.schema';
 import { CaloriesController } from './calories.controller';
 import { CaloriesService } from './calories.service';
 import { AuthModule } from '../auth/auth.module';
 
 /**
- * Member-facing calorie tracking. Decoupled from other modules.
- * Single OpenAI-powered chat API; data isolated per tenant and user.
- * Staff can view member progress via /calories/member/:memberUserId/*.
+ * Member-facing calorie tracking + full nutrition analysis (one AI call).
+ * Data isolated per tenant and user. Staff can view member progress.
  */
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: CalorieEntry.name, schema: CalorieEntrySchema },
+      { name: NutritionAnalysis.name, schema: NutritionAnalysisSchema },
     ]),
     AuthModule,
   ],
