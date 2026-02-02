@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { storage, api } from '../api/client';
+import { runDashboardTour } from '../utils/guidedTour';
 import Logo from './Logo';
 import './Layout.css';
 
@@ -95,6 +96,7 @@ export default function Layout({
               key={item.id}
               className={`nav-item ${activeNav === item.id ? 'active' : ''}`}
               onClick={() => handleNav(item.id)}
+              data-tour={`nav-${item.id}`}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
@@ -108,7 +110,11 @@ export default function Layout({
               <span className="nav-label">Platform Admin</span>
             </button>
           )}
-          <button className="nav-item" onClick={toggleTheme}>
+          <button type="button" className="nav-item" onClick={() => { closeDrawer(); runDashboardTour(); }} data-tour="tour-trigger">
+            <span className="nav-icon">📖</span>
+            <span className="nav-label">Guide</span>
+          </button>
+          <button type="button" className="nav-item" onClick={toggleTheme} data-tour="theme-toggle">
             <span className="nav-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
             <span className="nav-label">{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
           </button>

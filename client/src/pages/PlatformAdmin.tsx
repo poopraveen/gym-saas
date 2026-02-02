@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, storage } from '../api/client';
+import OnboardingGuideModal from '../components/OnboardingGuideModal';
+import { runPlatformTour } from '../utils/guidedTour';
 import './PlatformAdmin.css';
 
 type Tenant = { _id: string; name: string; slug?: string; subdomain?: string; isActive?: boolean };
@@ -37,6 +39,7 @@ export default function PlatformAdmin() {
   const [detailModal, setDetailModal] = useState<TenantDetails | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [showOnboardingGuide, setShowOnboardingGuide] = useState(false);
 
   useEffect(() => {
     if (storage.getRole() !== 'SUPER_ADMIN') {
@@ -117,17 +120,27 @@ export default function PlatformAdmin() {
       <header className="platform-header">
         <h1>Platform Admin</h1>
         <div className="platform-actions">
-          <button onClick={() => navigate('/')}>Go to Dashboard</button>
-          <button onClick={handleLogout}>Logout</button>
+          <button type="button" className="btn-outline" onClick={() => runPlatformTour()}>
+            📖 Take a tour
+          </button>
+          <button type="button" className="btn-outline" onClick={() => setShowOnboardingGuide(true)} data-tour="platform-onboarding-guide">
+            📄 Onboarding guide
+          </button>
+          <button type="button" onClick={() => navigate('/')} data-tour="platform-go-dashboard">Go to Dashboard</button>
+          <button type="button" onClick={handleLogout}>Logout</button>
         </div>
       </header>
 
       {error && <div className="platform-error">{error}</div>}
 
-      <section className="platform-section">
+      {showOnboardingGuide && (
+        <OnboardingGuideModal onClose={() => setShowOnboardingGuide(false)} />
+      )}
+
+      <section className="platform-section" data-tour="platform-tenants-table">
         <div className="platform-section-header">
           <h2>Tenants</h2>
-          <button className="btn-primary" onClick={() => setCreateOpen(true)}>Create Tenant</button>
+          <button type="button" className="btn-primary" onClick={() => setCreateOpen(true)} data-tour="platform-create-tenant">Create Tenant</button>
         </div>
 
         <table className="platform-table">
