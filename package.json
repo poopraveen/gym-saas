@@ -5,6 +5,7 @@
   "scripts": {
     "build": "nest build",
     "seed": "ts-node src/scripts/seed.ts",
+    "reset-admin": "ts-node src/scripts/reset-admin.ts",
     "import:gym-users": "ts-node src/scripts/import-gym-users.ts",
     "start": "node dist/main",
     "start:dev": "nest start --watch",

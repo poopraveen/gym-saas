@@ -179,4 +179,12 @@ export class MembersService {
     const r = await this.memberModel.findOne({ tenantId }).sort({ regNo: -1 }).select('regNo').lean();
     return r?.regNo ?? 0;
   }
+
+  /** Check if a member exists by phone (for enquiry conversion duplicate check). */
+  async findByPhone(tenantId: string, phoneNumber: string): Promise<Record<string, unknown> | null> {
+    const normalized = String(phoneNumber || '').trim();
+    if (!normalized) return null;
+    const m = await this.memberModel.findOne({ tenantId, phoneNumber: normalized }).lean();
+    return m ? (m as unknown as Record<string, unknown>) : null;
+  }
 }

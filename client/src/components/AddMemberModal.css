@@ -91,6 +91,19 @@
   color: var(--text-primary);
 }
 
+.input-readonly {
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.enquiry-followup-context {
+  padding: 0 24px 12px;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
 .form-section {
   margin-bottom: 20px;
 }

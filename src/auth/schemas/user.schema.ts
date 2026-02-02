@@ -24,4 +24,5 @@ export class User extends Document {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+// Unique per tenant (email can exist in multiple tenants)
 UserSchema.index({ tenantId: 1, email: 1 }, { unique: true });

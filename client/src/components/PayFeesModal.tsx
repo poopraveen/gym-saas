@@ -32,6 +32,7 @@ export default function PayFeesModal({ member, onClose, onSave }: PayFeesModalPr
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [customDueDate, setCustomDueDate] = useState<Date | null>(null);
 
   useEffect(() => {
     api.legacy.getNextReceiptId().then((r) => setReceiptId(r.receiptId)).catch(() => setReceiptId('—'));
@@ -42,8 +43,16 @@ export default function PayFeesModal({ member, onClose, onSave }: PayFeesModalPr
     setAmount(amt);
   }, [pack, duration]);
 
+  useEffect(() => {
+    setCustomDueDate(null);
+  }, [startFromToday, pack, duration, currentDue?.getTime()]);
+
   const baseDate = startFromToday ? today : (currentDue || today);
-  const newDueDate = addMonths(baseDate, duration);
+  const computedDueDate = addMonths(baseDate, duration);
+  const todayStr = format(today, 'yyyy-MM-dd');
+  const maxDueDate = today;
+  const newDueDateRaw = customDueDate ?? computedDueDate;
+  const newDueDate = isAfter(newDueDateRaw, maxDueDate) ? maxDueDate : newDueDateRaw;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,7 +142,19 @@ export default function PayFeesModal({ member, onClose, onSave }: PayFeesModalPr
             </div>
             <div className="form-row pf-new-due">
               <label>New due date</label>
-              <span className="pf-due-value">{format(newDueDate, 'MMM d, yyyy')}</span>
+              <input
+                type="date"
+                value={format(newDueDate, 'yyyy-MM-dd')}
+                max={todayStr}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v) setCustomDueDate(new Date(v));
+                  else setCustomDueDate(null);
+                }}
+                className="pf-due-input"
+                title="Only today or past dates (future disabled)"
+              />
+              <span className="pf-due-hint">Computed: {format(computedDueDate, 'MMM d, yyyy')}. Only today or past allowed.</span>
             </div>
           </div>
           <div className="form-row">

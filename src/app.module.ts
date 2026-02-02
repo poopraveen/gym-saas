@@ -10,6 +10,8 @@ import { ProfileUsersModule } from './profile-users/profile-users.module';
 import { LegacyModule } from './legacy/legacy.module';
 import { FollowUpsModule } from './follow-ups/follow-ups.module';
 import { AtlasMembersModule } from './atlas-members/atlas-members.module';
+import { PlatformModule } from './platform/platform.module';
+import { EnquiriesModule } from './enquiries/enquiries.module';
 
 @Module({
   controllers: [AppController],
@@ -24,6 +26,8 @@ import { AtlasMembersModule } from './atlas-members/atlas-members.module';
     LegacyModule,
     FollowUpsModule,
     AtlasMembersModule,
+    PlatformModule,
+    EnquiriesModule,
   ],
 })
 export class AppModule {}

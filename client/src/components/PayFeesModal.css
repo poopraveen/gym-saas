@@ -62,8 +62,29 @@
 
 .pf-new-due {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.pf-due-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.pf-due-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.pf-due-hint {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
 }
 
 .pf-due-value {

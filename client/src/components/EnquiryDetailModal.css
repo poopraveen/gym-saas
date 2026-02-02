@@ -1,0 +1,148 @@
+.modal.modal-detail {
+  max-width: 560px;
+}
+
+.enquiry-detail-body {
+  padding: 0 24px 24px;
+}
+
+.enquiry-detail-body .detail-section {
+  margin-bottom: 24px;
+}
+
+.enquiry-detail-body .detail-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.enquiry-detail-body .detail-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 20px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.enquiry-detail-body .detail-dl dt {
+  margin: 0;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.enquiry-detail-body .detail-dl dd {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.detail-notes {
+  grid-column: 2;
+}
+
+.detail-phone-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-phone-row .whatsapp-btn {
+  flex-shrink: 0;
+}
+
+.detail-muted {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.followup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.followup-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.followup-item:last-child {
+  border-bottom: none;
+}
+
+.followup-date {
+  font-weight: 500;
+  margin-right: 10px;
+}
+
+.followup-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--hover-bg);
+  font-size: 0.8rem;
+  margin-right: 8px;
+}
+
+.followup-notes {
+  margin: 6px 0 0 0;
+  color: var(--text-primary);
+}
+
+.followup-next {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--primary);
+}
+
+.enquiry-detail-actions {
+  flex-wrap: wrap;
+}
+
+.enquiry-detail-actions .btn-lost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.enquiry-detail-actions .btn-lost:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.enquiry-detail-actions .btn-mark-new {
+  border-color: var(--primary);
+}
+
+.enquiry-detail-body .status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.enquiry-detail-body .status-badge.status-New {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--primary);
+}
+
+.enquiry-detail-body .status-badge.status-Follow-up {
+  background: rgba(234, 179, 8, 0.2);
+  color: #b45309;
+}
+
+.enquiry-detail-body .status-badge.status-Converted {
+  background: rgba(34, 197, 94, 0.2);
+  color: #15803d;
+}
+
+.enquiry-detail-body .status-badge.status-Lost {
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+}

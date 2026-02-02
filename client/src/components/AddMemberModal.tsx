@@ -134,7 +134,9 @@ export default function AddMemberModal({
             <input
               type="date"
               value={format(new Date(form['Date of Joining']), 'yyyy-MM-dd')}
+              max={format(new Date(), 'yyyy-MM-dd')}
               onChange={(e) => update('Date of Joining', new Date(e.target.value).getTime())}
+              title="Future dates disabled"
             />
           </div>
           <div className="form-row">

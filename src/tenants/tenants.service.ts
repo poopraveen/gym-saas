@@ -1,7 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Tenant } from './schemas/tenant.schema';
+import { Tenant, TenantBranding, ThemeType } from './schemas/tenant.schema';
+
+export interface CreateTenantDto {
+  name: string;
+  slug?: string;
+  subdomain?: string;
+  customDomain?: string;
+  adminEmail: string;
+  adminPassword: string;
+  adminName?: string;
+  defaultTheme?: ThemeType;
+  branding?: TenantBranding;
+}
+
+export interface UpdateTenantDto {
+  name?: string;
+  subdomain?: string;
+  customDomain?: string;
+  isActive?: boolean;
+  defaultTheme?: ThemeType;
+  branding?: Partial<TenantBranding>;
+}
 
 @Injectable()
 export class TenantsService {
@@ -9,9 +30,44 @@ export class TenantsService {
     @InjectModel(Tenant.name) private tenantModel: Model<Tenant>,
   ) {}
 
-  async create(name: string, slug?: string): Promise<Tenant> {
+  async create(
+    name: string,
+    slug?: string,
+    options?: { subdomain?: string; defaultTheme?: string; branding?: Record<string, unknown> },
+  ): Promise<Tenant> {
     const s = slug || name.toLowerCase().replace(/\s+/g, '-');
-    return this.tenantModel.create({ name, slug: s });
+    const subdomain = options?.subdomain ?? s;
+    return this.tenantModel.create({
+      name,
+      slug: s,
+      subdomain,
+      defaultTheme: (options?.defaultTheme as 'light' | 'dark') || 'dark',
+      branding: options?.branding,
+    });
+  }
+
+  /** Public config for login page or app (name, logo, background, theme). Use tenantId when available (after login). */
+  async getPublicConfig(host?: string, tenantId?: string) {
+    let tenant: Record<string, unknown> | null = null;
+    if (tenantId) {
+      const byId = await this.findById(tenantId);
+      tenant = byId as Record<string, unknown> | null;
+    }
+    if (!tenant && host && host !== 'localhost' && host !== '127.0.0.1') {
+      const byHost = await this.findBySubdomainOrDomain(host);
+      tenant = byHost as Record<string, unknown> | null;
+    }
+    if (!tenant) {
+      return { name: 'Reps & Dips', theme: 'dark' };
+    }
+    const t = tenant as { name?: string; defaultTheme?: string; branding?: { logo?: string; backgroundImage?: string; primaryColor?: string } };
+    return {
+      name: t.name || 'Gym',
+      theme: t.defaultTheme || 'dark',
+      logo: t.branding?.logo,
+      backgroundImage: t.branding?.backgroundImage,
+      primaryColor: t.branding?.primaryColor,
+    };
   }
 
   async findAll() {
@@ -22,7 +78,41 @@ export class TenantsService {
     return this.tenantModel.findById(id).lean();
   }
 
+  async ensureSubdomain(tenantId: string, subdomain: string) {
+    await this.tenantModel.updateOne(
+      { _id: tenantId },
+      { $set: { subdomain } },
+    );
+  }
+
+  async updateTenant(tenantId: string, dto: UpdateTenantDto) {
+    const update: Record<string, unknown> = {};
+    if (dto.name != null) update.name = dto.name;
+    if (dto.subdomain != null) update.subdomain = dto.subdomain;
+    if (dto.customDomain != null) update.customDomain = dto.customDomain;
+    if (dto.isActive != null) update.isActive = dto.isActive;
+    if (dto.defaultTheme != null) update.defaultTheme = dto.defaultTheme;
+    if (dto.branding != null) update.branding = dto.branding;
+    await this.tenantModel.updateOne({ _id: tenantId }, { $set: update });
+    return this.findById(tenantId);
+  }
+
   async findBySlug(slug: string) {
     return this.tenantModel.findOne({ slug }).lean();
+  }
+
+  async findBySubdomainOrDomain(host: string) {
+    if (!host) return null;
+    const normalized = host.replace(/:\d+$/, '').toLowerCase();
+    const subdomain = normalized.split('.')[0];
+    if (subdomain && subdomain !== 'www') {
+      const byCustom = await this.tenantModel.findOne({ customDomain: normalized }).lean();
+      if (byCustom) return byCustom;
+      const bySubOrSlug = await this.tenantModel
+        .findOne({ $or: [{ subdomain }, { slug: subdomain }] })
+        .lean();
+      if (bySubOrSlug) return bySubOrSlug;
+    }
+    return this.tenantModel.findOne({ customDomain: normalized }).lean();
   }
 }

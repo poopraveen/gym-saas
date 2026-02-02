@@ -62,6 +62,8 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<StatusType | 'all'>('all');
   const [sortBy, setSortBy] = useState<'default' | 'expired' | 'soon' | 'valid' | 'new'>('default');
   const [searchQuery, setSearchQuery] = useState('');
+  const [membersPage, setMembersPage] = useState(1);
+  const [membersPageSize, setMembersPageSize] = useState(10);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState<Member | null>(null);
   const [showPayFeesModal, setShowPayFeesModal] = useState<Member | null>(null);
@@ -145,6 +147,18 @@ export default function Dashboard() {
     }
     return list;
   })();
+
+  const totalMembersCount = filteredMembers.length;
+  const totalPages = Math.max(1, Math.ceil(totalMembersCount / membersPageSize));
+  const effectivePage = Math.min(membersPage, totalPages) || 1;
+  const paginatedMembers = filteredMembers.slice(
+    (effectivePage - 1) * membersPageSize,
+    effectivePage * membersPageSize,
+  );
+
+  useEffect(() => {
+    setMembersPage(1);
+  }, [filter, statusFilter, sortBy, searchQuery]);
 
   const loadFinance = async () => {
     if (activeNav === 'dashboard') setDashboardLoading(true);
@@ -230,6 +244,10 @@ export default function Dashboard() {
     return () => ro.disconnect();
   }, [activeNav, filter, statusFilter, searchQuery, loading, filteredMembers.length]);
 
+  useEffect(() => {
+    if (membersPage > totalPages && totalPages >= 1) setMembersPage(totalPages);
+  }, [totalPages, membersPage]);
+
   const handleCheckIn = async () => {
     const regNo = parseInt(regNoInput, 10);
     if (isNaN(regNo)) return;
@@ -275,6 +293,10 @@ export default function Dashboard() {
   };
 
   const handleNavChange = (id: string) => {
+    if (id === 'enquiries') {
+      navigate('/enquiries');
+      return;
+    }
     if (id === 'add') {
       setActiveNav('add');
       setShowAddModal(true);
@@ -657,6 +679,7 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
+            <>
             <div className={`people-layout ${selectedMember ? 'has-detail' : ''}`}>
               <div className="people-list">
                 <div className="people-list-body">
@@ -669,7 +692,7 @@ export default function Dashboard() {
                     <span></span>
                     <span></span>
                   </div>
-                {filteredMembers.map((row) => {
+                {paginatedMembers.map((row) => {
                   const mid = (row as Record<string, unknown>).memberId as string;
                   const fu = followUps[mid];
                   const isExpanded = expandedMember === mid;
@@ -824,6 +847,67 @@ export default function Dashboard() {
                 </aside>
               )}
             </div>
+            <div className="pagination-bar">
+              <div className="pagination-info">
+                Showing {(effectivePage - 1) * membersPageSize + 1}–{Math.min(effectivePage * membersPageSize, totalMembersCount)} of {totalMembersCount}
+              </div>
+              <div className="pagination-controls">
+                <label className="pagination-page-size">
+                  <span>Per page</span>
+                  <select
+                    value={membersPageSize}
+                    onChange={(e) => { setMembersPageSize(Number(e.target.value)); setMembersPage(1); }}
+                    className="pagination-select"
+                  >
+                    {[10, 20, 50, 100].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="pagination-btn"
+                  disabled={effectivePage <= 1}
+                  onClick={() => setMembersPage((p) => Math.max(1, p - 1))}
+                  aria-label="Previous page"
+                >
+                  Previous
+                </button>
+                <span className="pagination-page-nums">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - effectivePage) <= 1)
+                    .reduce<number[]>((acc, p, i, arr) => {
+                      if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push(-1);
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, idx) =>
+                      p === -1 ? (
+                        <span key={`ellipsis-${idx}`} className="pagination-ellipsis">…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`pagination-btn pagination-num ${p === effectivePage ? 'active' : ''}`}
+                          onClick={() => setMembersPage(p)}
+                        >
+                          {p}
+                        </button>
+                      ),
+                    )}
+                </span>
+                <button
+                  type="button"
+                  className="pagination-btn"
+                  disabled={effectivePage >= totalPages}
+                  onClick={() => setMembersPage((p) => Math.min(totalPages, p + 1))}
+                  aria-label="Next page"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
           )}
         </div>
       )}

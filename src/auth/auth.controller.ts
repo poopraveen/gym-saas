@@ -19,9 +19,16 @@ export class AuthController {
   async login(
     @Body() body: { email: string; password: string },
     @Headers('x-tenant-id') tenantId: string,
+    @Headers('host') host: string,
+    @Headers('x-forwarded-host') forwardedHost: string,
   ) {
-    if (!tenantId) throw new BadRequestException('X-Tenant-ID header required');
-    return this.authService.login(body.email, body.password, tenantId);
+    const resolvedHost = forwardedHost || host;
+    return this.authService.login(
+      body.email,
+      body.password,
+      tenantId || undefined,
+      resolvedHost,
+    );
   }
 
   @Post('register')

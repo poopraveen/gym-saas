@@ -75,13 +75,16 @@
   gap: 12px;
 }
 
-.logo-icon {
+.logo-icon,
+.logo-img {
   width: 40px;
   height: 40px;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
-.logo-compact .logo-icon {
+.logo-compact .logo-icon,
+.logo-compact .logo-img {
   width: 36px;
   height: 36px;
 }

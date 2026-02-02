@@ -7,6 +7,29 @@
   background: var(--bg);
 }
 
+.login-page[style*='backgroundImage']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 0;
+}
+
+.login-page[style*='backgroundImage'] {
+  position: relative;
+}
+
+.login-page[style*='backgroundImage'] .login-card {
+  position: relative;
+  z-index: 1;
+}
+
+.login-brand-logo {
+  max-width: 160px;
+  max-height: 80px;
+  object-fit: contain;
+}
+
 .login-card {
   width: 100%;
   max-width: 400px;

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { storage, api } from '../api/client';
 import Logo from './Logo';
 import './Layout.css';
 
 type NavItem = { id: string; label: string; icon: string };
+
+type TenantConfig = { name: string; logo?: string };
 
 export default function Layout({
   children,
@@ -12,14 +16,17 @@ export default function Layout({
   onLogout,
 }: {
   children: React.ReactNode;
-  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance';
+  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries';
   onNavChange: (id: string) => void;
   onLogout: () => void;
 }) {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const isSuperAdmin = storage.getRole() === 'SUPER_ADMIN';
   const [showScrollTop, setShowScrollTop] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
+  const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
 
   useEffect(() => {
     const el = mainRef.current;
@@ -29,10 +36,22 @@ export default function Layout({
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
+  useEffect(() => {
+    const tenantId = storage.getTenantId();
+    if (!tenantId) {
+      setTenantConfig(null);
+      return;
+    }
+    api.tenant.getConfig(undefined, tenantId)
+      .then((c) => setTenantConfig({ name: c.name, logo: c.logo }))
+      .catch(() => setTenantConfig(null));
+  }, []);
+
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'main', label: 'People', icon: '👥' },
     { id: 'add', label: 'Add Member', icon: '➕' },
+    { id: 'enquiries', label: 'Enquiry Members', icon: '📋' },
     { id: 'checkin', label: 'Attendance', icon: '✓' },
     { id: 'finance', label: 'Finance', icon: '💰' },
   ];
@@ -61,14 +80,14 @@ export default function Layout({
           <span className={`hamburger ${drawerOpen ? 'open' : ''}`} />
           <span className={`hamburger ${drawerOpen ? 'open' : ''}`} />
         </button>
-        <Logo compact />
+        <Logo compact tenantName={tenantConfig?.name} logoUrl={tenantConfig?.logo} />
       </header>
 
       <div className={`drawer-overlay ${drawerOpen ? 'visible' : ''}`} onClick={closeDrawer} aria-hidden />
 
       <aside className={`drawer ${drawerOpen ? 'open' : ''}`}>
         <div className="drawer-header">
-          <Logo />
+          <Logo tenantName={tenantConfig?.name} logoUrl={tenantConfig?.logo} />
         </div>
         <nav className="drawer-nav">
           {navItems.map((item) => (
@@ -83,6 +102,12 @@ export default function Layout({
           ))}
         </nav>
         <div className="drawer-footer">
+          {isSuperAdmin && (
+            <button className="nav-item" onClick={() => { closeDrawer(); navigate('/platform'); }}>
+              <span className="nav-icon">⚙️</span>
+              <span className="nav-label">Platform Admin</span>
+            </button>
+          )}
           <button className="nav-item" onClick={toggleTheme}>
             <span className="nav-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
             <span className="nav-label">{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
