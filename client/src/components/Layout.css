@@ -4,7 +4,7 @@
   min-height: 100vh;
 }
 
-/* Top bar - always visible */
+/* Top bar - fixed at viewport top so it never scrolls away */
 .topbar {
   display: flex;
   align-items: center;
@@ -12,8 +12,10 @@
   padding: 12px 20px;
   background: var(--card-bg);
   border-bottom: 1px solid var(--border);
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
 }
 
@@ -195,6 +197,7 @@
 .main-content {
   flex: 1;
   padding: 0;
+  padding-top: 56px; /* kept in sync with .topbar height so content is not under header */
   overflow: auto;
   background: var(--bg);
   position: relative;

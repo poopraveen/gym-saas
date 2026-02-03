@@ -20,14 +20,16 @@
 
 .people-sticky-top {
   flex-shrink: 0;
-  background: var(--bg);
+  width: 100%;
+  background: var(--bg, #22252a);
   padding: 0 0 16px 0;
   margin-bottom: 0;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  isolation: isolate;
 }
 
 .people-list-scroll {
@@ -290,7 +292,8 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 24px;
-  margin-top: 20px;
+  margin-top: 24px;
+  padding-top: 4px;
   position: relative;
   z-index: 1;
 }
