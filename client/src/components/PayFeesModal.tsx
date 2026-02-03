@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { format, addMonths, isAfter, differenceInDays } from 'date-fns';
+import { format, addMonths, addYears, isAfter, differenceInDays } from 'date-fns';
 import { api } from '../api/client';
 import './PayFeesModal.css';
 
@@ -49,10 +49,8 @@ export default function PayFeesModal({ member, onClose, onSave }: PayFeesModalPr
 
   const baseDate = startFromToday ? today : (currentDue || today);
   const computedDueDate = addMonths(baseDate, duration);
-  const todayStr = format(today, 'yyyy-MM-dd');
-  const maxDueDate = today;
   const newDueDateRaw = customDueDate ?? computedDueDate;
-  const newDueDate = isAfter(newDueDateRaw, maxDueDate) ? maxDueDate : newDueDateRaw;
+  const newDueDate = newDueDateRaw;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,16 +143,16 @@ export default function PayFeesModal({ member, onClose, onSave }: PayFeesModalPr
               <input
                 type="date"
                 value={format(newDueDate, 'yyyy-MM-dd')}
-                max={todayStr}
+                max={format(addYears(new Date(), 10), 'yyyy-MM-dd')}
                 onChange={(e) => {
                   const v = e.target.value;
                   if (v) setCustomDueDate(new Date(v));
                   else setCustomDueDate(null);
                 }}
                 className="pf-due-input"
-                title="Only today or past dates (future disabled)"
+                title="Today and future dates enabled"
               />
-              <span className="pf-due-hint">Computed: {format(computedDueDate, 'MMM d, yyyy')}. Only today or past allowed.</span>
+              <span className="pf-due-hint">Computed: {format(computedDueDate, 'MMM d, yyyy')}. You can select any date including future.</span>
             </div>
           </div>
           <div className="form-row">
