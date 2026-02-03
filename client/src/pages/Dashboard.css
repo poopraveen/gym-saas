@@ -18,14 +18,15 @@
   min-height: 100%;
 }
 
+/* Sticky header: stick below the fixed app topbar (56px) so it never hides under it */
 .people-sticky-top {
   flex-shrink: 0;
   width: 100%;
   background: var(--bg, #22252a);
-  padding: 0 0 16px 0;
+  padding: 20px 0 16px 0;
   margin-bottom: 0;
   position: sticky;
-  top: 0;
+  top: 56px; /* match Layout.css .main-content padding-top / topbar height */
   z-index: 20;
   border-bottom: 1px solid var(--border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -85,11 +86,13 @@
   align-items: center;
   gap: 16px;
   margin-bottom: 16px;
+  width: 100%;
 }
 
 .search-row {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .status-filter-pills {
@@ -97,6 +100,7 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .status-pill {
@@ -1003,6 +1007,21 @@
 }
 
 @media (max-width: 768px) {
+  .people-sticky-top {
+    top: 56px;
+    padding: 16px 0 12px 0;
+  }
+  .search-and-status-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .search-row {
+    flex: none;
+    max-width: none;
+  }
+  .search-input {
+    max-width: none;
+  }
   .people-list-header {
     display: none;
   }
