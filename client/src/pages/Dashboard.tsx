@@ -692,16 +692,17 @@ export default function Dashboard() {
             <>
             <div className={`people-layout ${selectedMember ? 'has-detail' : ''}`}>
               <div className="people-list" data-tour="people-list">
-                <div className="people-list-body">
-                  <div className="people-list-header">
-                    <span></span>
-                    <span>Member</span>
-                    <span>Phone</span>
-                    <span>Subscription</span>
-                    <span>Status</span>
-                    <span></span>
-                    <span></span>
-                  </div>
+                <div className="people-list-header">
+                  <span></span>
+                  <span>Member</span>
+                  <span>Phone</span>
+                  <span>Subscription</span>
+                  <span>Status</span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div className="people-list-body-scroll">
+                  <div className="people-list-body">
                 {paginatedMembers.map((row, rowIndex) => {
                   const mid = (row as Record<string, unknown>).memberId as string;
                   const fu = followUps[mid];
@@ -792,6 +793,7 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
+                  </div>
                 </div>
               </div>
               {selectedMember && (

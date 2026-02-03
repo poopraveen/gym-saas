@@ -306,19 +306,15 @@
 .people-list {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  max-height: 70vh;
   background: rgba(43, 46, 50, 0.75);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  overflow: hidden;
+  overflow: clip;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
-}
-
-.people-list-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
 }
 
 .people-list-header {
@@ -334,10 +330,21 @@
   letter-spacing: 0.04em;
   color: var(--text-secondary);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  position: sticky;
-  top: var(--sticky-top-height, 180px);
-  z-index: 5;
   flex-shrink: 0;
+  z-index: 5;
+}
+
+.people-list-body-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.people-list-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .people-item {
