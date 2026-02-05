@@ -17,6 +17,14 @@ function toValidNumber(val: unknown): number {
   return match ? parseInt(match[0], 10) : 0;
 }
 
+function toValidOptionalNumber(val: unknown): number | undefined {
+  if (val == null || val === '') return undefined;
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  const s = String(val).trim();
+  const match = s.match(/\d+(\.\d+)?/);
+  return match ? parseFloat(match[0]) : undefined;
+}
+
 /** Maps legacy API field names to schema. */
 function mapToMember(dto: Record<string, unknown>, tenantId: string): Partial<Member> {
   return {
@@ -24,8 +32,13 @@ function mapToMember(dto: Record<string, unknown>, tenantId: string): Partial<Me
     regNo: toValidNumber(dto['Reg No:'] ?? dto.regNo),
     name: (dto['NAME'] ?? dto.name) as string,
     gender: (dto['Gender'] ?? dto.gender) as string,
+    age: toValidOptionalNumber(dto.age ?? dto['Age']),
+    heightCm: toValidOptionalNumber(dto.heightCm ?? dto['Height (cm)'] ?? dto.height),
+    weightKg: toValidOptionalNumber(dto.weightKg ?? dto['Weight (kg)'] ?? dto.weight),
+    goal: (dto.goal ?? dto['Goal']) != null ? String(dto.goal ?? dto['Goal']).trim() || undefined : undefined,
     dateOfJoining: toValidDate(dto['Date of Joining'] ?? dto.dateOfJoining),
     phoneNumber: String(dto['Phone Number'] ?? dto.phoneNumber ?? ''),
+    email: (dto['Email'] ?? dto.email) != null ? String(dto['Email'] ?? dto.email).trim() || undefined : undefined,
     typeofPack: (dto['Typeof pack'] ?? dto.typeofPack) as string,
     dueDate: toValidDate(dto['DUE DATE'] ?? dto.dueDate),
     feesOptions: toValidNumber(dto['Fees Options'] ?? dto.feesOptions),
@@ -47,6 +60,7 @@ function mapToLegacy(m: Member): Record<string, unknown> {
     Gender: m.gender,
     'Date of Joining': m.dateOfJoining,
     'Phone Number': m.phoneNumber,
+    Email: m.email,
     'Typeof pack': m.typeofPack,
     'DUE DATE': m.dueDate,
     'Fees Options': m.feesOptions,
@@ -209,5 +223,51 @@ export class MembersService {
     const row = mapToLegacy(m as unknown as Member);
     (row as Record<string, unknown>).memberId = `GYM-${year}-${String(regNo).padStart(5, '0')}`;
     return row;
+  }
+
+  /**
+   * Update member email (e.g. when creating a member login so it can be used later for lookup/prefill).
+   */
+  async updateEmail(tenantId: string, regNo: number, email: string): Promise<void> {
+    const trimmed = String(email || '').trim();
+    if (!trimmed) return;
+    await this.memberModel.updateOne(
+      { tenantId, regNo },
+      { $set: { email: trimmed } },
+    );
+  }
+
+  /**
+   * Get RDI/nutrition profile for a member (age, gender, heightCm, weightKg, goal).
+   */
+  async getProfile(tenantId: string, regNo: number): Promise<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }> {
+    const m = await this.memberModel.findOne({ tenantId, regNo }).select('age gender heightCm weightKg goal').lean();
+    if (!m) return {};
+    const row = m as unknown as Record<string, unknown>;
+    return {
+      age: row.age != null ? Number(row.age) : undefined,
+      gender: row.gender != null ? String(row.gender) : undefined,
+      heightCm: row.heightCm != null ? Number(row.heightCm) : undefined,
+      weightKg: row.weightKg != null ? Number(row.weightKg) : undefined,
+      goal: row.goal != null ? String(row.goal) : undefined,
+    };
+  }
+
+  /**
+   * Update RDI/nutrition profile for a member. Only provided fields are updated.
+   */
+  async updateProfile(
+    tenantId: string,
+    regNo: number,
+    profile: { age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string },
+  ): Promise<void> {
+    const set: Record<string, unknown> = {};
+    if (profile.age !== undefined) set.age = profile.age;
+    if (profile.gender !== undefined) set.gender = profile.gender;
+    if (profile.heightCm !== undefined) set.heightCm = profile.heightCm;
+    if (profile.weightKg !== undefined) set.weightKg = profile.weightKg;
+    if (profile.goal !== undefined) set.goal = profile.goal;
+    if (Object.keys(set).length === 0) return;
+    await this.memberModel.updateOne({ tenantId, regNo }, { $set: set });
   }
 }

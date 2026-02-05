@@ -8,29 +8,32 @@
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
   min-height: 100%;
   background: transparent;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .people-view-sticky {
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  min-width: 0;
 }
 
-/* Sticky header: stick below the fixed app topbar (56px) so it never hides under it */
+/* People filter card: same style as finance cards – card color with gradient + opacity */
 .people-sticky-top {
   flex-shrink: 0;
   width: 100%;
-  background: var(--bg, #22252a);
-  padding: 20px 0 16px 0;
-  margin-bottom: 0;
-  position: sticky;
-  top: 56px; /* match Layout.css .main-content padding-top / topbar height */
-  z-index: 20;
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  isolation: isolate;
+  min-width: 0;
+  background: linear-gradient(135deg, var(--card-bg) 0%, rgb(84 86 90 / 50%) 100%);
+  padding: 16px 16px 14px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
 }
 
 .people-list-scroll {
@@ -47,13 +50,19 @@
   color: var(--text-primary);
 }
 
+.people-sticky-top .page-title {
+  margin: 0 0 12px 0;
+}
+
 .people-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
   gap: 12px;
+  width: 100%;
+  min-width: 0;
 }
 
 .people-actions {
@@ -85,7 +94,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   width: 100%;
 }
 
@@ -212,8 +221,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 0;
+  width: 100%;
+  min-width: 0;
 }
 
 .filter-tabs {
@@ -232,6 +243,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.sort-by-wrap label {
+  white-space: nowrap;
 }
 
 .btn-clear-all {
@@ -264,6 +280,8 @@
   background: var(--input-bg);
   color: var(--text-primary);
   cursor: pointer;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .sort-select:focus {
@@ -296,10 +314,11 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 24px;
-  margin-top: 24px;
-  padding-top: 4px;
+  margin-top: 0;
+  padding-top: 0;
   position: relative;
   z-index: 1;
+  min-width: 0;
 }
 
 .people-layout.has-detail {
@@ -318,14 +337,14 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   max-height: 70vh;
-  background: rgba(43, 46, 50, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--card-bg);
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  overflow: clip;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  overflow: visible;
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
 }
 
 .people-list-header {
@@ -333,16 +352,14 @@
   grid-template-columns: 48px 1fr 120px 100px 80px 44px 40px;
   gap: 12px;
   padding: 14px 20px;
-  background: rgba(55, 65, 81, 0.6);
-  backdrop-filter: blur(8px);
+  background: var(--hover-bg);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  z-index: 5;
 }
 
 .people-list-body-scroll {
@@ -366,7 +383,7 @@
   padding: 14px 20px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border);
   border-left: 3px solid transparent;
   background: transparent;
 }
@@ -376,11 +393,11 @@
 }
 
 .people-item:hover {
-  background: rgba(55, 65, 81, 0.5);
+  background: var(--hover-bg);
 }
 
 .people-item.selected {
-  background: rgba(59, 130, 246, 0.25);
+  background: var(--active-bg);
   border-left-color: var(--primary);
 }
 
@@ -467,27 +484,10 @@
   color: var(--primary);
 }
 
-/* Light theme: glass card so girl image shows through */
-[data-theme='light'] .people-list {
-  background: rgba(255, 255, 255, 0.72);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
-[data-theme='light'] .people-list-header {
-  background: rgba(241, 245, 249, 0.85);
-  border-bottom-color: rgba(0, 0, 0, 0.06);
-}
-
-[data-theme='light'] .people-item {
-  border-bottom-color: rgba(0, 0, 0, 0.06);
-}
-
-[data-theme='light'] .people-item:hover {
-  background: rgba(241, 245, 249, 0.7);
-}
-
-[data-theme='light'] .people-item.selected {
-  background: rgba(59, 130, 246, 0.15);
+/* Light theme: card uses theme variables (already set in index.css) */
+[data-theme='light'] .people-list,
+[data-theme='light'] .people-sticky-top {
+  border-color: var(--border);
 }
 
 .member-detail {
@@ -1008,8 +1008,12 @@
 
 @media (max-width: 768px) {
   .people-sticky-top {
-    top: 56px;
-    padding: 16px 0 12px 0;
+    padding: 16px 12px 12px;
+    border-radius: 10px;
+  }
+  .people-sticky-top .page-title {
+    margin: 0 0 12px 0;
+    font-size: 1.5rem;
   }
   .search-and-status-row {
     flex-direction: column;
@@ -1022,6 +1026,17 @@
   .search-input {
     max-width: none;
   }
+  .filter-row {
+    gap: 10px;
+  }
+  .filter-tab {
+    padding: 8px 14px;
+    font-size: 0.9rem;
+  }
+  .people-list {
+    max-height: 60vh;
+    border-radius: 12px;
+  }
   .people-list-header {
     display: none;
   }
@@ -1030,6 +1045,33 @@
     grid-template-columns: 44px minmax(0, 1fr) minmax(70px, 90px) 70px 40px 36px;
     gap: 10px;
     padding: 10px 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  .people-sticky-top {
+    padding: 12px 10px 10px;
+  }
+  .status-pill {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+  .sort-by-wrap label {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .people-sticky-top {
+    padding: 10px 8px 8px;
+  }
+  .filter-tabs {
+    width: 100%;
+  }
+  .filter-tab {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
   }
 }
 

@@ -5,6 +5,14 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+/** Callbacks for global loader (mask UI during API calls). Set by GlobalLoader on mount. */
+let loaderStart: (() => void) | null = null;
+let loaderEnd: (() => void) | null = null;
+export function setLoaderCallbacks(start: () => void, end: () => void) {
+  loaderStart = start;
+  loaderEnd = end;
+}
+
 export const storage = {
   getToken: () => localStorage.getItem('gym_token'),
   setToken: (t: string) => localStorage.setItem('gym_token', t),
@@ -23,22 +31,27 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const tenantId = storage.getTenantId();
-  const token = storage.getToken();
+  loaderStart?.();
+  try {
+    const tenantId = storage.getTenantId();
+    const token = storage.getToken();
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
-  if (tenantId) headers['X-Tenant-ID'] = tenantId;
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+    if (tenantId) headers['X-Tenant-ID'] = tenantId;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || res.statusText);
+    const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || res.statusText);
+    }
+    return res.json();
+  } finally {
+    loaderEnd?.();
   }
-  return res.json();
 }
 
 /** Parse API error response (e.g. { message: "Please describe what you ate.", error: "Bad Request" }) for display. */
@@ -90,6 +103,15 @@ export const api = {
       const q = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : '';
       return request<AiMember[]>(`/auth/ai-members${q}`);
     },
+    resetMemberPassword: (userId: string, newPassword: string) =>
+      request<{ message: string; newPassword: string }>('/auth/reset-member-password', {
+        method: 'POST',
+        body: JSON.stringify({ userId, newPassword }),
+      }),
+    deactivateMemberUser: (userId: string) =>
+      request<{ message: string }>(`/auth/member-users/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+      }),
   },
   legacy: {
     lookup: (gymId?: string, regNo?: string) => {
@@ -252,6 +274,13 @@ export const api = {
       );
     },
     getReferenceFoods: () => request<ReferenceFood[]>('/calories/reference-foods'),
+    getProfile: () =>
+      request<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }>('/calories/profile'),
+    saveProfile: (profile: { age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }) =>
+      request<{ success: boolean }>('/calories/profile', {
+        method: 'POST',
+        body: JSON.stringify(profile),
+      }),
   },
 };
 

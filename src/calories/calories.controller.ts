@@ -9,6 +9,7 @@ import { ChatCalorieDto } from './dto/chat-calorie.dto';
 import { AcceptDefaultDto } from './dto/accept-default.dto';
 import { SetEntryDto } from './dto/set-entry.dto';
 import { AnalyzeDto } from './dto/analyze.dto';
+import { SaveProfileDto } from './dto/profile.dto';
 
 /**
  * Member-facing calorie tracking.
@@ -63,6 +64,32 @@ export class CaloriesController {
     const userId = this.userId(req);
     if (!tenantId || !userId) throw new Error('Unauthorized');
     return this.caloriesService.getToday(tenantId, userId);
+  }
+
+  /** GET /calories/profile - RDI profile for current user (from linked member if MEMBER). */
+  @Get('profile')
+  async getProfile(@Req() req: any) {
+    const tenantId = this.tenantId(req);
+    const userId = this.userId(req);
+    if (!tenantId || !userId) throw new Error('Unauthorized');
+    return this.caloriesService.getProfile(tenantId, userId);
+  }
+
+  /** POST /calories/profile - Save RDI profile (members only; stored on linked member). */
+  @Post('profile')
+  async saveProfile(@Req() req: any, @Body() body: SaveProfileDto) {
+    const tenantId = this.tenantId(req);
+    const userId = this.userId(req);
+    if (!tenantId || !userId) throw new Error('Unauthorized');
+    const profile = body ?? {};
+    await this.caloriesService.saveProfile(tenantId, userId, {
+      age: profile.age,
+      gender: profile.gender,
+      heightCm: profile.heightCm,
+      weightKg: profile.weightKg,
+      goal: profile.goal,
+    });
+    return { success: true };
   }
 
   /** GET /calories/last-7-days - for dashboard alerts (missing days) */
@@ -212,11 +239,13 @@ export class CaloriesController {
   @Get('reference-foods')
   async getReferenceFoods() {
     const { NUTRITION_REFERENCE } = await import('./data/nutrition-reference');
+    const baseUnits = ['pieces', 'cups', 'grams', 'serving'];
+    const liquidUnits = ['pieces', 'cups', 'grams', 'serving', 'ml'];
     return NUTRITION_REFERENCE.map((f) => ({
       id: f.id,
       name: f.name,
       defaultUnit: f.defaultUnit,
-      units: ['pieces', 'cups', 'grams', 'serving'],
+      units: f.liquid ? liquidUnits : baseUnits,
     }));
   }
 }

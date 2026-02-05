@@ -5,6 +5,7 @@ import { NutritionAnalysis, NutritionAnalysisSchema } from './schemas/nutrition-
 import { CaloriesController } from './calories.controller';
 import { CaloriesService } from './calories.service';
 import { AuthModule } from '../auth/auth.module';
+import { MembersModule } from '../members/members.module';
 
 /**
  * Member-facing calorie tracking + full nutrition analysis (one AI call).
@@ -17,6 +18,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: NutritionAnalysis.name, schema: NutritionAnalysisSchema },
     ]),
     AuthModule,
+    MembersModule,
   ],
   controllers: [CaloriesController],
   providers: [CaloriesService],

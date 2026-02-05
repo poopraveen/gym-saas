@@ -6,6 +6,8 @@ import {
   Headers,
   Req,
   Query,
+  Param,
+  Delete,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -137,5 +139,41 @@ export class AuthController {
     const tenantId = req.user?.tenantId;
     if (!tenantId) throw new BadRequestException('Unauthorized');
     return this.authService.listMemberUsers(tenantId, search);
+  }
+
+  /**
+   * Reset password for a member enrolled for AI. Returns new password once so admin can share it.
+   * TENANT_ADMIN or MANAGER only.
+   */
+  @Post('reset-member-password')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  async resetMemberPassword(
+    @Req() req: { user: { tenantId: string } },
+    @Body() body: { userId: string; newPassword: string },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    if (!body.userId || !body.newPassword || body.newPassword.length < 6) {
+      throw new BadRequestException('userId and newPassword (min 6 characters) required');
+    }
+    return this.authService.resetMemberPassword(tenantId, body.userId, body.newPassword);
+  }
+
+  /**
+   * Deactivate a member user (remove Nutrition AI login). Soft delete.
+   * TENANT_ADMIN or MANAGER only.
+   */
+  @Delete('member-users/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  async deactivateMemberUser(
+    @Req() req: { user: { tenantId: string } },
+    @Param('userId') userId: string,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    return this.authService.deactivateMemberUser(tenantId, userId);
   }
 }

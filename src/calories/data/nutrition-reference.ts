@@ -17,10 +17,12 @@ export interface FoodReference {
   id: string;
   name: string;
   /** Default unit for display */
-  defaultUnit: 'pieces' | 'cups' | 'grams' | 'serving';
+  defaultUnit: 'pieces' | 'cups' | 'grams' | 'serving' | 'ml';
   /** Grams per 1 unit (e.g. 1 piece dosa ≈ 80g, 1 cup rice ≈ 195g) */
   gramsPerUnit: number;
   per100g: NutritionReferencePer100;
+  /** If true, unit dropdown includes ml (milliliters). */
+  liquid?: boolean;
 }
 
 /** Sample foods: dosa, chicken variants, egg, tea, rice, guava. Values approximate (ICMR/Indian dietary references). */
@@ -105,6 +107,7 @@ export const NUTRITION_REFERENCE: FoodReference[] = [
     name: 'Tea (with milk & sugar)',
     defaultUnit: 'cups',
     gramsPerUnit: 200,
+    liquid: true,
     per100g: {
       calories: 35,
       protein: 1.2,
@@ -120,6 +123,7 @@ export const NUTRITION_REFERENCE: FoodReference[] = [
     name: 'Tea (plain)',
     defaultUnit: 'cups',
     gramsPerUnit: 200,
+    liquid: true,
     per100g: {
       calories: 2,
       protein: 0.1,

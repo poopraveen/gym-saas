@@ -34,7 +34,7 @@ function getStatus(dueDate: Date | null, joinDate: Date | null): StatusType {
   if (!dueDate) return 'new';
   const daysDiff = differenceInDays(dueDate, new Date());
   if (daysDiff < 0) return 'expired';
-  if (daysDiff <= 30) return 'soon';
+  if (daysDiff <= 5) return 'soon'; /* soon = due within 5 days only; more than 5 days = valid */
   const daysSinceJoin = joinDate ? differenceInDays(new Date(), joinDate) : 999;
   return daysSinceJoin <= 30 ? 'new' : 'valid';
 }
@@ -70,7 +70,6 @@ export default function Dashboard() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [followUpHistory, setFollowUpHistory] = useState<Array<{ comment: string; nextFollowUpDate?: string; createdAt: string }>>([]);
-  const stickyTopRef = useRef<HTMLDivElement>(null);
 
   const loadList = async () => {
     try {
@@ -229,20 +228,6 @@ export default function Dashboard() {
       }, 100);
     }
   }, [selectedMember]);
-
-  useEffect(() => {
-    const el = stickyTopRef.current;
-    const container = peopleViewRef.current;
-    if (!el || !container || activeNav !== 'main') return;
-    const setHeight = () => {
-      const h = el.offsetHeight;
-      container.style.setProperty('--sticky-top-height', `${h}px`);
-    };
-    setHeight();
-    const ro = new ResizeObserver(setHeight);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [activeNav, filter, statusFilter, searchQuery, loading, filteredMembers.length]);
 
   useEffect(() => {
     if (membersPage > totalPages && totalPages >= 1) setMembersPage(totalPages);
@@ -602,7 +587,7 @@ export default function Dashboard() {
 
       {activeNav === 'main' && (
         <div ref={peopleViewRef} className="people-view people-view-sticky">
-          <div ref={stickyTopRef} className="people-sticky-top">
+          <div className="people-sticky-top">
             <div className="people-header">
               <h1 className="page-title">People</h1>
               <div className="people-actions">
@@ -714,7 +699,9 @@ export default function Dashboard() {
                         onClick={() => setSelectedMember(row)}
                       >
                         <div className="pi-avatar">
-                          {(row.NAME as string)?.charAt(0)?.toUpperCase() || '?'}
+                          {row['Reg No:'] != null && String(row['Reg No:']).trim() !== ''
+                            ? String(row['Reg No:']).padStart(3, '0').slice(-3)
+                            : '?'}
                         </div>
                         <div className="pi-info">
                           <span className="pi-name">{row.NAME || '—'}</span>
@@ -799,7 +786,9 @@ export default function Dashboard() {
               {selectedMember && (
                 <aside ref={memberDetailRef} className="member-detail">
                   <div className="md-avatar">
-                    {(selectedMember.NAME as string)?.charAt(0)?.toUpperCase() || '?'}
+                    {selectedMember['Reg No:'] != null && String(selectedMember['Reg No:']).trim() !== ''
+                      ? String(selectedMember['Reg No:']).padStart(3, '0').slice(-3)
+                      : '?'}
                   </div>
                   <h3>{selectedMember.NAME}</h3>
                   <p className="md-meta">

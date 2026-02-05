@@ -15,11 +15,27 @@ export class Member extends Document {
   @Prop()
   gender: string;
 
+  /** Optional RDI/nutrition profile (age in years, height in cm, weight in kg, goal). */
+  @Prop()
+  age?: number;
+
+  @Prop()
+  heightCm?: number;
+
+  @Prop()
+  weightKg?: number;
+
+  @Prop()
+  goal?: string;
+
   @Prop()
   dateOfJoining: Date;
 
   @Prop()
   phoneNumber: string;
+
+  @Prop()
+  email: string;
 
   @Prop()
   typeofPack: string;

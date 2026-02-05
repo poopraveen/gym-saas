@@ -92,20 +92,51 @@ export default function NutritionAI() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyRefreshInProgressRef = useRef(false);
 
-  /** Nutrition Analysis (one-shot AI): reference foods, meal list, result */
+  /** Nutrition Analysis (one-shot AI): reference foods from API + user-added custom foods, meal list, result */
   const [referenceFoods, setReferenceFoods] = useState<ReferenceFood[]>([]);
+  /** Custom foods added via "Others" in this session; merged with reference for dropdown */
+  const [customFoods, setCustomFoods] = useState<ReferenceFood[]>([]);
   const [analysisMeals, setAnalysisMeals] = useState<{ food: string; quantity: string; unit: string }[]>([]);
   const [analysisDate, setAnalysisDate] = useState<string>(() => toDateOnly(new Date()));
   const [analysisResult, setAnalysisResult] = useState<NutritionAnalysisResult | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [foodPopupItem, setFoodPopupItem] = useState<FoodNutritionBreakdown | null>(null);
-  /** Optional profile sent to analyze (age, gender, height, weight, goal) */
+  /** Optional profile sent to analyze (age, gender, height, weight, goal). Loaded from member on mount; editable via profile modal. */
   const [userProfile, setUserProfile] = useState<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }>({});
-  /** Add-food form: selected food, quantity, unit */
+  /** Profile modal: visible state and form draft (pre-filled from userProfile or GET profile when modal opens). */
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }>({});
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileLoadError, setProfileLoadError] = useState('');
+  /** Add-food form: selected food, quantity, unit. Use "__others__" when "Others (enter new)" is selected */
   const [addFoodName, setAddFoodName] = useState('');
   const [addFoodQty, setAddFoodQty] = useState('1');
   const [addFoodUnit, setAddFoodUnit] = useState('');
+  /** When "Others" is selected, user types the new food name here */
+  const [customFoodNameInput, setCustomFoodNameInput] = useState('');
+  /** Food dropdown open state (custom scrollable dropdown) */
+  const [foodDropdownOpen, setFoodDropdownOpen] = useState(false);
+  const foodDropdownRef = useRef<HTMLDivElement>(null);
+
+  /** Merged list for dropdown: reference foods + custom foods (no duplicate names; reference first) */
+  const displayFoods = React.useMemo(() => {
+    const seen = new Set<string>();
+    const out: ReferenceFood[] = [];
+    referenceFoods.forEach((f) => {
+      if (!seen.has(f.name.toLowerCase())) {
+        seen.add(f.name.toLowerCase());
+        out.push(f);
+      }
+    });
+    customFoods.forEach((f) => {
+      if (!seen.has(f.name.toLowerCase())) {
+        seen.add(f.name.toLowerCase());
+        out.push(f);
+      }
+    });
+    return out;
+  }, [referenceFoods, customFoods]);
 
   const todayStr = toDateOnly(new Date());
 
@@ -194,6 +225,45 @@ export default function NutritionAI() {
     api.calories.getAnalysis(analysisDate).then((r) => setAnalysisResult(r ?? null)).catch(() => setAnalysisResult(null));
   }, [isMember, analysisDate]);
 
+  /** Load saved RDI profile from member data (members only) so analyze uses it without opening modal. */
+  useEffect(() => {
+    if (!isMember) return;
+    api.calories.getProfile().then((p) => setUserProfile(p || {})).catch(() => setUserProfile({}));
+  }, [isMember]);
+
+  /** When profile modal opens, fetch latest profile to pre-fill form (from member/customer data). */
+  useEffect(() => {
+    if (!profileModalOpen || !isMember) return;
+    setProfileLoadError('');
+    api.calories
+      .getProfile()
+      .then((p) => {
+        setProfileForm(p || {});
+      })
+      .catch(() => {
+        setProfileForm({});
+        setProfileLoadError('Could not load saved profile.');
+      });
+  }, [profileModalOpen, isMember]);
+
+  const openProfileModal = () => setProfileModalOpen(true);
+  const closeProfileModal = () => {
+    setProfileModalOpen(false);
+    setProfileLoadError('');
+  };
+  const saveProfileFromModal = async () => {
+    setProfileSaving(true);
+    try {
+      await api.calories.saveProfile(profileForm);
+      setUserProfile(profileForm);
+      closeProfileModal();
+    } catch (e) {
+      setProfileLoadError(getApiErrorMessage(e));
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   const loadMemberProgress = async (member: AiMember) => {
     setSelectedMember(member);
     setMemberProgressLoading(true);
@@ -247,6 +317,19 @@ export default function NutritionAI() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [lastResult]);
+
+  /** Close food dropdown when clicking outside */
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (foodDropdownRef.current && !foodDropdownRef.current.contains(e.target as Node)) {
+        setFoodDropdownOpen(false);
+      }
+    };
+    if (foodDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [foodDropdownOpen]);
 
   const missingDays = last7Days.filter((d) => !d.hasEntry);
   const missingCount = missingDays.length;
@@ -375,18 +458,28 @@ export default function NutritionAI() {
     navigate('/');
   };
 
-  /** Add one meal item to analysis list (from reference food + quantity + unit) */
+  /** Add one meal item to analysis list (from dropdown or "Others" custom name). New custom foods are added to list for next time. */
   const handleAddAnalysisMeal = () => {
-    const name = addFoodName.trim();
+    const name = (addFoodName === '__others__' ? customFoodNameInput.trim() : addFoodName).trim();
     const qty = addFoodQty.trim() || '1';
     const unit = addFoodUnit.trim() || 'serving';
     if (!name) return;
-    const ref = referenceFoods.find((f) => f.name.toLowerCase() === name.toLowerCase());
+    const ref = displayFoods.find((f) => f.name.toLowerCase() === name.toLowerCase());
     const defaultUnit = ref?.defaultUnit ?? 'serving';
+    if (addFoodName === '__others__') {
+      const existing = customFoods.some((f) => f.name.toLowerCase() === name.toLowerCase());
+      if (!existing) {
+        setCustomFoods((prev) => [
+          ...prev,
+          { id: `custom-${Date.now()}`, name, defaultUnit: 'serving', units: ['serving', 'piece', 'cup', 'grams', 'ml'] },
+        ]);
+      }
+      setCustomFoodNameInput('');
+    }
     setAnalysisMeals((prev) => [...prev, { food: name, quantity: qty, unit: unit || defaultUnit }]);
     setAddFoodName('');
     setAddFoodQty('1');
-    setAddFoodUnit(ref?.defaultUnit ?? '');
+    setAddFoodUnit(ref?.defaultUnit ?? 'serving');
   };
 
   const removeAnalysisMealAt = (index: number) => {
@@ -408,13 +501,18 @@ export default function NutritionAI() {
     }
   };
 
-  /** When user selects a reference food, set default unit */
+  /** When user selects a food (or "Others"), set default unit */
   const onSelectReferenceFood = (name: string) => {
     setAddFoodName(name);
-    const ref = referenceFoods.find((f) => f.name === name);
-    if (ref) {
-      setAddFoodUnit(ref.defaultUnit);
-      if (!addFoodQty || addFoodQty === '0') setAddFoodQty('1');
+    if (name === '__others__') {
+      setAddFoodUnit('serving');
+      setCustomFoodNameInput('');
+    } else {
+      const ref = displayFoods.find((f) => f.name === name);
+      if (ref) {
+        setAddFoodUnit(ref.defaultUnit);
+        if (!addFoodQty || addFoodQty === '0') setAddFoodQty('1');
+      }
     }
   };
 
@@ -762,7 +860,7 @@ export default function NutritionAI() {
         <section className="nutrition-widget analysis-widget">
           <h2>Log food &amp; get full analysis</h2>
           <p className="analysis-intro">
-            Select foods and quantities below. Then tap &quot;Analyze my day&quot; to get calories, macros, vitamins, minerals, and personalised suggestions in one go.
+            Select foods from the list (from reference data and any you added via &quot;Others&quot;) or choose <strong>Others (enter new)</strong> to add a new food — it will appear in the list for next time. Set quantity and unit, then tap &quot;Analyze my day&quot; for calories, macros, vitamins, minerals, and personalised suggestions.
           </p>
           <div className="analysis-date-row">
             <label>Date</label>
@@ -776,17 +874,70 @@ export default function NutritionAI() {
           </div>
           <div className="add-food-row">
             <label>Food</label>
-            <select
-              value={addFoodName}
-              onChange={(e) => onSelectReferenceFood(e.target.value)}
-              className="add-food-select"
-              aria-label="Select food"
-            >
-              <option value="">— Select food —</option>
-              {referenceFoods.map((f) => (
-                <option key={f.id} value={f.name}>{f.name}</option>
-              ))}
-            </select>
+            <div className="add-food-select-wrap" ref={foodDropdownRef}>
+              <button
+                type="button"
+                className="add-food-select-trigger"
+                onClick={() => setFoodDropdownOpen((o) => !o)}
+                aria-expanded={foodDropdownOpen}
+                aria-haspopup="listbox"
+                aria-label="Select food"
+                id="add-food-select-label"
+              >
+                <span className="add-food-select-value">
+                  {!addFoodName ? '— Select food —' : addFoodName === '__others__' ? 'Others (enter new)' : addFoodName}
+                </span>
+                <span className="add-food-select-chevron" aria-hidden>▼</span>
+              </button>
+              {foodDropdownOpen && (
+                <ul
+                  className="add-food-select-dropdown"
+                  role="listbox"
+                  aria-labelledby="add-food-select-label"
+                >
+                  <li
+                    role="option"
+                    className="add-food-select-option"
+                    aria-selected={!addFoodName}
+                    onClick={() => { onSelectReferenceFood(''); setFoodDropdownOpen(false); }}
+                  >
+                    — Select food —
+                  </li>
+                  {displayFoods.map((f) => (
+                    <li
+                      key={f.id}
+                      role="option"
+                      className="add-food-select-option"
+                      aria-selected={addFoodName === f.name}
+                      onClick={() => { onSelectReferenceFood(f.name); setFoodDropdownOpen(false); }}
+                    >
+                      {f.name}
+                    </li>
+                  ))}
+                  <li
+                    role="option"
+                    className="add-food-select-option add-food-select-option-others"
+                    aria-selected={addFoodName === '__others__'}
+                    onClick={() => { onSelectReferenceFood('__others__'); setFoodDropdownOpen(false); }}
+                  >
+                    Others (enter new)
+                  </li>
+                </ul>
+              )}
+            </div>
+            {addFoodName === '__others__' && (
+              <>
+                <label className="add-food-other-label">New food name</label>
+                <input
+                  type="text"
+                  value={customFoodNameInput}
+                  onChange={(e) => setCustomFoodNameInput(e.target.value)}
+                  placeholder="e.g. Paneer tikka"
+                  className="add-food-other-input"
+                  aria-label="Enter new food name"
+                />
+              </>
+            )}
             <label className="add-food-qty-label">Qty</label>
             <input
               type="text"
@@ -798,11 +949,11 @@ export default function NutritionAI() {
             />
             <label className="add-food-unit-label">Unit</label>
             <select
-              value={addFoodUnit || (referenceFoods.find((f) => f.name === addFoodName)?.defaultUnit ?? 'serving')}
+              value={addFoodUnit || (displayFoods.find((f) => f.name === addFoodName)?.defaultUnit ?? 'serving')}
               onChange={(e) => setAddFoodUnit(e.target.value)}
               className="add-food-unit-select"
             >
-              {(referenceFoods.find((f) => f.name === addFoodName)?.units ?? ['serving', 'piece', 'cup', 'grams']).map((u) => (
+              {(displayFoods.find((f) => f.name === addFoodName)?.units ?? ['serving', 'piece', 'cup', 'grams', 'ml']).map((u) => (
                 <option key={u} value={u}>{u}</option>
               ))}
             </select>
@@ -810,7 +961,7 @@ export default function NutritionAI() {
               type="button"
               className="btn-primary btn-add-food"
               onClick={handleAddAnalysisMeal}
-              disabled={!addFoodName.trim()}
+              disabled={addFoodName === '__others__' ? !customFoodNameInput.trim() : !addFoodName.trim()}
             >
               Add
             </button>
@@ -826,34 +977,45 @@ export default function NutritionAI() {
                   </li>
                 ))}
               </ul>
-              <div className="analysis-profile-toggle">
-                <label className="profile-toggle-label">
-                  <input
-                    type="checkbox"
-                    checked={Object.keys(userProfile).length > 0}
-                    onChange={(e) => { if (!e.target.checked) setUserProfile({}); }}
-                  />
-                  Add profile for better RDI (age, gender, height, weight, goal)
-                </label>
+              <div className="analysis-profile-block">
+                <button type="button" className="btn-profile-edit" onClick={openProfileModal}>
+                  {Object.keys(userProfile).length > 0 ? 'Edit profile for better RDI' : 'Add profile for better RDI'}
+                </button>
                 {Object.keys(userProfile).length > 0 && (
-                  <div className="analysis-profile-fields">
-                    <input type="number" placeholder="Age" min={1} max={120} value={userProfile.age ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, age: e.target.value ? Number(e.target.value) : undefined }))} />
-                    <select value={userProfile.gender ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, gender: e.target.value || undefined }))}>
-                      <option value="">Gender</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                    </select>
-                    <input type="number" placeholder="Height (cm)" min={50} max={250} value={userProfile.heightCm ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, heightCm: e.target.value ? Number(e.target.value) : undefined }))} />
-                    <input type="number" placeholder="Weight (kg)" min={20} max={300} value={userProfile.weightKg ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, weightKg: e.target.value ? Number(e.target.value) : undefined }))} />
-                    <select value={userProfile.goal ?? ''} onChange={(e) => setUserProfile((p) => ({ ...p, goal: e.target.value || undefined }))}>
-                      <option value="">Goal</option>
-                      <option value="weight_loss">Weight loss</option>
-                      <option value="muscle_gain">Muscle gain</option>
-                      <option value="maintenance">Maintenance</option>
-                    </select>
-                  </div>
+                  <p className="profile-summary">
+                    Profile set: {[userProfile.age != null && `age ${userProfile.age}`, userProfile.gender, userProfile.heightCm != null && `${userProfile.heightCm} cm`, userProfile.weightKg != null && `${userProfile.weightKg} kg`, userProfile.goal].filter(Boolean).join(', ') || '—'}
+                  </p>
                 )}
               </div>
+              {profileModalOpen && (
+                <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title" onClick={closeProfileModal}>
+                  <div className="modal-card profile-modal" onClick={(e) => e.stopPropagation()}>
+                    <h2 id="profile-modal-title">RDI profile (age, gender, height, weight, goal)</h2>
+                    <p className="modal-hint">Pre-filled from your member data when available. Used for better daily recommendations.</p>
+                    {profileLoadError && <div className="profile-modal-error">{profileLoadError}</div>}
+                    <div className="profile-modal-fields">
+                      <input type="number" placeholder="Age" min={1} max={120} value={profileForm.age ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, age: e.target.value ? Number(e.target.value) : undefined }))} />
+                      <select value={profileForm.gender ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, gender: e.target.value || undefined }))}>
+                        <option value="">Gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                      </select>
+                      <input type="number" placeholder="Height (cm)" min={50} max={250} value={profileForm.heightCm ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, heightCm: e.target.value ? Number(e.target.value) : undefined }))} />
+                      <input type="number" placeholder="Weight (kg)" min={20} max={300} value={profileForm.weightKg ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, weightKg: e.target.value ? Number(e.target.value) : undefined }))} />
+                      <select value={profileForm.goal ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, goal: e.target.value || undefined }))}>
+                        <option value="">Goal</option>
+                        <option value="weight_loss">Weight loss</option>
+                        <option value="muscle_gain">Muscle gain</option>
+                        <option value="maintenance">Maintenance</option>
+                      </select>
+                    </div>
+                    <div className="modal-actions">
+                      <button type="button" className="btn-secondary" onClick={closeProfileModal} disabled={profileSaving}>Cancel</button>
+                      <button type="button" className="btn-primary" onClick={saveProfileFromModal} disabled={profileSaving}>{profileSaving ? 'Saving…' : 'Save profile'}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 className="btn-primary btn-analyze"

@@ -160,6 +160,8 @@ export class AuthService {
       role: Role.MEMBER,
       linkedRegNo: regNo,
     });
+    // Store email on the member record for later use (lookup, display, etc.)
+    await this.membersService.updateEmail(tenantId, regNo, email);
     const { passwordHash, ...rest } = user.toObject();
     return rest;
   }
@@ -221,5 +223,32 @@ export class AuthService {
   async assertMemberInTenant(tenantId: string, userId: string): Promise<void> {
     const user = await this.userModel.findOne({ _id: userId, tenantId, role: Role.MEMBER }).lean();
     if (!user) throw new UnauthorizedException('Member not found in your tenant');
+  }
+
+  /**
+   * Reset password for a MEMBER user (enrolled for AI). Returns the new password once so admin can share it.
+   * Caller must be TENANT_ADMIN or MANAGER.
+   */
+  async resetMemberPassword(
+    tenantId: string,
+    userId: string,
+    newPassword: string,
+  ): Promise<{ message: string; newPassword: string }> {
+    const user = await this.userModel.findOne({ _id: userId, tenantId, role: Role.MEMBER }).lean();
+    if (!user) throw new BadRequestException('Member user not found in your tenant');
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.userModel.updateOne({ _id: userId }, { $set: { passwordHash: hash } });
+    return { message: 'Password updated. Share the new password with the member once.', newPassword };
+  }
+
+  /**
+   * Deactivate a MEMBER user (remove login access to Nutrition AI). Soft delete: sets isActive = false.
+   * Caller must be TENANT_ADMIN or MANAGER.
+   */
+  async deactivateMemberUser(tenantId: string, userId: string): Promise<{ message: string }> {
+    const user = await this.userModel.findOne({ _id: userId, tenantId, role: Role.MEMBER }).lean();
+    if (!user) throw new BadRequestException('Member user not found in your tenant');
+    await this.userModel.updateOne({ _id: userId }, { $set: { isActive: false } });
+    return { message: 'User deactivated. They can no longer log in to Nutrition AI.' };
   }
 }

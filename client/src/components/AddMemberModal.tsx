@@ -12,6 +12,7 @@ export type MemberFormData = {
   Gender: string;
   'Date of Joining': number;
   'Phone Number': string;
+  Email: string;
   'Typeof pack': string;
   'Fees Options': number;
   'Fees Amount': number;
@@ -24,6 +25,7 @@ const defaultForm: MemberFormData = {
   Gender: 'Male',
   'Date of Joining': Date.now(),
   'Phone Number': '',
+  Email: '',
   'Typeof pack': 'Gendral',
   'Fees Options': 1,
   'Fees Amount': 800,
@@ -66,12 +68,13 @@ export default function AddMemberModal({
     }
     setSaving(true);
     try {
-      const data = {
+      const data: Record<string, unknown> = {
         ...form,
         'Reg No:': nextRegNo,
         lastUpdateDateTime: String(Date.now()),
         monthlyAttendance: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0 },
       };
+      if (!form.Email.trim()) delete data.Email;
       await onSubmit(data);
       onClose();
     } catch (err) {
@@ -117,6 +120,16 @@ export default function AddMemberModal({
               value={form['Phone Number']}
               onChange={(e) => update('Phone Number', e.target.value)}
               placeholder="Phone number"
+            />
+          </div>
+          <div className="form-row">
+            <label>Email (optional)</label>
+            <input
+              type="email"
+              value={form.Email}
+              onChange={(e) => update('Email', e.target.value)}
+              placeholder="member@example.com"
+              autoComplete="off"
             />
           </div>
           </div>

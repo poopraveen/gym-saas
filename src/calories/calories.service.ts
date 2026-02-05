@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import OpenAI from 'openai';
+import { AuthService } from '../auth/auth.service';
+import { MembersService } from '../members/members.service';
 import { CalorieEntry } from './schemas/calorie-entry.schema';
 import {
   NutritionAnalysis,
@@ -110,7 +112,7 @@ Output JSON format (use exact keys):
 }
 
 RDI (Indian adult, 2000 kcal baseline): Protein 50-60g, Carbs 250-300g, Fat 50-65g, Fiber 25-30g. Vitamin C 40mg, Calcium 1000mg, Iron 19mg (F)/29mg (M), etc.
-Scale values by quantity (pieces/cups/grams/serving). For status: deficient <70% RDI, slightly_low 70-90%, optimal 90-110%, excess >110%.
+Scale values by quantity (pieces/cups/grams/serving/ml). For liquids use ml (e.g. 1 cup ≈ 240 ml). For status: deficient <70% RDI, slightly_low 70-90%, optimal 90-110%, excess >110%.
 Suggestions: simple, food-based, culturally relevant (Indian foods). 2-4 suggestions. Improvements: 2-4 items with foods, portions, optional swaps.`;
 
 @Injectable()
@@ -121,6 +123,8 @@ export class CaloriesService {
     @InjectModel(CalorieEntry.name) private readonly calorieModel: Model<CalorieEntry>,
     @InjectModel(NutritionAnalysis.name) private readonly nutritionAnalysisModel: Model<NutritionAnalysis>,
     private config: ConfigService,
+    private authService: AuthService,
+    private membersService: MembersService,
   ) {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (apiKey) this.openai = new OpenAI({ apiKey });
@@ -269,6 +273,35 @@ export class CaloriesService {
     const date = this.todayDate();
     const doc = await this.calorieModel.findOne({ tenantId, userId, date }).lean();
     return doc as CalorieEntry | null;
+  }
+
+  /**
+   * Get RDI profile for the current user. Only members with linkedRegNo have stored profile; others get {}.
+   */
+  async getProfile(
+    tenantId: string,
+    userId: string,
+  ): Promise<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }> {
+    const me = await this.authService.getMe(userId) as { linkedRegNo?: number };
+    const regNo = me?.linkedRegNo;
+    if (regNo == null || typeof regNo !== 'number') return {};
+    return this.membersService.getProfile(tenantId, regNo);
+  }
+
+  /**
+   * Save RDI profile for the current user. Only members with linkedRegNo can save.
+   */
+  async saveProfile(
+    tenantId: string,
+    userId: string,
+    profile: { age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string },
+  ): Promise<void> {
+    const me = await this.authService.getMe(userId) as { linkedRegNo?: number };
+    const regNo = me?.linkedRegNo;
+    if (regNo == null || typeof regNo !== 'number') {
+      throw new BadRequestException('Only members can save RDI profile. Link your account to a member first.');
+    }
+    await this.membersService.updateProfile(tenantId, regNo, profile);
   }
 
   /**

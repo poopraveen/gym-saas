@@ -138,14 +138,23 @@
 }
 
 .drawer-header {
+  flex-shrink: 0;
   padding: 20px;
   border-bottom: 1px solid var(--border);
 }
 
 .drawer-nav {
   flex: 1;
+  min-height: 0;
   padding: 16px 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.drawer-footer {
+  flex-shrink: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
 }
 
 .nav-item {
@@ -182,11 +191,6 @@
 
 .nav-label {
   white-space: nowrap;
-}
-
-.drawer-footer {
-  padding: 12px 0;
-  border-top: 1px solid var(--border);
 }
 
 .logout:hover {
