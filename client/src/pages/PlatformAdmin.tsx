@@ -40,6 +40,7 @@ export default function PlatformAdmin() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
   const [showOnboardingGuide, setShowOnboardingGuide] = useState(false);
+  const [pitchPdfDownloadingId, setPitchPdfDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (storage.getRole() !== 'SUPER_ADMIN') {
@@ -108,6 +109,19 @@ export default function PlatformAdmin() {
     setDetailModal(null);
   };
 
+  const handleDownloadPitchPdf = async (tenantId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPitchPdfDownloadingId(tenantId);
+    setError('');
+    try {
+      await api.platform.downloadTenantPitchPdf(tenantId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to download PDF');
+    } finally {
+      setPitchPdfDownloadingId(null);
+    }
+  };
+
   const handleLogout = () => {
     storage.clear();
     navigate('/login');
@@ -165,12 +179,23 @@ export default function PlatformAdmin() {
                 <td>{t.subdomain || '—'}</td>
                 <td>{t.isActive !== false ? 'Active' : 'Inactive'}</td>
                 <td onClick={(e) => e.stopPropagation()}>
-                  <button
-                    className="btn-sm"
-                    onClick={() => setResetModal({ tenantId: t._id, email: '' })}
-                  >
-                    Reset Admin
-                  </button>
+                  <div className="platform-row-actions">
+                    <button
+                      type="button"
+                      className="btn-sm btn-pitch-pdf"
+                      onClick={(e) => handleDownloadPitchPdf(t._id, e)}
+                      disabled={pitchPdfDownloadingId === t._id}
+                      title="Download application pitch PDF for this tenant"
+                    >
+                      {pitchPdfDownloadingId === t._id ? '…' : 'Pitch PDF'}
+                    </button>
+                    <button
+                      className="btn-sm"
+                      onClick={() => setResetModal({ tenantId: t._id, email: '' })}
+                    >
+                      Reset Admin
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -304,6 +329,14 @@ export default function PlatformAdmin() {
               )}
             </div>
             <div className="modal-actions">
+              <button
+                type="button"
+                className="btn-pitch-pdf"
+                onClick={(e) => { e.preventDefault(); handleDownloadPitchPdf(detailModal._id, e); }}
+                disabled={pitchPdfDownloadingId === detailModal._id}
+              >
+                {pitchPdfDownloadingId === detailModal._id ? 'Downloading…' : 'Download Pitch PDF'}
+              </button>
               <button type="button" onClick={() => setDetailModal(null)}>Close</button>
             </div>
           </div>

@@ -858,8 +858,8 @@
 
 .profile-modal-fields {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
@@ -872,6 +872,45 @@
   color: var(--text-primary);
   font-size: 0.9rem;
   min-width: 100px;
+}
+
+.profile-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.profile-field-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.profile-unit-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.profile-unit-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.profile-unit-option input {
+  margin: 0;
+}
+
+.profile-height-ft {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.profile-height-ft input {
+  width: 4rem;
 }
 
 .profile-modal .modal-actions {

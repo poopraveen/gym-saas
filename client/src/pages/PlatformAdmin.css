@@ -147,6 +147,18 @@
   background: var(--hover-bg);
 }
 
+.platform-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-pitch-pdf {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

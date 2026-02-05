@@ -54,12 +54,18 @@ async function request<T>(
   }
 }
 
-/** Parse API error response (e.g. { message: "Please describe what you ate.", error: "Bad Request" }) for display. */
+/** Parse API error response for display. Handles NestJS ValidationPipe: message can be string or string[]. */
 export function getApiErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
   try {
-    const obj = JSON.parse(raw) as { message?: string; error?: string };
-    if (typeof obj.message === 'string' && obj.message.trim()) return obj.message.trim();
+    const obj = JSON.parse(raw) as { message?: string | string[]; error?: string };
+    if (obj.message != null) {
+      if (Array.isArray(obj.message)) {
+        const joined = obj.message.filter((m) => typeof m === 'string').join('. ');
+        if (joined) return joined;
+      }
+      if (typeof obj.message === 'string' && obj.message.trim()) return obj.message.trim();
+    }
     if (typeof obj.error === 'string' && obj.error.trim()) return obj.error.trim();
   } catch {
     // not JSON
@@ -172,6 +178,26 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ email, newPassword }),
       }),
+    /** Download pitch PDF for a tenant (SUPER_ADMIN). Fetches blob and triggers browser download. */
+    downloadTenantPitchPdf: async (tenantId: string): Promise<void> => {
+      const token = storage.getToken();
+      const tenantIdHeader = storage.getTenantId();
+      const API_BASE = import.meta.env.VITE_API_URL || '/api';
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (tenantIdHeader) headers['X-Tenant-ID'] = tenantIdHeader;
+      const res = await fetch(`${API_BASE}/platform/tenants/${encodeURIComponent(tenantId)}/pitch-pdf`, { headers });
+      if (!res.ok) throw new Error(res.statusText || 'Failed to download PDF');
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition');
+      const match = disposition && /filename="?([^";\n]+)"?/.exec(disposition);
+      const fileName = match ? match[1].trim() : `pitch-${tenantId}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
   },
   followUps: {
     create: (data: { memberId: string; regNo: number; comment: string; nextFollowUpDate?: string }) =>

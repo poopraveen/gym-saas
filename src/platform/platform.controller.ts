@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
   ForbiddenException,
+  StreamableFile,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -61,5 +62,15 @@ export class PlatformController {
     );
     if (!ok) throw new ForbiddenException('User not found');
     return { success: true };
+  }
+
+  /** GET /platform/tenants/:id/pitch-pdf — generate application pitch PDF for this tenant (SUPER_ADMIN only). */
+  @Get('tenants/:id/pitch-pdf')
+  async getTenantPitchPdf(@Param('id') id: string) {
+    const { buffer, fileName } = await this.platformService.getTenantPitchPdf(id);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${fileName}"`,
+    });
   }
 }

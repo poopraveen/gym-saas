@@ -109,6 +109,9 @@ export default function NutritionAI() {
   const [profileForm, setProfileForm] = useState<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }>({});
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileLoadError, setProfileLoadError] = useState('');
+  /** Height/weight input preference: users can enter in cm or ft/in, kg or lbs */
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft'>('cm');
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
   /** Add-food form: selected food, quantity, unit. Use "__others__" when "Others (enter new)" is selected */
   const [addFoodName, setAddFoodName] = useState('');
   const [addFoodQty, setAddFoodQty] = useState('1');
@@ -252,6 +255,7 @@ export default function NutritionAI() {
     setProfileLoadError('');
   };
   const saveProfileFromModal = async () => {
+    setProfileLoadError('');
     setProfileSaving(true);
     try {
       await api.calories.saveProfile(profileForm);
@@ -263,6 +267,18 @@ export default function NutritionAI() {
       setProfileSaving(false);
     }
   };
+
+  /** Height: cm to feet + inches for display */
+  const heightCmToFeetInches = (cm: number | undefined) => {
+    if (cm == null || cm <= 0) return { feet: 0, inches: 0 };
+    const totalInches = cm / 2.54;
+    const feet = Math.floor(totalInches / 12);
+    const inches = Math.round(totalInches % 12);
+    return { feet, inches };
+  };
+  const feetInchesToCm = (feet: number, inches: number) => Math.round((feet * 12 + inches) * 2.54);
+  const kgToLbs = (kg: number | undefined) => (kg == null ? 0 : Math.round(kg * 2.205));
+  const lbsToKg = (lbs: number) => lbs / 2.205;
 
   const loadMemberProgress = async (member: AiMember) => {
     setSelectedMember(member);
@@ -992,7 +1008,7 @@ export default function NutritionAI() {
                   <div className="modal-card profile-modal" onClick={(e) => e.stopPropagation()}>
                     <h2 id="profile-modal-title">RDI profile (age, gender, height, weight, goal)</h2>
                     <p className="modal-hint">Pre-filled from your member data when available. Used for better daily recommendations.</p>
-                    {profileLoadError && <div className="profile-modal-error">{profileLoadError}</div>}
+                    {profileLoadError && <div className="profile-modal-error" role="alert">{profileLoadError}</div>}
                     <div className="profile-modal-fields">
                       <input type="number" placeholder="Age" min={1} max={120} value={profileForm.age ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, age: e.target.value ? Number(e.target.value) : undefined }))} />
                       <select value={profileForm.gender ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, gender: e.target.value || undefined }))}>
@@ -1000,8 +1016,45 @@ export default function NutritionAI() {
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                       </select>
-                      <input type="number" placeholder="Height (cm)" min={50} max={250} value={profileForm.heightCm ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, heightCm: e.target.value ? Number(e.target.value) : undefined }))} />
-                      <input type="number" placeholder="Weight (kg)" min={20} max={300} value={profileForm.weightKg ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, weightKg: e.target.value ? Number(e.target.value) : undefined }))} />
+                      <div className="profile-field-group">
+                        <span className="profile-field-label">Height</span>
+                        <div className="profile-unit-row">
+                          <label className="profile-unit-option">
+                            <input type="radio" name="heightUnit" checked={heightUnit === 'cm'} onChange={() => setHeightUnit('cm')} />
+                            <span>cm</span>
+                          </label>
+                          <label className="profile-unit-option">
+                            <input type="radio" name="heightUnit" checked={heightUnit === 'ft'} onChange={() => setHeightUnit('ft')} />
+                            <span>ft & in</span>
+                          </label>
+                        </div>
+                        {heightUnit === 'cm' ? (
+                          <input type="number" placeholder="Height (cm)" min={50} max={250} value={profileForm.heightCm ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, heightCm: e.target.value ? Number(e.target.value) : undefined }))} />
+                        ) : (
+                          <div className="profile-height-ft">
+                            <input type="number" placeholder="ft" min={2} max={8} value={profileForm.heightCm != null && profileForm.heightCm > 0 ? heightCmToFeetInches(profileForm.heightCm).feet : ''} onChange={(e) => { const ft = e.target.value !== '' ? Number(e.target.value) : 0; const { inches } = heightCmToFeetInches(profileForm.heightCm); setProfileForm((p) => ({ ...p, heightCm: feetInchesToCm(ft, inches) })); }} />
+                            <input type="number" placeholder="in" min={0} max={11} value={profileForm.heightCm != null && profileForm.heightCm > 0 ? heightCmToFeetInches(profileForm.heightCm).inches : ''} onChange={(e) => { const inc = e.target.value !== '' ? Number(e.target.value) : 0; const { feet } = heightCmToFeetInches(profileForm.heightCm); setProfileForm((p) => ({ ...p, heightCm: feetInchesToCm(feet, inc) })); }} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="profile-field-group">
+                        <span className="profile-field-label">Weight</span>
+                        <div className="profile-unit-row">
+                          <label className="profile-unit-option">
+                            <input type="radio" name="weightUnit" checked={weightUnit === 'kg'} onChange={() => setWeightUnit('kg')} />
+                            <span>kg</span>
+                          </label>
+                          <label className="profile-unit-option">
+                            <input type="radio" name="weightUnit" checked={weightUnit === 'lbs'} onChange={() => setWeightUnit('lbs')} />
+                            <span>lbs</span>
+                          </label>
+                        </div>
+                        {weightUnit === 'kg' ? (
+                          <input type="number" placeholder="Weight (kg)" min={20} max={300} step="0.1" value={profileForm.weightKg ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, weightKg: e.target.value ? Number(e.target.value) : undefined }))} />
+                        ) : (
+                          <input type="number" placeholder="Weight (lbs)" min={44} max={660} step="0.1" value={profileForm.weightKg != null ? Math.round(profileForm.weightKg * 2.205 * 10) / 10 : ''} onChange={(e) => setProfileForm((p) => ({ ...p, weightKg: e.target.value ? lbsToKg(Number(e.target.value)) : undefined }))} />
+                        )}
+                      </div>
                       <select value={profileForm.goal ?? ''} onChange={(e) => setProfileForm((p) => ({ ...p, goal: e.target.value || undefined }))}>
                         <option value="">Goal</option>
                         <option value="weight_loss">Weight loss</option>

@@ -14,6 +14,8 @@ export default function GlobalLoader() {
   }, []);
 
   if (count === 0) return null;
+  // Hide overlay during pitch screenshot capture so PDF images are clean
+  if (typeof window !== 'undefined' && sessionStorage.getItem('hide_loader_for_screenshot') === '1') return null;
 
   return (
     <div className="global-loader-overlay" aria-busy="true" aria-live="polite" role="status">
