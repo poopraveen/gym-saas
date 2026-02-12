@@ -15,6 +15,8 @@ import { PlatformModule } from './platform/platform.module';
 import { EnquiriesModule } from './enquiries/enquiries.module';
 import { CaloriesModule } from './calories/calories.module';
 import { MedicalHistoryModule } from './medical-history/medical-history.module';
+import { WorkoutPlanModule } from './workout-plan/workout-plan.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   controllers: [AppController],
@@ -36,6 +38,8 @@ import { MedicalHistoryModule } from './medical-history/medical-history.module';
     EnquiriesModule,
     CaloriesModule,
     MedicalHistoryModule,
+    WorkoutPlanModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

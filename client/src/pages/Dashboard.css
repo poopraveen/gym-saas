@@ -701,6 +701,27 @@
   background: var(--primary-hover);
 }
 
+.checkin-qr-wrap {
+  margin-bottom: 20px;
+}
+
+.checkin-qr-label {
+  margin: 0 0 10px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.checkin-qr-box {
+  display: inline-block;
+  padding: 12px;
+  background: white;
+  border-radius: 10px;
+}
+
+.checkin-qr-box svg {
+  display: block;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -720,11 +741,41 @@
   max-width: 1400px;
 }
 
+.dashboard-fit {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dashboard-fit .page-title {
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
+.dashboard-fit .dashboard-cards {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
 .dashboard-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 20px;
   margin-bottom: 28px;
+}
+
+.dashboard-cards-grid {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .dashboard-cards-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dash-card {
@@ -736,6 +787,15 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.dash-card-clickable {
+  cursor: pointer;
+}
+
+.dash-card-clickable:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 .dash-card-1 { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(59, 130, 246, 0.1) 100%); }
@@ -752,6 +812,163 @@
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-primary);
+}
+
+.dc-value-split {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.dc-sep {
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0 2px;
+}
+
+.dc-sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.dc-action {
+  font-size: 0.9rem;
+  color: var(--primary);
+  margin-top: auto;
+}
+
+/* Renewals due in 3 days – popup with table + WhatsApp follow-up */
+.renewals-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.renewals-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+.renewals-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.renewals-modal-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.renewals-modal-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.renewals-modal-close:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.renewals-modal-body {
+  padding: 1rem 1.25rem;
+  overflow: auto;
+  min-height: 0;
+}
+
+.renewals-modal-hint {
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.renewals-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.renewals-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.renewals-table th,
+.renewals-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.renewals-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--input-bg);
+  white-space: nowrap;
+}
+
+.renewals-table td {
+  color: var(--text-primary);
+}
+
+.renewals-td-name {
+  font-weight: 500;
+}
+
+.renewals-td-phone {
+  font-variant-numeric: tabular-nums;
+}
+
+.renewals-td-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.renewals-td-action .whatsapp-btn {
+  flex-shrink: 0;
+}
+
+.renewals-followup-btn {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.renewals-followup-btn:hover {
+  background: var(--primary-hover);
 }
 
 .dashboard-charts {
@@ -1058,6 +1275,27 @@
   }
   .sort-by-wrap label {
     font-size: 0.85rem;
+  }
+  .renewals-modal-overlay {
+    padding: 0.5rem;
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
+  .renewals-modal {
+    max-height: 90vh;
+  }
+  .renewals-modal-header,
+  .renewals-modal-body {
+    padding: 0.85rem 1rem;
+  }
+  .renewals-table th,
+  .renewals-table td {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.85rem;
+  }
+  .renewals-td-action {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

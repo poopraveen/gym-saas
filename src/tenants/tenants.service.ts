@@ -25,6 +25,8 @@ export interface UpdateTenantDto {
   defaultTheme?: ThemeType;
   branding?: Partial<TenantBranding>;
   subscriptionTier?: SubscriptionTier;
+  /** Optional settings (e.g. telegramChatId for absence alerts). */
+  settings?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -61,7 +63,7 @@ export class TenantsService {
       tenant = byHost as Record<string, unknown> | null;
     }
     if (!tenant) {
-      return { name: 'Reps & Dips', theme: 'dark', allowsMedicalDocuments: false };
+      return { name: 'Reps & Dips', theme: 'dark', allowsMedicalDocuments: false, medicalDocumentsLimit: 5 };
     }
     const t = tenant as {
       name?: string;
@@ -70,6 +72,7 @@ export class TenantsService {
       subscriptionTier?: SubscriptionTier;
     };
     const tier = t.subscriptionTier ?? 'free';
+    const medicalDocumentsLimit = tier === 'premium' ? 30 : 5;
     return {
       name: t.name || 'Gym',
       theme: t.defaultTheme || 'dark',
@@ -77,6 +80,7 @@ export class TenantsService {
       backgroundImage: t.branding?.backgroundImage,
       primaryColor: t.branding?.primaryColor,
       allowsMedicalDocuments: tier === 'premium',
+      medicalDocumentsLimit,
     };
   }
 
@@ -104,6 +108,7 @@ export class TenantsService {
     if (dto.defaultTheme != null) update.defaultTheme = dto.defaultTheme;
     if (dto.branding != null) update.branding = dto.branding;
     if (dto.subscriptionTier != null) update.subscriptionTier = dto.subscriptionTier;
+    if (dto.settings != null) update.settings = dto.settings;
     await this.tenantModel.updateOne({ _id: tenantId }, { $set: update });
     return this.findById(tenantId);
   }

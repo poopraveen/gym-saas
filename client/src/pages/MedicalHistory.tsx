@@ -64,6 +64,8 @@ export default function MedicalHistory() {
   const [viewDocError, setViewDocError] = useState('');
   const [viewDocLoading, setViewDocLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingHealthForm, setEditingHealthForm] = useState(false);
+  const [tenantConfig, setTenantConfig] = useState<{ medicalDocumentsLimit?: number; allowsMedicalDocuments?: boolean } | null>(null);
 
   const bloodGroups = useMemo(
     () => ['', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'],
@@ -112,6 +114,19 @@ export default function MedicalHistory() {
     if (!isMember) return;
     loadDocuments();
   }, [isMember]);
+
+  useEffect(() => {
+    const tenantId = storage.getTenantId();
+    if (!tenantId) return;
+    api.tenant.getConfig(undefined, tenantId)
+      .then((c) => setTenantConfig({ medicalDocumentsLimit: c.medicalDocumentsLimit ?? 5, allowsMedicalDocuments: c.allowsMedicalDocuments }))
+      .catch(() => setTenantConfig({ medicalDocumentsLimit: 5, allowsMedicalDocuments: false }));
+  }, [isMember]);
+
+  const maxDocuments = tenantConfig?.medicalDocumentsLimit ?? 5;
+  const atDocumentLimit = documents.length >= maxDocuments;
+  const hasSavedHealthData = !!(form.updatedAt || (form.bloodGroup || form.emergencyContactName || form.emergencyContactPhone || (form.allergies && form.allergies.length) || (form.conditions && form.conditions.length) || (form.medications && form.medications.length) || (form.injuries && form.injuries.length) || form.notes));
+  const showHealthForm = !hasSavedHealthData || editingHealthForm;
 
   const handleUpload = async () => {
     if (!uploadFile) {
@@ -208,6 +223,11 @@ export default function MedicalHistory() {
       navigate('/medical-history');
       return;
     }
+    if (id === 'workout-plan') {
+      setActiveNav('workout-plan');
+      navigate('/workout-plan');
+      return;
+    }
   };
 
   const handleSave = async () => {
@@ -225,12 +245,34 @@ export default function MedicalHistory() {
         emergencyContactPhone: form.emergencyContactPhone?.trim() || undefined,
       };
       const saved = (await api.medicalHistory.saveMine(payload)) as MedicalHistoryModel | null;
-      if (saved) setForm((p) => ({ ...p, updatedAt: saved.updatedAt }));
+      if (saved) {
+        setForm((p) => ({ ...p, updatedAt: saved.updatedAt }));
+        setEditingHealthForm(false);
+      }
     } catch (e) {
       setError(getApiErrorMessage(e));
     } finally {
       setSaving(false);
     }
+  };
+
+  const downloadDocumentsCsv = () => {
+    const headers = ['#', 'Record ID', 'Name', 'File name', 'Date', 'Size'];
+    const rows = documents.map((doc, i) => [
+      i + 1,
+      shortId(doc._id),
+      doc.label || doc.originalName,
+      doc.originalName,
+      formatDate(doc.uploadedAt),
+      formatSize(doc.size) || '',
+    ]);
+    const csv = [headers.join(','), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `medical-records-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   if (!isMember) {
@@ -250,88 +292,108 @@ export default function MedicalHistory() {
     <Layout activeNav={activeNav as any} onNavChange={handleNavChange} onLogout={handleLogout}>
       <div className="medical-history-page">
         <h1 className="page-title">Medical History</h1>
-        <p className="mh-hint">
-          Add important health details (allergies, conditions, medications). This helps trainers/guidance. You can update anytime.
-        </p>
 
-        <div className="mh-card">
-          {error && <div className="mh-error">{error}</div>}
-          {loading ? (
-            <div className="mh-hint">Loading…</div>
-          ) : (
-            <>
-              <div className="mh-grid">
-                <div className="mh-row">
-                  <select
-                    value={form.bloodGroup || ''}
-                    onChange={(e) => setForm((p) => ({ ...p, bloodGroup: e.target.value || '' }))}
-                  >
-                    {bloodGroups.map((bg) => (
-                      <option key={bg} value={bg}>
-                        {bg || 'Blood group (optional)'}
-                      </option>
-                    ))}
-                  </select>
+        {showHealthForm ? (
+          <div className="mh-card">
+            <p className="mh-hint">Add important health details (allergies, conditions, medications). This helps trainers/guidance. You can update anytime.</p>
+            {error && <div className="mh-error">{error}</div>}
+            {loading ? (
+              <div className="mh-hint">Loading…</div>
+            ) : (
+              <>
+                <div className="mh-grid">
+                  <div className="mh-row">
+                    <select
+                      value={form.bloodGroup || ''}
+                      onChange={(e) => setForm((p) => ({ ...p, bloodGroup: e.target.value || '' }))}
+                    >
+                      {bloodGroups.map((bg) => (
+                        <option key={bg} value={bg}>{bg || 'Blood group (optional)'}</option>
+                      ))}
+                    </select>
+                    <input
+                      value={form.emergencyContactPhone || ''}
+                      placeholder="Emergency contact phone"
+                      onChange={(e) => setForm((p) => ({ ...p, emergencyContactPhone: e.target.value }))}
+                    />
+                  </div>
                   <input
-                    value={form.emergencyContactPhone || ''}
-                    placeholder="Emergency contact phone"
-                    onChange={(e) => setForm((p) => ({ ...p, emergencyContactPhone: e.target.value }))}
+                    value={form.emergencyContactName || ''}
+                    placeholder="Emergency contact name"
+                    onChange={(e) => setForm((p) => ({ ...p, emergencyContactName: e.target.value }))}
+                  />
+                  <input
+                    value={allergiesText}
+                    placeholder="Allergies (comma separated) e.g. peanuts, lactose"
+                    onChange={(e) => setAllergiesText(e.target.value)}
+                  />
+                  <input
+                    value={conditionsText}
+                    placeholder="Conditions (comma separated) e.g. asthma, diabetes"
+                    onChange={(e) => setConditionsText(e.target.value)}
+                  />
+                  <input
+                    value={medicationsText}
+                    placeholder="Medications (comma separated) e.g. metformin"
+                    onChange={(e) => setMedicationsText(e.target.value)}
+                  />
+                  <input
+                    value={injuriesText}
+                    placeholder="Injuries (comma separated) e.g. knee pain"
+                    onChange={(e) => setInjuriesText(e.target.value)}
+                  />
+                  <textarea
+                    value={form.notes || ''}
+                    placeholder="Notes (optional) e.g. doctor advice, surgery history"
+                    onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                   />
                 </div>
-
-                <input
-                  value={form.emergencyContactName || ''}
-                  placeholder="Emergency contact name"
-                  onChange={(e) => setForm((p) => ({ ...p, emergencyContactName: e.target.value }))}
-                />
-
-                <input
-                  value={allergiesText}
-                  placeholder="Allergies (comma separated) e.g. peanuts, lactose"
-                  onChange={(e) => setAllergiesText(e.target.value)}
-                />
-                <input
-                  value={conditionsText}
-                  placeholder="Conditions (comma separated) e.g. asthma, diabetes"
-                  onChange={(e) => setConditionsText(e.target.value)}
-                />
-                <input
-                  value={medicationsText}
-                  placeholder="Medications (comma separated) e.g. metformin"
-                  onChange={(e) => setMedicationsText(e.target.value)}
-                />
-                <input
-                  value={injuriesText}
-                  placeholder="Injuries (comma separated) e.g. knee pain"
-                  onChange={(e) => setInjuriesText(e.target.value)}
-                />
-                <textarea
-                  value={form.notes || ''}
-                  placeholder="Notes (optional) e.g. doctor advice, surgery history"
-                  onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                />
-              </div>
-
-              <div className="mh-actions">
-                <button type="button" className="btn-secondary" onClick={() => navigate('/nutrition-ai')} disabled={saving}>
-                  Back
-                </button>
-                <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-                  {saving ? 'Saving…' : 'Save medical history'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+                <div className="mh-actions">
+                  <button type="button" className="btn-secondary" onClick={() => navigate('/nutrition-ai')} disabled={saving}>Back</button>
+                  <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="mh-card mh-health-table-card">
+            <h2 className="mh-section-title">Your health details</h2>
+            {error && <div className="mh-error">{error}</div>}
+            {loading ? (
+              <div className="mh-hint">Loading…</div>
+            ) : (
+              <>
+                <div className="mh-health-table-wrap">
+                  <table className="mh-health-table">
+                    <tbody>
+                      <tr><th>Blood group</th><td>{form.bloodGroup || '—'}</td></tr>
+                      <tr><th>Emergency contact</th><td>{[form.emergencyContactName, form.emergencyContactPhone].filter(Boolean).join(' · ') || '—'}</td></tr>
+                      <tr><th>Allergies</th><td>{joinCsv(form.allergies) || '—'}</td></tr>
+                      <tr><th>Conditions</th><td>{joinCsv(form.conditions) || '—'}</td></tr>
+                      <tr><th>Medications</th><td>{joinCsv(form.medications) || '—'}</td></tr>
+                      <tr><th>Injuries</th><td>{joinCsv(form.injuries) || '—'}</td></tr>
+                      <tr><th>Notes</th><td>{form.notes || '—'}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mh-actions">
+                  <button type="button" className="btn-secondary" onClick={() => navigate('/nutrition-ai')}>Back</button>
+                  <button type="button" className="btn-primary" onClick={() => setEditingHealthForm(true)}>Edit</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="mh-card mh-docs-card">
           <h2 className="mh-docs-title">Medical records (photos & documents)</h2>
           <p className="mh-hint">
-            Upload lab reports, prescriptions, or photos for future reference. You can name each record (e.g. &quot;Blood test March 2024&quot;). Document upload is available on the Premium plan. Maximum 5 records per user.
+            You can upload up to {maxDocuments} records. {maxDocuments === 5 ? 'Subscribe to Premium to upload more than 5.' : ''}
           </p>
-          <p className={`mh-docs-limit ${documents.length >= 5 ? 'mh-docs-limit-max' : ''}`}>
-            You have {documents.length}/5 records.
-            {documents.length >= 5 && ' Delete one to upload a new record.'}
+          <p className={`mh-docs-limit ${atDocumentLimit ? 'mh-docs-limit-max' : ''}`}>
+            You have {documents.length}/{maxDocuments} records.
+            {atDocumentLimit && !tenantConfig?.allowsMedicalDocuments && ' Subscribe to Premium to upload more.'}
+            {atDocumentLimit && tenantConfig?.allowsMedicalDocuments && ' Delete one to upload a new record.'}
           </p>
           <div className="mh-upload-row">
             <input
@@ -340,7 +402,7 @@ export default function MedicalHistory() {
               accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
               className="mh-file-input"
               onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-              disabled={documents.length >= 5}
+              disabled={atDocumentLimit}
             />
             <input
               type="text"
@@ -348,23 +410,30 @@ export default function MedicalHistory() {
               placeholder="Name for this record (optional)"
               value={uploadLabel}
               onChange={(e) => setUploadLabel(e.target.value)}
-              disabled={documents.length >= 5}
+              disabled={atDocumentLimit}
             />
             <button
               type="button"
               className="btn-primary"
               onClick={handleUpload}
-              disabled={uploading || !uploadFile || documents.length >= 5}
+              disabled={uploading || !uploadFile || atDocumentLimit}
             >
-              {uploading ? 'Uploading…' : documents.length >= 5 ? 'Max 5 records' : 'Upload'}
+              {uploading ? 'Uploading…' : atDocumentLimit ? `Max ${maxDocuments} records` : 'Upload'}
             </button>
           </div>
           {uploadError && <div className="mh-error">{uploadError}</div>}
           <p className="mh-hint mh-upload-hint">Images: JPEG, PNG, GIF, WebP. Documents: PDF. Max 10 MB.</p>
 
           <div className="mh-docs-list-section">
-            <h3 className="mh-docs-list-title">Your medical records</h3>
-            <p className="mh-hint">Records are stored by ID and name. Click View to open and download from Cloudinary.</p>
+            <div className="mh-docs-list-header">
+              <h3 className="mh-docs-list-title">Your medical records</h3>
+              {documents.length > 0 && (
+                <button type="button" className="btn-secondary mh-export-btn" onClick={downloadDocumentsCsv}>
+                  Download table (CSV)
+                </button>
+              )}
+            </div>
+            <p className="mh-hint">Click View to open and download. Export the table below for your records.</p>
             {documentsLoading ? (
               <p className="mh-hint">Loading…</p>
             ) : documents.length === 0 ? (

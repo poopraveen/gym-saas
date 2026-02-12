@@ -12,6 +12,10 @@ export class MedicalHistoryDocument extends Document {
   @Prop({ required: true })
   publicId: string;
 
+  /** Cloudinary resource_type (e.g. image, raw) for correct delete. */
+  @Prop()
+  resourceType?: string;
+
   @Prop({ required: true })
   originalName: string;
 

@@ -3,13 +3,26 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Readable } from 'stream';
+import * as path from 'path';
 import * as sharp from 'sharp';
 import { v2 as cloudinary } from 'cloudinary';
 import { MedicalHistoryDocument } from './schemas/medical-history-document.schema';
 import { TenantsService, SubscriptionTier } from '../tenants/tenants.service';
 
+/** Ensure .env is loaded from project root (same folder as package.json) if not already in process.env. */
+function ensureEnvLoaded(): void {
+  if (process.env.CLOUDINARY_URL || process.env.CLOUDINARY_CLOUD_NAME) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
+  } catch {
+    // dotenv or .env missing; continue
+  }
+}
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-const MAX_DOCUMENTS_PER_USER = 5;
+const MAX_DOCUMENTS_FREE = 5;
+const MAX_DOCUMENTS_PREMIUM = 30;
 
 const ALLOWED_MIMES = [
   'image/jpeg',
@@ -24,30 +37,38 @@ const MAX_IMAGE_DIMENSION = 1920;
 /** WebP quality (0–100) for compressed images. */
 const COMPRESS_QUALITY = 80;
 
+/**
+ * Configure Cloudinary. Prefer explicit env vars (App Key = api_key, API Secret = api_secret).
+ * Format: CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
+ * i.e. App Key before the colon, API Secret after.
+ */
 function configureCloudinary(config: ConfigService): void {
-  const url = config.get<string>('CLOUDINARY_URL');
-  if (url && url.startsWith('cloudinary://')) {
+  const cloudName = config.get<string>('CLOUDINARY_CLOUD_NAME') || process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = config.get<string>('CLOUDINARY_API_KEY') || process.env.CLOUDINARY_API_KEY;
+  const apiSecret = config.get<string>('CLOUDINARY_API_SECRET') || process.env.CLOUDINARY_API_SECRET;
+  if (cloudName && apiKey && apiSecret) {
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+    return;
+  }
+  const url = config.get<string>('CLOUDINARY_URL') || process.env.CLOUDINARY_URL;
+  if (url && typeof url === 'string' && url.startsWith('cloudinary://')) {
     try {
       const rest = url.replace('cloudinary://', '');
       const at = rest.indexOf('@');
       if (at === -1) return;
       const keySecret = rest.slice(0, at);
-      const cloudName = rest.slice(at + 1).split('/')[0];
+      const parsedCloudName = rest.slice(at + 1).split('/')[0];
       const colon = keySecret.indexOf(':');
       if (colon === -1) return;
-      const apiKey = keySecret.slice(0, colon);
-      const apiSecret = keySecret.slice(colon + 1);
-      cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+      const parsedApiKey = keySecret.slice(0, colon);
+      const parsedApiSecret = keySecret.slice(colon + 1);
+      cloudinary.config({
+        cloud_name: parsedCloudName,
+        api_key: parsedApiKey,
+        api_secret: parsedApiSecret,
+      });
     } catch {
-      // fallback to separate env vars
-    }
-  }
-  if (!cloudinary.config().cloud_name) {
-    const cloudName = config.get<string>('CLOUDINARY_CLOUD_NAME');
-    const apiKey = config.get<string>('CLOUDINARY_API_KEY');
-    const apiSecret = config.get<string>('CLOUDINARY_API_SECRET');
-    if (cloudName && apiKey && apiSecret) {
-      cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+      // ignore
     }
   }
 }
@@ -107,13 +128,16 @@ export class MedicalHistoryDocumentsService {
     label?: string,
   ): Promise<{ _id: string; originalName: string; label?: string; mimeType: string; size: number; url: string; uploadedAt: string }> {
     const tier = await this.getTenantTier(tenantId);
-    if (tier !== 'premium') {
-      throw new ForbiddenException('Document upload is available on the Premium plan.');
-    }
     const currentCount = await this.docModel.countDocuments({ tenantId, userId });
-    if (currentCount >= MAX_DOCUMENTS_PER_USER) {
+    const limit = tier === 'premium' ? MAX_DOCUMENTS_PREMIUM : MAX_DOCUMENTS_FREE;
+    if (currentCount >= limit) {
+      if (tier !== 'premium') {
+        throw new ForbiddenException(
+          'You have reached the limit of 5 medical records. Subscribe to Premium to upload more.',
+        );
+      }
       throw new ForbiddenException(
-        `Maximum ${MAX_DOCUMENTS_PER_USER} medical records allowed. Delete an existing record to upload a new one.`,
+        `Maximum ${MAX_DOCUMENTS_PREMIUM} medical records allowed. Delete an existing record to upload a new one.`,
       );
     }
     if (!file.buffer || file.buffer.length === 0) {
@@ -125,8 +149,21 @@ export class MedicalHistoryDocumentsService {
     if (!ALLOWED_MIMES.includes(file.mimetype)) {
       throw new BadRequestException('Allowed types: images (JPEG, PNG, GIF, WebP) and PDF.');
     }
-    if (!this.configService.get('CLOUDINARY_URL') && !this.configService.get('CLOUDINARY_CLOUD_NAME')) {
-      throw new BadRequestException('File storage is not configured.');
+    ensureEnvLoaded();
+    configureCloudinary(this.configService);
+    const hasUrl = !!(this.configService.get('CLOUDINARY_URL') || process.env.CLOUDINARY_URL);
+    const hasSeparate = !!(this.configService.get('CLOUDINARY_CLOUD_NAME') || process.env.CLOUDINARY_CLOUD_NAME);
+    const cloudConfigured = !!cloudinary.config().cloud_name;
+    const envPath = path.resolve(process.cwd(), '.env');
+    if (!cloudConfigured && !hasUrl && !hasSeparate) {
+      throw new BadRequestException(
+        `File storage is not configured. Add CLOUDINARY_URL to the .env file. Expected file location: ${envPath} (run the server from the project root, same folder as package.json). Example line: CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME Then restart the server.`,
+      );
+    }
+    if (!cloudConfigured) {
+      throw new BadRequestException(
+        `File storage is not configured. CLOUDINARY_URL is set but invalid or Cloudinary could not be configured. Check the value in ${envPath} — it must be exactly: cloudinary://API_KEY:API_SECRET@CLOUD_NAME (no quotes, no spaces). Then restart the server.`,
+      );
     }
 
     let buffer = file.buffer;
@@ -159,6 +196,7 @@ export class MedicalHistoryDocumentsService {
               tenantId,
               userId,
               publicId: result.public_id,
+              resourceType: (result as any).resource_type || 'image',
               originalName: file.originalname,
               label: displayLabel,
               mimeType: mimetype,
@@ -221,13 +259,16 @@ export class MedicalHistoryDocumentsService {
     const doc = await this.docModel.findOne({ _id: documentId, tenantId, userId }).lean();
     if (!doc) return false;
     const d = doc as any;
+    const resourceType = d.resourceType || 'image';
     try {
-      await cloudinary.uploader.destroy(d.publicId, { resource_type: 'image' });
+      await cloudinary.uploader.destroy(d.publicId, { resource_type: resourceType });
     } catch {
-      try {
-        await cloudinary.uploader.destroy(d.publicId, { resource_type: 'raw' });
-      } catch {
-        // ignore
+      if (resourceType !== 'raw') {
+        try {
+          await cloudinary.uploader.destroy(d.publicId, { resource_type: 'raw' });
+        } catch {
+          // ignore
+        }
       }
     }
     await this.docModel.deleteOne({ _id: documentId, tenantId, userId });

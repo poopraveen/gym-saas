@@ -17,7 +17,7 @@ export default function Layout({
   onLogout,
 }: {
   children: React.ReactNode;
-  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries' | 'onboarding' | 'nutrition-ai' | 'medical-history';
+  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries' | 'onboarding' | 'nutrition-ai' | 'medical-history' | 'workout-plan';
   onNavChange: (id: string) => void;
   onLogout: () => void;
 }) {
@@ -71,6 +71,7 @@ export default function Layout({
     ? [
         { id: 'nutrition-ai', label: 'Nutrition AI', icon: '🥗' },
         { id: 'medical-history', label: 'Medical History', icon: '🩺' },
+        { id: 'workout-plan', label: 'Workout Plan', icon: '💪' },
       ]
     : [
         { id: 'dashboard', label: 'Dashboard', icon: '📊' },

@@ -43,6 +43,59 @@ function averageCalories(history: { totalCalories: number }[]): number | null {
   return Math.round(sum / history.length);
 }
 
+/** Format nutrient key for display (e.g. vitaminD -> Vitamin D, vitaminBComplex -> Vitamin B Complex, calcium -> Calcium). */
+function formatNutrientLabel(key: string): string {
+  const withSpaces = key.replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+  return withSpaces.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+/** Default units for micros (for display). */
+const NUTRIENT_UNIT: Record<string, string> = {
+  vitaminA: 'mcg', vitaminBComplex: 'mg', vitaminC: 'mg', vitaminD: 'mcg', vitaminE: 'mg',
+  calcium: 'mg', iron: 'mg', magnesium: 'mg', potassium: 'mg', sodium: 'mg', zinc: 'mg',
+};
+
+/** Render vitamins/minerals block with scale (progress bar) for each value. */
+function NutrientScalesSection({
+  title,
+  values,
+  rdiPct,
+  unitMap = NUTRIENT_UNIT,
+}: {
+  title: string;
+  values: Record<string, number> | undefined;
+  rdiPct: Record<string, number> | undefined;
+  unitMap?: Record<string, string>;
+}) {
+  if (!rdiPct || typeof rdiPct !== 'object' || Object.keys(rdiPct).length === 0) return null;
+  const entries = Object.entries(rdiPct).filter(([, p]) => typeof p === 'number');
+  if (entries.length === 0) return null;
+  return (
+    <div className="nutrient-scales-section">
+      <h3>{title}</h3>
+      <div className="nutrient-scales-grid">
+        {entries.map(([key, pct]) => {
+          const value = values?.[key];
+          const unit = unitMap[key] ?? '';
+          const pctNum = Number(pct);
+          const barPct = Math.min(100, Math.max(0, pctNum));
+          const barColor = pctNum < 70 ? 'var(--pill-expired, #dc2626)' : pctNum <= 110 ? 'var(--primary)' : 'var(--pill-soon, #d97706)';
+          return (
+            <div key={key} className="summary-item nutrient-scale-item">
+              <span className="summary-label">{formatNutrientLabel(key)}</span>
+              <span className="summary-value">{value != null ? `${Number(value).toFixed(1)} ${unit}` : '—'}</span>
+              <div className="progress-wrap">
+                <div className="progress-bar" style={{ width: `${barPct}%`, backgroundColor: barColor }} />
+                <span className="progress-pct">{Math.round(pctNum)}% of RDI</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function NutritionAI() {
   const navigate = useNavigate();
   const role = storage.getRole();
@@ -467,6 +520,10 @@ export default function NutritionAI() {
       navigate('/medical-history');
       return;
     }
+    if (id === 'workout-plan') {
+      navigate('/workout-plan');
+      return;
+    }
     if (id === 'onboarding') {
       navigate('/onboarding');
       return;
@@ -747,6 +804,16 @@ export default function NutritionAI() {
                               </div>
                             </div>
                           </div>
+                          <NutrientScalesSection
+                            title="Vitamins"
+                            values={memberAnalysisResult.dailyTotal.vitamins}
+                            rdiPct={memberAnalysisResult.rdiPercentage?.vitamins as Record<string, number> | undefined}
+                          />
+                          <NutrientScalesSection
+                            title="Minerals"
+                            values={memberAnalysisResult.dailyTotal.minerals}
+                            rdiPct={memberAnalysisResult.rdiPercentage?.minerals as Record<string, number> | undefined}
+                          />
                           {memberAnalysisResult.perFood?.length > 0 && (
                             <div className="per-food-section">
                               <h3>Per food</h3>
@@ -1145,6 +1212,16 @@ export default function NutritionAI() {
                 </div>
               </div>
             </div>
+            <NutrientScalesSection
+              title="Vitamins"
+              values={analysisResult.dailyTotal.vitamins}
+              rdiPct={analysisResult.rdiPercentage?.vitamins as Record<string, number> | undefined}
+            />
+            <NutrientScalesSection
+              title="Minerals"
+              values={analysisResult.dailyTotal.minerals}
+              rdiPct={analysisResult.rdiPercentage?.minerals as Record<string, number> | undefined}
+            />
             {analysisResult.perFood?.length > 0 && (
               <div className="per-food-section">
                 <h3>Per food</h3>

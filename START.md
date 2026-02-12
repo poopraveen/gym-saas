@@ -45,3 +45,13 @@ In your browser, go to: **http://localhost:5173**
 ---
 
 **Both servers must be running at the same time** (backend on 3000, frontend on 5173).
+
+## Optional: Medical document uploads (Cloudinary)
+
+To allow members to upload medical documents/photos, add this to the **project root** `.env` (same folder as `package.json`):
+
+```
+CLOUDINARY_URL=cloudinary://YOUR_API_KEY:YOUR_API_SECRET@YOUR_CLOUD_NAME
+```
+
+Then **restart the backend server**. Without this, the app will show "File storage is not configured" when uploading.

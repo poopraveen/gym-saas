@@ -1,6 +1,10 @@
 .medical-history-page {
   padding: 1rem 1.25rem;
   max-width: 560px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  min-height: 0;
 }
 
 .mh-card {
@@ -55,6 +59,7 @@
 
 .mh-row > * {
   flex: 1;
+  min-width: 0;
 }
 
 .mh-actions {
@@ -62,6 +67,49 @@
   gap: 0.75rem;
   justify-content: flex-end;
   margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.mh-actions .btn-primary,
+.mh-actions .btn-secondary {
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  touch-action: manipulation;
+}
+
+/* Health details table (after save – form card disappears) */
+.mh-health-table-card {
+  margin-top: 0.75rem;
+}
+.mh-section-title {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+.mh-health-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+.mh-health-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.mh-health-table th,
+.mh-health-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.mh-health-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  width: 140px;
+  flex-shrink: 0;
+}
+.mh-health-table td {
+  color: var(--text-primary);
 }
 
 /* Medical records (documents) section */
@@ -93,16 +141,25 @@
   font-size: 0.9rem;
   color: var(--text-primary);
   max-width: 100%;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 .mh-label-input {
   flex: 1;
   min-width: 160px;
-  padding: 0.5rem 0.65rem;
+  padding: 0.6rem 0.75rem;
+  min-height: 44px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--input-bg);
   color: var(--text-primary);
   font-size: 0.95rem;
+  box-sizing: border-box;
+}
+.mh-upload-row .btn-primary {
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  touch-action: manipulation;
 }
 .mh-upload-hint {
   margin-top: 0.35rem;
@@ -113,10 +170,22 @@
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
+.mh-docs-list-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
 .mh-docs-list-title {
   font-size: 1rem;
-  margin: 0 0 0.25rem 0;
+  margin: 0;
   color: var(--text-primary);
+}
+.mh-export-btn {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.65rem;
 }
 .mh-docs-table-wrap {
   overflow-x: auto;
@@ -293,5 +362,166 @@
 }
 .mh-view-modal-footer a {
   text-decoration: none;
+}
+
+/* Mobile – proper support: stack rows, touch targets, no overflow */
+@media (max-width: 600px) {
+  .medical-history-page {
+    padding: 0.75rem 1rem;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    max-width: 100%;
+  }
+  .medical-history-page .page-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .mh-card {
+    padding: 0.85rem;
+    margin-top: 0.6rem;
+    border-radius: 12px;
+  }
+  .mh-hint {
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+  /* Stack blood group + emergency phone so they’re not cramped */
+  .mh-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .mh-row > * {
+    width: 100%;
+  }
+  .mh-grid input,
+  .mh-grid textarea,
+  .mh-grid select {
+    padding: 0.6rem 0.75rem;
+    font-size: 16px; /* avoids zoom on iOS */
+    min-height: 44px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .mh-grid textarea {
+    min-height: 100px;
+  }
+  .mh-upload-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+  .mh-upload-row .btn-primary {
+    width: 100%;
+  }
+  .mh-label-input {
+    min-width: 0;
+    width: 100%;
+  }
+  .mh-file-input {
+    width: 100%;
+  }
+  .mh-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  .mh-actions .btn-primary,
+  .mh-actions .btn-secondary {
+    width: 100%;
+    min-height: 48px;
+  }
+  .mh-docs-table-wrap,
+  .mh-health-table-wrap {
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+  }
+  .mh-health-table {
+    font-size: 0.9rem;
+  }
+  .mh-health-table th {
+    width: 120px;
+    min-width: 100px;
+    padding: 0.5rem 0.5rem 0.5rem 0;
+  }
+  .mh-health-table td {
+    padding: 0.5rem 0;
+  }
+  .mh-docs-table th,
+  .mh-docs-table td {
+    padding: 0.5rem 0.4rem;
+    font-size: 0.85rem;
+  }
+  .mh-td-name,
+  .mh-td-filename {
+    max-width: 90px;
+  }
+  .mh-doc-actions {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .mh-doc-actions .mh-doc-btn,
+  .mh-doc-actions .mh-doc-btn-delete {
+    width: 100%;
+    min-height: 40px;
+  }
+  .mh-view-modal-overlay {
+    padding: 0.5rem;
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+    align-items: flex-start;
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+  .mh-view-modal {
+    max-width: 100%;
+    max-height: 95vh;
+    width: 100%;
+  }
+  .mh-view-modal-body {
+    max-height: 55vh;
+  }
+  .mh-view-modal-footer {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .mh-view-modal-footer a,
+  .mh-view-modal-footer button {
+    flex: 1;
+    min-width: 100px;
+    min-height: 44px;
+  }
+  .mh-docs-list-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .mh-export-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* Very small screens – tighten table and ensure no overflow */
+@media (max-width: 380px) {
+  .medical-history-page {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .mh-card {
+    padding: 0.75rem;
+  }
+  .mh-health-table th {
+    width: 100px;
+    font-size: 0.85rem;
+  }
+  .mh-docs-table th:nth-child(n+4),
+  .mh-docs-table td:nth-child(n+4) {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
 }
 

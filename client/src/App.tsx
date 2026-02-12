@@ -9,6 +9,8 @@ import Enquiries from './pages/Enquiries';
 import Onboarding from './pages/Onboarding';
 import NutritionAI from './pages/NutritionAI';
 import MedicalHistory from './pages/MedicalHistory';
+import WorkoutPlan from './pages/WorkoutPlan';
+import CheckIn from './pages/CheckIn';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!storage.getToken() || !storage.getTenantId()) {
@@ -39,6 +41,7 @@ export default function App() {
       <GlobalLoader />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/checkin" element={<CheckIn />} />
         <Route
           path="/platform"
           element={
@@ -76,6 +79,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <MedicalHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workout-plan"
+          element={
+            <ProtectedRoute>
+              <WorkoutPlan />
             </ProtectedRoute>
           }
         />

@@ -20,6 +20,7 @@ import FollowUpModal from '../components/FollowUpModal';
 import PayFeesModal from '../components/PayFeesModal';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { CardSkeleton, ListSkeleton, ChartSkeleton } from '../components/LoadingSkeleton';
+import { QRCodeSVG } from 'qrcode.react';
 import './Dashboard.css';
 
 type Member = Record<string, unknown>;
@@ -70,6 +71,8 @@ export default function Dashboard() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [followUpHistory, setFollowUpHistory] = useState<Array<{ comment: string; nextFollowUpDate?: string; createdAt: string }>>([]);
+  const [qrPayload, setQrPayload] = useState<{ url: string; token: string } | null>(null);
+  const [showRenewalsDueModal, setShowRenewalsDueModal] = useState(false);
 
   const loadList = async () => {
     try {
@@ -149,6 +152,24 @@ export default function Dashboard() {
 
   const totalMembersCount = filteredMembers.length;
   const totalPages = Math.max(1, Math.ceil(totalMembersCount / membersPageSize));
+
+  const inactive7Count = allMembers.filter((m) => {
+    const last = m.lastCheckInTime as string | undefined;
+    if (!last || !String(last).trim()) return true;
+    const d = new Date(String(last));
+    if (isNaN(d.getTime())) return true;
+    const days = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
+    return days > 7;
+  }).length;
+  const renewalsDue3Members = allMembers.filter((m) => {
+    const due = m.dueDate as Date | undefined;
+    if (!due) return false;
+    const d = new Date(due);
+    const days = (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    return days >= 0 && days <= 3;
+  });
+  const renewalsDue3Count = renewalsDue3Members.length;
+  const todayAttendanceCount = checkinTable.length;
   const effectivePage = Math.min(membersPage, totalPages) || 1;
   const paginatedMembers = filteredMembers.slice(
     (effectivePage - 1) * membersPageSize,
@@ -206,7 +227,10 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeNav === 'checkin') loadCheckIn();
+    if (activeNav === 'checkin') {
+      loadCheckIn();
+      api.attendance.qrPayload().then((p) => setQrPayload(p)).catch(() => setQrPayload(null));
+    }
     if (activeNav === 'finance') {
       setDashboardLoading(false);
       loadFinance();
@@ -332,141 +356,93 @@ export default function Dashboard() {
         />
       )}
 
+      {showRenewalsDueModal && (
+        <div className="renewals-modal-overlay" onClick={() => setShowRenewalsDueModal(false)} role="dialog" aria-modal="true" aria-labelledby="renewals-modal-title">
+          <div className="renewals-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="renewals-modal-header">
+              <h2 id="renewals-modal-title">Renewals due in 3 days</h2>
+              <button type="button" className="renewals-modal-close" onClick={() => setShowRenewalsDueModal(false)} aria-label="Close">×</button>
+            </div>
+            <div className="renewals-modal-body">
+              <p className="renewals-modal-hint">Members whose due date is within the next 3 days. Use WhatsApp to follow up.</p>
+              <div className="renewals-table-wrap">
+                <table className="renewals-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Phone</th>
+                      <th>Due date</th>
+                      <th>Follow up</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {renewalsDue3Members.map((m) => (
+                      <tr key={String((m as Record<string, unknown>).memberId ?? m['Reg No:'])}>
+                        <td className="renewals-td-name">{String(m.NAME ?? '—')}</td>
+                        <td className="renewals-td-phone">{String(m['Phone Number'] ?? '—')}</td>
+                        <td>{safeFormat(m.dueDate as Date, 'MMM d, yyyy')}</td>
+                        <td className="renewals-td-action">
+                          <WhatsAppButton
+                            phone={String(m['Phone Number'] ?? '')}
+                            onClick={() => { setShowRenewalsDueModal(false); handleWhatsAppClick(m); }}
+                          />
+                          <button
+                            type="button"
+                            className="btn-sm renewals-followup-btn"
+                            onClick={() => { setShowRenewalsDueModal(false); handleWhatsAppClick(m); }}
+                          >
+                            Follow up
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeNav === 'dashboard' && (
-        <div className="people-view dashboard-view">
+        <div className="people-view dashboard-view dashboard-fit">
           <h1 className="page-title">Dashboard</h1>
           {dashboardLoading ? (
-            <div className="dashboard-cards">
+            <div className="dashboard-cards dashboard-cards-grid">
               {[1, 2, 3, 4].map((i) => (
                 <CardSkeleton key={i} />
               ))}
             </div>
           ) : (
-            <>
-              <div className="dashboard-cards">
-                <div className="dash-card dash-card-1">
-                  <span className="dc-label">Total Members</span>
-                  <span className="dc-value">{(finance?.totalMembers ?? 0).toLocaleString()}</span>
-                </div>
-                <div className="dash-card dash-card-2">
-                  <span className="dc-label">Active Members</span>
-                  <span className="dc-value">{(finance?.activeMembers ?? 0).toLocaleString()}</span>
-                </div>
-                <div className="dash-card dash-card-3">
-                  <span className="dc-label">Fees Collected</span>
-                  <span className="dc-value">₹{(finance?.overallFees ?? 0).toLocaleString()}</span>
-                </div>
-                <div className="dash-card dash-card-4">
-                  <span className="dc-label">Pending Fees</span>
-                  <span className="dc-value">₹{(finance?.pendingFees ?? 0).toLocaleString()}</span>
-                </div>
+            <div className="dashboard-cards dashboard-cards-grid">
+              <div className="dash-card dash-card-1 dash-card-clickable" onClick={() => handleNavChange('add')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handleNavChange('add')}>
+                <span className="dc-label">Register members</span>
+                <span className="dc-value">{(finance?.totalMembers ?? allMembers.length ?? 0).toLocaleString()}</span>
+                <span className="dc-action">Add member →</span>
               </div>
-              <div className="dashboard-charts">
-                <div className="chart-card">
-                  <h4>Fees Paid vs Pending</h4>
-                  {dashboardLoading ? (
-                    <ChartSkeleton />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={feesChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                        <XAxis dataKey="name" stroke="var(--text-secondary)" />
-                        <YAxis stroke="var(--text-secondary)" />
-                        <Tooltip
-                          contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
-                          formatter={(v: number) => [`₹${v.toLocaleString()}`, '']}
-                        />
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-                <div className="chart-card">
-                  <h4>Monthly Member Growth</h4>
-                  {dashboardLoading ? (
-                    <ChartSkeleton />
-                  ) : (finance?.monthlyGrowth?.length ?? 0) > 0 ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <LineChart data={finance?.monthlyGrowth || []}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                        <XAxis dataKey="month" stroke="var(--text-secondary)" />
-                        <YAxis stroke="var(--text-secondary)" />
-                        <Tooltip
-                          contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
-                        />
-                        <Line type="monotone" dataKey="cumulative" stroke="var(--primary)" strokeWidth={2} dot={{ fill: 'var(--primary)' }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="empty-state">No growth data yet</div>
-                  )}
-                </div>
+              <div className="dash-card dash-card-2">
+                <span className="dc-label">Today attendance vs active</span>
+                <span className="dc-value dc-value-split">{todayAttendanceCount} <span className="dc-sep">/</span> {(finance?.activeMembers ?? 0).toLocaleString()}</span>
+                <span className="dc-sub">Check-ins today / Active members</span>
               </div>
-              <div className="monthly-collections-section">
-                <div className="mc-header">
-                  <div>
-                    <h3>Monthly Collection Details</h3>
-                    <p className="mc-subtitle">Fees collected per month (based on member join date)</p>
-                  </div>
-                  {finance?.monthlyCollections && finance.monthlyCollections.length > 0 && (
-                    <button
-                      className="btn-pdf"
-                      onClick={() =>
-                        downloadMonthlyReportPDF(finance.monthlyCollections!, {
-                          totalMembers: finance?.totalMembers,
-                          overallFees: finance?.overallFees,
-                          monthlyFees: finance?.monthlyFees,
-                        })
-                      }
-                      type="button"
-                    >
-                      📥 Download PDF
-                    </button>
-                  )}
-                </div>
-                {finance?.monthlyCollections && finance.monthlyCollections.length > 0 ? (
-                  <>
-                    <div className="mc-chart">
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={finance.monthlyCollections} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                          <XAxis dataKey="month" stroke="var(--text-secondary)" tick={{ fontSize: 11 }} />
-                          <YAxis stroke="var(--text-secondary)" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                          <Tooltip
-                            contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}
-                            formatter={(v: number) => [`₹${Number(v).toLocaleString()}`, 'Collection']}
-                            labelFormatter={(l) => l}
-                          />
-                          <Bar dataKey="amount" fill="var(--primary)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="mc-table-wrapper">
-                      <table className="mc-table">
-                        <thead>
-                          <tr>
-                            <th>Month</th>
-                            <th>New Members</th>
-                            <th>Collection</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {finance.monthlyCollections.map((row) => (
-                            <tr key={row.monthKey}>
-                              <td>{row.month}</td>
-                              <td>{row.count}</td>
-                              <td>₹{row.amount.toLocaleString()}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                ) : (
-                  <div className="empty-state">No monthly collection data yet</div>
-                )}
+              <div className="dash-card dash-card-3">
+                <span className="dc-label">Inactive &gt;7 days</span>
+                <span className="dc-value">{inactive7Count.toLocaleString()}</span>
+                <span className="dc-sub">No check-in in last 7 days</span>
               </div>
-            </>
+              <div
+                className="dash-card dash-card-4 dash-card-clickable"
+                onClick={() => setShowRenewalsDueModal(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setShowRenewalsDueModal(true)}
+              >
+                <span className="dc-label">Renewals due in 3 days</span>
+                <span className="dc-value">{renewalsDue3Count.toLocaleString()}</span>
+                <span className="dc-sub">Due within 3 days</span>
+                <span className="dc-action">View list →</span>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -570,6 +546,19 @@ export default function Dashboard() {
                 Check In
               </button>
             </div>
+            {qrPayload && (
+              <div className="checkin-qr-wrap">
+                <p className="checkin-qr-label">Members can scan to check in (valid 24h)</p>
+                <div className="checkin-qr-box">
+                  <QRCodeSVG
+                    value={qrPayload.url.startsWith('http') ? qrPayload.url : `${window.location.origin}${qrPayload.url}`}
+                    size={180}
+                    level="M"
+                    includeMargin
+                  />
+                </div>
+              </div>
+            )}
             <div className="chips">
               {checkinTable.length === 0 ? (
                 <div className="empty-state">No check-ins today</div>

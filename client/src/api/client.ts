@@ -66,6 +66,25 @@ async function request<T>(
   }
 }
 
+/** Public API call (no auth headers). Used for QR check-in page. */
+async function requestPublic<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || res.statusText);
+  if (!text || text.trim() === '') return null as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error('Invalid JSON response');
+  }
+}
+
 /** Parse API error response for display. Handles NestJS ValidationPipe: message can be string or string[]. */
 export function getApiErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
@@ -99,6 +118,7 @@ export const api = {
         backgroundImage?: string;
         primaryColor?: string;
         allowsMedicalDocuments?: boolean;
+        medicalDocumentsLimit?: number;
       }>(q ? `/tenants/config?${q}` : '/tenants/config');
     },
   },
@@ -169,6 +189,15 @@ export const api = {
         monthlyGrowth: { month: string; count: number; cumulative: number }[];
         monthlyCollections: { month: string; monthKey: string; amount: number; count: number }[];
       }>('/legacy/finance'),
+  },
+  attendance: {
+    qrPayload: () =>
+      request<{ url: string; token: string }>('/attendance/qr-payload'),
+    checkInByQR: (token: string, regNo: number) =>
+      requestPublic<{ success: boolean; name?: string }>('/attendance/checkin-qr', {
+        method: 'POST',
+        body: JSON.stringify({ token, regNo }),
+      }),
   },
   platform: {
     listTenants: () => request<unknown[]>('/platform/tenants'),
@@ -369,6 +398,36 @@ export const api = {
     },
     deleteDocument: (id: string) =>
       request<{ success: boolean }>(`/medical-history/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+  workoutPlan: {
+    getMine: () =>
+      request<{ name: string; days: { dayOfWeek: number; label: string }[]; updatedAt?: string } | null>('/workout-plan'),
+    upsertMine: (data: { name?: string; days?: { dayOfWeek: number; label: string }[] }) =>
+      request<{ name: string; days: { dayOfWeek: number; label: string }[]; updatedAt: string }>('/workout-plan', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    getLogs: (params?: { from?: string; to?: string; limit?: number }) => {
+      const sp = new URLSearchParams();
+      if (params?.from) sp.set('from', params.from);
+      if (params?.to) sp.set('to', params.to);
+      if (params?.limit != null) sp.set('limit', String(params.limit));
+      const q = sp.toString();
+      return request<Array<{ _id: string; date: string; workoutLabel: string; notes?: string; durationMinutes?: number; createdAt: string }>>(
+        q ? `/workout-plan/logs?${q}` : '/workout-plan/logs',
+      );
+    },
+    createLog: (data: { date: string; workoutLabel: string; notes?: string; durationMinutes?: number }) =>
+      request<{ _id: string; date: string; workoutLabel: string; notes?: string; durationMinutes?: number; createdAt: string }>('/workout-plan/logs', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deleteLog: (id: string) =>
+      request<{ success: boolean }>(`/workout-plan/logs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+  notifications: {
+    runAbsence: () =>
+      request<{ sent: number; skipped: number }>('/notifications/run-absence', { method: 'POST' }),
   },
 };
 
