@@ -15,6 +15,8 @@ export interface CreateTenantDto {
   branding?: TenantBranding;
 }
 
+export type SubscriptionTier = 'free' | 'premium';
+
 export interface UpdateTenantDto {
   name?: string;
   subdomain?: string;
@@ -22,6 +24,7 @@ export interface UpdateTenantDto {
   isActive?: boolean;
   defaultTheme?: ThemeType;
   branding?: Partial<TenantBranding>;
+  subscriptionTier?: SubscriptionTier;
 }
 
 @Injectable()
@@ -58,15 +61,22 @@ export class TenantsService {
       tenant = byHost as Record<string, unknown> | null;
     }
     if (!tenant) {
-      return { name: 'Reps & Dips', theme: 'dark' };
+      return { name: 'Reps & Dips', theme: 'dark', allowsMedicalDocuments: false };
     }
-    const t = tenant as { name?: string; defaultTheme?: string; branding?: { logo?: string; backgroundImage?: string; primaryColor?: string } };
+    const t = tenant as {
+      name?: string;
+      defaultTheme?: string;
+      branding?: { logo?: string; backgroundImage?: string; primaryColor?: string };
+      subscriptionTier?: SubscriptionTier;
+    };
+    const tier = t.subscriptionTier ?? 'free';
     return {
       name: t.name || 'Gym',
       theme: t.defaultTheme || 'dark',
       logo: t.branding?.logo,
       backgroundImage: t.branding?.backgroundImage,
       primaryColor: t.branding?.primaryColor,
+      allowsMedicalDocuments: tier === 'premium',
     };
   }
 
@@ -93,6 +103,7 @@ export class TenantsService {
     if (dto.isActive != null) update.isActive = dto.isActive;
     if (dto.defaultTheme != null) update.defaultTheme = dto.defaultTheme;
     if (dto.branding != null) update.branding = dto.branding;
+    if (dto.subscriptionTier != null) update.subscriptionTier = dto.subscriptionTier;
     await this.tenantModel.updateOne({ _id: tenantId }, { $set: update });
     return this.findById(tenantId);
   }

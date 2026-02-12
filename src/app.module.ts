@@ -14,6 +14,7 @@ import { AtlasMembersModule } from './atlas-members/atlas-members.module';
 import { PlatformModule } from './platform/platform.module';
 import { EnquiriesModule } from './enquiries/enquiries.module';
 import { CaloriesModule } from './calories/calories.module';
+import { MedicalHistoryModule } from './medical-history/medical-history.module';
 
 @Module({
   controllers: [AppController],
@@ -34,6 +35,7 @@ import { CaloriesModule } from './calories/calories.module';
     PlatformModule,
     EnquiriesModule,
     CaloriesModule,
+    MedicalHistoryModule,
   ],
 })
 export class AppModule {}

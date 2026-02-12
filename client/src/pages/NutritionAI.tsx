@@ -463,6 +463,10 @@ export default function NutritionAI() {
 
   const handleNavChange = (id: string) => {
     if (id === 'nutrition-ai') return;
+    if (id === 'medical-history') {
+      navigate('/medical-history');
+      return;
+    }
     if (id === 'onboarding') {
       navigate('/onboarding');
       return;

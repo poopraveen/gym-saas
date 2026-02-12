@@ -8,6 +8,7 @@ import PlatformAdmin from './pages/PlatformAdmin';
 import Enquiries from './pages/Enquiries';
 import Onboarding from './pages/Onboarding';
 import NutritionAI from './pages/NutritionAI';
+import MedicalHistory from './pages/MedicalHistory';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!storage.getToken() || !storage.getTenantId()) {
@@ -67,6 +68,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <NutritionAI />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/medical-history"
+          element={
+            <ProtectedRoute>
+              <MedicalHistory />
             </ProtectedRoute>
           }
         />

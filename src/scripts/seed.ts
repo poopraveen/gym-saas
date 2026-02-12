@@ -43,6 +43,9 @@ async function seed() {
 
   const tenantId = String(tenant._id);
 
+  await tenants.updateTenant(tenantId, { subscriptionTier: 'premium' });
+  console.log('Tenant set to Premium (medical document upload enabled).');
+
   try {
     await auth.register(
       'admin@repsanddips.com',
@@ -61,10 +64,29 @@ async function seed() {
     }
   }
 
+  try {
+    await auth.register(
+      'Ranjith@rad.com',
+      'password',
+      tenantId,
+      'Ranjith',
+      Role.TENANT_ADMIN,
+    );
+    console.log('Ranjith user created.');
+  } catch (e: unknown) {
+    const err = e as { code?: number };
+    if (err?.code === 11000) {
+      console.log('Ranjith user already exists.');
+    } else {
+      throw e;
+    }
+  }
+
   console.log('');
   console.log('Seed done.');
   console.log('Tenant ID:', tenantId);
   console.log('Login: admin@repsanddips.com / Admin123!');
+  console.log('Login: Ranjith@rad.com / password');
 
   // Platform tenant + super admin (for platform panel)
   let platformTenant: { _id: unknown } | null = await tenants.findBySlug('platform') as { _id: unknown } | null;

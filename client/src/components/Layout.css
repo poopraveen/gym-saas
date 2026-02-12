@@ -70,6 +70,15 @@
   transform: translateY(-7px) rotate(-45deg);
 }
 
+.topbar-user-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Logo */
 .logo {
   display: flex;
@@ -155,6 +164,20 @@
   flex-shrink: 0;
   padding: 12px 0;
   border-top: 1px solid var(--border);
+}
+
+.drawer-footer-brand {
+  padding: 16px 20px 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.drawer-footer-brand .logo {
+  opacity: 0.85;
+}
+
+.drawer-footer-brand .logo-text {
+  font-size: 0.95rem;
 }
 
 .nav-item {

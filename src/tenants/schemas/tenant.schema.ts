@@ -36,6 +36,10 @@ export class Tenant extends Document {
 
   @Prop({ type: Object })
   settings?: Record<string, unknown>;
+
+  /** Subscription tier: premium enables medical document upload for members. */
+  @Prop({ default: 'free' })
+  subscriptionTier?: 'free' | 'premium';
 }
 
 export const TenantSchema = SchemaFactory.createForClass(Tenant);

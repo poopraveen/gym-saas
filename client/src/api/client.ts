@@ -20,10 +20,13 @@ export const storage = {
   setTenantId: (id: string) => localStorage.setItem('gym_tenant_id', id),
   getRole: () => localStorage.getItem('gym_role'),
   setRole: (r: string) => localStorage.setItem('gym_role', r),
+  getUserName: () => localStorage.getItem('gym_user_name'),
+  setUserName: (name: string) => localStorage.setItem('gym_user_name', name),
   clear: () => {
     localStorage.removeItem('gym_token');
     localStorage.removeItem('gym_tenant_id');
     localStorage.removeItem('gym_role');
+    localStorage.removeItem('gym_user_name');
   },
 };
 
@@ -37,18 +40,27 @@ async function request<T>(
     const token = storage.getToken();
 
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
     if (tenantId) headers['X-Tenant-ID'] = tenantId;
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    const text = await res.text();
     if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err || res.statusText);
+      throw new Error(text || res.statusText);
     }
-    return res.json();
+    if (!text || text.trim() === '') {
+      return null as T;
+    }
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error('Invalid JSON response');
+    }
   } finally {
     loaderEnd?.();
   }
@@ -80,9 +92,14 @@ export const api = {
       if (host) params.set('host', host);
       if (tenantId) params.set('tenantId', tenantId);
       const q = params.toString();
-      return request<{ name: string; theme: string; logo?: string; backgroundImage?: string; primaryColor?: string }>(
-        q ? `/tenants/config?${q}` : '/tenants/config',
-      );
+      return request<{
+        name: string;
+        theme: string;
+        logo?: string;
+        backgroundImage?: string;
+        primaryColor?: string;
+        allowsMedicalDocuments?: boolean;
+      }>(q ? `/tenants/config?${q}` : '/tenants/config');
     },
   },
   auth: {
@@ -307,6 +324,51 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(profile),
       }),
+  },
+  medicalHistory: {
+    getMine: () =>
+      request<{
+        bloodGroup?: string;
+        allergies?: string[];
+        conditions?: string[];
+        medications?: string[];
+        injuries?: string[];
+        notes?: string;
+        emergencyContactName?: string;
+        emergencyContactPhone?: string;
+        updatedAt?: string;
+      } | null>('/medical-history'),
+    saveMine: (data: {
+      bloodGroup?: string;
+      allergies?: string[];
+      conditions?: string[];
+      medications?: string[];
+      injuries?: string[];
+      notes?: string;
+      emergencyContactName?: string;
+      emergencyContactPhone?: string;
+    }) =>
+      request('/medical-history', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    listDocuments: () =>
+      request<Array<{ _id: string; originalName: string; label?: string; mimeType?: string; size?: number; uploadedAt: string }>>(
+        '/medical-history/documents',
+      ),
+    getDocument: (id: string) =>
+      request<{ url: string; originalName: string; label?: string; mimeType?: string }>(`/medical-history/documents/${encodeURIComponent(id)}`),
+    uploadDocument: (file: File, label?: string) => {
+      const form = new FormData();
+      form.append('file', file);
+      if (label != null && String(label).trim()) form.append('label', String(label).trim());
+      return request<{ _id: string; originalName: string; label?: string; mimeType: string; size: number; url: string; uploadedAt: string }>(
+        '/medical-history/documents',
+        { method: 'POST', body: form },
+      );
+    },
+    deleteDocument: (id: string) =>
+      request<{ success: boolean }>(`/medical-history/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
 };
 

@@ -42,6 +42,8 @@ export default function Login() {
       storage.setToken(res.access_token);
       storage.setTenantId(res.user.tenantId as string);
       storage.setRole((res.user.role as string) || '');
+      if (res.user.name != null) storage.setUserName(String(res.user.name));
+      else if (res.user.email) storage.setUserName(String(res.user.email));
       navigate(res.user.role === 'SUPER_ADMIN' ? '/platform' : '/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');

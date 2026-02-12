@@ -17,7 +17,7 @@ export default function Layout({
   onLogout,
 }: {
   children: React.ReactNode;
-  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries' | 'onboarding' | 'nutrition-ai';
+  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries' | 'onboarding' | 'nutrition-ai' | 'medical-history';
   onNavChange: (id: string) => void;
   onLogout: () => void;
 }) {
@@ -29,6 +29,7 @@ export default function Layout({
   const [showScrollTop, setShowScrollTop] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
+  const [userName, setUserNameState] = useState(() => storage.getUserName() || 'User');
 
   useEffect(() => {
     const el = mainRef.current;
@@ -49,9 +50,28 @@ export default function Layout({
       .catch(() => setTenantConfig(null));
   }, []);
 
+  useEffect(() => {
+    const stored = storage.getUserName();
+    if (stored) setUserNameState(stored);
+    if (storage.getToken() && !stored) {
+      api.auth.getMe()
+        .then((me) => {
+          const name = me.name ? String(me.name) : me.email ? String(me.email) : '';
+          if (name) {
+            storage.setUserName(name);
+            setUserNameState(name);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
   const isMember = storage.getRole() === 'MEMBER';
   const navItems: NavItem[] = isMember
-    ? [{ id: 'nutrition-ai', label: 'Nutrition AI', icon: '🥗' }]
+    ? [
+        { id: 'nutrition-ai', label: 'Nutrition AI', icon: '🥗' },
+        { id: 'medical-history', label: 'Medical History', icon: '🩺' },
+      ]
     : [
         { id: 'dashboard', label: 'Dashboard', icon: '📊' },
         { id: 'main', label: 'People', icon: '👥' },
@@ -87,7 +107,7 @@ export default function Layout({
           <span className={`hamburger ${drawerOpen ? 'open' : ''}`} />
           <span className={`hamburger ${drawerOpen ? 'open' : ''}`} />
         </button>
-        <Logo compact tenantName={tenantConfig?.name} logoUrl={tenantConfig?.logo} />
+        <span className="topbar-user-name">{userName}</span>
       </header>
 
       <div className={`drawer-overlay ${drawerOpen ? 'visible' : ''}`} onClick={closeDrawer} aria-hidden />
@@ -145,6 +165,9 @@ export default function Layout({
             <span className="nav-icon">🚪</span>
             <span className="nav-label">Logout</span>
           </button>
+          <div className="drawer-footer-brand">
+            <Logo tenantName={tenantConfig?.name} logoUrl={tenantConfig?.logo} />
+          </div>
         </div>
       </aside>
 

@@ -1,0 +1,297 @@
+.medical-history-page {
+  padding: 1rem 1.25rem;
+  max-width: 560px;
+}
+
+.mh-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem;
+  margin-top: 0.75rem;
+}
+
+.mh-hint {
+  margin: 0.25rem 0 0.75rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.mh-error {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.6rem;
+  background: var(--error-bg, rgba(197, 48, 48, 0.1));
+  color: var(--error, #c53030);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.mh-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+}
+
+.mh-grid input,
+.mh-grid textarea,
+.mh-grid select {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.mh-grid textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.mh-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.mh-row > * {
+  flex: 1;
+}
+
+.mh-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+/* Medical records (documents) section */
+.mh-docs-card {
+  margin-top: 1.25rem;
+}
+.mh-docs-title {
+  font-size: 1.1rem;
+  margin: 0 0 0.25rem 0;
+  color: var(--text-primary);
+}
+.mh-docs-limit {
+  margin: 0.35rem 0 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.mh-docs-limit-max {
+  color: var(--error, #c53030);
+  font-weight: 500;
+}
+.mh-upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.mh-file-input {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  max-width: 100%;
+}
+.mh-label-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+.mh-upload-hint {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+}
+.mh-docs-list-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.mh-docs-list-title {
+  font-size: 1rem;
+  margin: 0 0 0.25rem 0;
+  color: var(--text-primary);
+}
+.mh-docs-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+.mh-docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.mh-docs-table th,
+.mh-docs-table td {
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.mh-docs-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--input-bg);
+}
+.mh-docs-table tbody tr:hover {
+  background: var(--hover-bg);
+}
+.mh-td-id {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.mh-td-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mh-td-filename {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.mh-doc-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.mh-doc-btn {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+}
+.mh-doc-btn-delete {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.mh-doc-btn-delete:hover:not(:disabled) {
+  color: var(--error, #c53030);
+  border-color: var(--error, #c53030);
+}
+.mh-doc-btn-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* View modal - content loaded from Cloudinary when user clicks View */
+.mh-view-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.mh-view-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+.mh-view-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mh-view-modal-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 0.5rem;
+}
+.mh-view-modal-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.mh-view-modal-close:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+.mh-view-modal-body {
+  flex: 1;
+  min-height: 200px;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--input-bg);
+}
+.mh-view-modal-img {
+  max-width: 100%;
+  max-height: 55vh;
+  object-fit: contain;
+}
+.mh-view-modal-iframe {
+  width: 100%;
+  min-height: 70vh;
+  border: none;
+  border-radius: 8px;
+}
+.mh-view-modal-fallback {
+  text-align: center;
+  padding: 1.5rem;
+}
+.mh-view-modal-fallback p {
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+}
+.mh-view-modal-error {
+  text-align: center;
+  padding: 1.5rem;
+}
+.mh-view-modal-error p {
+  margin: 0 0 0.5rem 0;
+  color: var(--error, #c53030);
+}
+.mh-view-modal-error .mh-hint {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+.mh-view-modal-footer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mh-view-modal-footer a {
+  text-decoration: none;
+}
+
