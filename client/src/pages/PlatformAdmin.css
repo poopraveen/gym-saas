@@ -236,6 +236,54 @@
   font-size: 0.9rem;
 }
 
+.detail-hint {
+  margin: 0 0 12px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.telegram-status-row {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+}
+
+.telegram-status-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-right: 8px;
+}
+
+.telegram-status-ok {
+  font-size: 0.9rem;
+  color: var(--success, #16a34a);
+  font-weight: 500;
+}
+
+.telegram-status-missing {
+  font-size: 0.9rem;
+  color: var(--error, #dc2626);
+  font-weight: 500;
+}
+
+.telegram-preview-row {
+  margin-top: 6px;
+}
+
+.modal-hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 20px 0 16px 0;
+}
+
+.modal-section-title {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
 .btn-reset-in-detail {
   margin-top: 12px;
 }

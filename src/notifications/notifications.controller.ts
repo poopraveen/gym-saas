@@ -1,8 +1,9 @@
-import { Controller, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/constants/roles';
+import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { NotificationsService } from './notifications.service';
 
 @Controller('notifications')
@@ -15,5 +16,24 @@ export class NotificationsController {
   @Post('run-absence')
   async runAbsence() {
     return this.notificationsService.runAbsenceCheck();
+  }
+
+  /** List who tried to chat with the bot (Telegram opt-in attempts) for this tenant. */
+  @Get('telegram-attempts')
+  async listTelegramAttempts(
+    @TenantId() tenantId: string,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.notificationsService.listTelegramAttempts(tenantId, {
+      status,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  /** Get Telegram config for QR (group invite link) and whether bot is set. */
+  @Get('telegram-config')
+  async getTelegramConfig(@TenantId() tenantId: string) {
+    return this.notificationsService.getTelegramConfig(tenantId);
   }
 }

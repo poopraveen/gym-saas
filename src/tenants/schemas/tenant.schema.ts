@@ -40,6 +40,18 @@ export class Tenant extends Document {
   /** Subscription tier: premium enables medical document upload for members. */
   @Prop({ default: 'free' })
   subscriptionTier?: 'free' | 'premium';
+
+  /** Telegram: bot token (from @BotFather). Each tenant can have its own bot. */
+  @Prop()
+  telegramBotToken?: string;
+
+  /** Telegram: chat ID for owner/group (absence summary). */
+  @Prop()
+  telegramChatId?: string;
+
+  /** Telegram: group invite link for QR code so members can join the chat. */
+  @Prop()
+  telegramGroupInviteLink?: string;
 }
 
 export const TenantSchema = SchemaFactory.createForClass(Tenant);

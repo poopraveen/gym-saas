@@ -11,6 +11,7 @@ import NutritionAI from './pages/NutritionAI';
 import MedicalHistory from './pages/MedicalHistory';
 import WorkoutPlan from './pages/WorkoutPlan';
 import CheckIn from './pages/CheckIn';
+import Telegram from './pages/Telegram';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!storage.getToken() || !storage.getTenantId()) {
@@ -87,6 +88,16 @@ export default function App() {
           element={
             <ProtectedRoute>
               <WorkoutPlan />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/telegram"
+          element={
+            <ProtectedRoute>
+              <MemberRoute>
+                <Telegram />
+              </MemberRoute>
             </ProtectedRoute>
           }
         />

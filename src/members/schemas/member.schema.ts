@@ -61,6 +61,10 @@ export class Member extends Document {
   @Prop()
   lastUpdateDateTime?: string;
 
+  /** Telegram chat ID for absence alerts (set when member messages the bot with phone). */
+  @Prop()
+  telegramChatId?: string;
+
   @Prop({ type: Object })
   legacyFields?: Record<string, unknown>;
 }

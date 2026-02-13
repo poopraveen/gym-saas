@@ -1,10 +1,12 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const PDFDocument = require('pdfkit');
-import { TenantsService, CreateTenantDto } from '../tenants/tenants.service';
+import { TenantsService, CreateTenantDto, UpdateTenantDto } from '../tenants/tenants.service';
 import { AuthService } from '../auth/auth.service';
+import { TelegramService } from '../notifications/telegram.service';
 import { Role } from '../common/constants/roles';
 
 /** Contact details shown on the pitch PDF (business pitch style). */
@@ -27,10 +29,18 @@ export interface TenantPitchInfo {
 
 @Injectable()
 export class PlatformService {
+  private readonly logger = new Logger(PlatformService.name);
+
   constructor(
     private tenantsService: TenantsService,
     private authService: AuthService,
+    private telegramService: TelegramService,
+    private configService: ConfigService,
   ) {}
+
+  private getPublicApiUrl(): string {
+    return this.configService.get<string>('PUBLIC_API_URL') || this.configService.get<string>('FRONTEND_URL') || '';
+  }
 
   async createTenantWithDefaults(dto: CreateTenantDto) {
     const tenant = await this.tenantsService.create(dto.name, dto.slug, {
@@ -42,6 +52,21 @@ export class PlatformService {
     const tenantId = String(tenantDoc._id);
     if (dto.customDomain) {
       await this.tenantsService.updateTenant(tenantId, { customDomain: dto.customDomain });
+    }
+    const telegramUpdates: UpdateTenantDto = {};
+    if (dto.telegramBotToken !== undefined) telegramUpdates.telegramBotToken = dto.telegramBotToken;
+    if (dto.telegramChatId !== undefined) telegramUpdates.telegramChatId = dto.telegramChatId;
+    if (dto.telegramGroupInviteLink !== undefined) telegramUpdates.telegramGroupInviteLink = dto.telegramGroupInviteLink;
+    if (Object.keys(telegramUpdates).length > 0) {
+      await this.tenantsService.updateTenant(tenantId, telegramUpdates);
+    }
+    if (dto.telegramBotToken) {
+      const base = this.getPublicApiUrl().replace(/\/$/, '');
+      if (base) {
+        await this.telegramService.setWebhook(dto.telegramBotToken, `${base}/api/notifications/telegram-webhook/${tenantId}`);
+      } else {
+        this.logger.warn('Telegram bot token set but PUBLIC_API_URL is empty - webhook NOT registered. Set PUBLIC_API_URL (e.g. https://your-app.onrender.com) on Render and Save Telegram again.');
+      }
     }
     await this.authService.register(
       dto.adminEmail,
@@ -58,14 +83,32 @@ export class PlatformService {
     return this.authService.resetUserPassword(tenantId, email, newPassword);
   }
 
-  /** Get full tenant details + admin user (email, name). Password is not stored in plain text. */
+  /** Update tenant and re-register Telegram webhook when tenant has a bot token (so "Save Telegram" fixes webhook if PUBLIC_API_URL was set later). */
+  async updateTenant(tenantId: string, dto: UpdateTenantDto) {
+    const updated = await this.tenantsService.updateTenant(tenantId, dto);
+    const tenant = await this.tenantsService.findById(tenantId) as Record<string, unknown> | null;
+    const botToken = (dto.telegramBotToken && String(dto.telegramBotToken).trim()) || (tenant?.telegramBotToken as string);
+    if (botToken) {
+      const base = this.getPublicApiUrl().replace(/\/$/, '');
+      if (base) {
+        await this.telegramService.setWebhook(botToken, `${base}/api/notifications/telegram-webhook/${tenantId}`);
+      } else {
+        this.logger.warn('PUBLIC_API_URL is empty - webhook not registered. Set it on Render (e.g. https://your-app.onrender.com) and Save Telegram again.');
+      }
+    }
+    return updated;
+  }
+
+  /** Get full tenant details + admin user (email, name). Password is not stored in plain text. Bot token is masked (never sent to client). */
   async getTenantDetails(tenantId: string) {
     const tenant = await this.tenantsService.findById(tenantId);
     if (!tenant) return null;
     const adminUser = await this.authService.getAdminUserByTenantId(tenantId);
     const t = tenant as Record<string, unknown>;
+    const { telegramBotToken, ...rest } = t;
     return {
-      ...t,
+      ...rest,
+      telegramBotToken: telegramBotToken ? '••••••••' : undefined,
       adminUser: adminUser ? { email: adminUser.email, name: adminUser.name, role: adminUser.role } : null,
     };
   }

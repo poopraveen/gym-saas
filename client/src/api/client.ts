@@ -211,11 +211,17 @@ export const api = {
         isActive?: boolean;
         defaultTheme?: string;
         branding?: Record<string, unknown>;
+        telegramBotToken?: string;
+        telegramChatId?: string;
+        telegramGroupInviteLink?: string;
         createdAt?: string;
         updatedAt?: string;
         adminUser?: { email: string; name?: string; role: string } | null;
       }>(`/platform/tenants/${id}`),
-    createTenant: (dto: { name: string; slug?: string; subdomain?: string; customDomain?: string; adminEmail: string; adminPassword: string; adminName?: string; defaultTheme?: string; branding?: Record<string, unknown> }) =>
+    /** Preview Telegram config for a tenant (same as gym GET /notifications/telegram-config). */
+    getTenantTelegramConfig: (tenantId: string) =>
+      request<{ groupInviteLink?: string; hasBot: boolean }>(`/platform/tenants/${encodeURIComponent(tenantId)}/telegram-config`),
+    createTenant: (dto: { name: string; slug?: string; subdomain?: string; customDomain?: string; adminEmail: string; adminPassword: string; adminName?: string; defaultTheme?: string; branding?: Record<string, unknown>; telegramBotToken?: string; telegramChatId?: string; telegramGroupInviteLink?: string }) =>
       request('/platform/tenants', { method: 'POST', body: JSON.stringify(dto) }),
     updateTenant: (id: string, dto: Record<string, unknown>) =>
       request(`/platform/tenants/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
@@ -428,6 +434,17 @@ export const api = {
   notifications: {
     runAbsence: () =>
       request<{ sent: number; skipped: number }>('/notifications/run-absence', { method: 'POST' }),
+    listTelegramAttempts: (params?: { status?: string; limit?: number }) => {
+      const sp = new URLSearchParams();
+      if (params?.status) sp.set('status', params.status);
+      if (params?.limit != null) sp.set('limit', String(params.limit));
+      const q = sp.toString();
+      return request<Array<{ _id: string; telegramChatId: string; phoneAttempted?: string; messageText?: string; memberId?: string; status: string; createdAt: string }>>(
+        q ? `/notifications/telegram-attempts?${q}` : '/notifications/telegram-attempts',
+      );
+    },
+    getTelegramConfig: () =>
+      request<{ groupInviteLink?: string; hasBot: boolean }>('/notifications/telegram-config'),
   },
 };
 

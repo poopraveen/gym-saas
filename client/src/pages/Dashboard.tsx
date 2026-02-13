@@ -314,6 +314,10 @@ export default function Dashboard() {
       navigate('/nutrition-ai');
       return;
     }
+    if (id === 'telegram') {
+      navigate('/telegram');
+      return;
+    }
     if (id === 'add') {
       setActiveNav('add');
       setShowAddModal(true);

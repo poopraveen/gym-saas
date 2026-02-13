@@ -15,6 +15,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/constants/roles';
 import { PlatformService } from './platform.service';
 import { TenantsService, CreateTenantDto, UpdateTenantDto } from '../tenants/tenants.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Controller('platform')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,6 +24,7 @@ export class PlatformController {
   constructor(
     private platformService: PlatformService,
     private tenantsService: TenantsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   @Post('tenants')
@@ -42,12 +44,18 @@ export class PlatformController {
     return details;
   }
 
+  /** Preview Telegram config for a tenant (same as gym admin GET /notifications/telegram-config). */
+  @Get('tenants/:id/telegram-config')
+  async getTenantTelegramConfig(@Param('id') id: string) {
+    return this.notificationsService.getTelegramConfig(id);
+  }
+
   @Put('tenants/:id')
   async updateTenant(
     @Param('id') id: string,
     @Body() body: UpdateTenantDto,
   ) {
-    return this.tenantsService.updateTenant(id, body);
+    return this.platformService.updateTenant(id, body);
   }
 
   @Post('tenants/:id/reset-admin')

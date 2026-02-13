@@ -13,6 +13,10 @@ export interface CreateTenantDto {
   adminName?: string;
   defaultTheme?: ThemeType;
   branding?: TenantBranding;
+  /** Telegram (per-tenant, stored in DB): bot token, owner chat ID, group invite link for QR. */
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  telegramGroupInviteLink?: string;
 }
 
 export type SubscriptionTier = 'free' | 'premium';
@@ -27,6 +31,10 @@ export interface UpdateTenantDto {
   subscriptionTier?: SubscriptionTier;
   /** Optional settings (e.g. telegramChatId for absence alerts). */
   settings?: Record<string, unknown>;
+  /** Telegram: bot token, owner/group chat ID, group invite link (stored in DB, not env). */
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  telegramGroupInviteLink?: string;
 }
 
 @Injectable()
@@ -109,6 +117,9 @@ export class TenantsService {
     if (dto.branding != null) update.branding = dto.branding;
     if (dto.subscriptionTier != null) update.subscriptionTier = dto.subscriptionTier;
     if (dto.settings != null) update.settings = dto.settings;
+    if (dto.telegramBotToken !== undefined) update.telegramBotToken = dto.telegramBotToken;
+    if (dto.telegramChatId !== undefined) update.telegramChatId = dto.telegramChatId;
+    if (dto.telegramGroupInviteLink !== undefined) update.telegramGroupInviteLink = dto.telegramGroupInviteLink;
     await this.tenantModel.updateOne({ _id: tenantId }, { $set: update });
     return this.findById(tenantId);
   }

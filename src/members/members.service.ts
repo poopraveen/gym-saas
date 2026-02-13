@@ -51,6 +51,12 @@ function mapToMember(dto: Record<string, unknown>, tenantId: string): Partial<Me
   };
 }
 
+/** Normalize phone to digits only for matching. */
+function phoneToDigits(phone: string | undefined): string {
+  if (!phone) return '';
+  return String(phone).replace(/\D/g, '');
+}
+
 /** Maps member to legacy API response format for frontend compatibility. */
 function mapToLegacy(m: Member): Record<string, unknown> {
   const legacy: Record<string, unknown> = {
@@ -69,6 +75,7 @@ function mapToLegacy(m: Member): Record<string, unknown> {
     lastCheckInTime: m.lastCheckInTime,
     comments: m.comments,
     lastUpdateDateTime: m.lastUpdateDateTime,
+    telegramChatId: m.telegramChatId,
     ...m.legacyFields,
   };
   return legacy;
@@ -251,6 +258,47 @@ export class MembersService {
       weightKg: row.weightKg != null ? Number(row.weightKg) : undefined,
       goal: row.goal != null ? String(row.goal) : undefined,
     };
+  }
+
+  /** Common country codes to strip for matching (e.g. 65 Singapore, 91 India). */
+  private static readonly COUNTRY_CODES = ['65', '91', '60', '1', '44', '81', '86', '82', '966', '971', '64', '61', '49', '33', '39', '34', '63', '62', '84', '66'];
+
+  /**
+   * Find a member by phone: exact digits match, or match without country code (so +65 9343 6035 matches 93436035).
+   */
+  async findByPhoneDigits(tenantId: string, phoneDigits: string): Promise<Member | null> {
+    const digits = phoneDigits.replace(/\D/g, '');
+    if (!digits || digits.length < 8) return null;
+    const members = await this.memberModel.find({ tenantId }).lean();
+    for (const m of members) {
+      const p = (m as Record<string, unknown>).phoneNumber as string | undefined;
+      const memberDigits = phoneToDigits(p);
+      if (!memberDigits) continue;
+      if (memberDigits === digits) return m as unknown as Member;
+      const digitsNoCountry = this.stripCountryCode(digits);
+      const memberNoCountry = this.stripCountryCode(memberDigits);
+      if (digitsNoCountry && (digitsNoCountry === memberDigits || digitsNoCountry === memberNoCountry)) return m as unknown as Member;
+      if (memberNoCountry && (memberNoCountry === digits || memberNoCountry === digitsNoCountry)) return m as unknown as Member;
+    }
+    return null;
+  }
+
+  private stripCountryCode(digits: string): string {
+    if (!digits) return '';
+    for (const cc of MembersService.COUNTRY_CODES) {
+      if (digits.startsWith(cc) && digits.length > cc.length) return digits.slice(cc.length);
+    }
+    return digits;
+  }
+
+  /**
+   * Set Telegram chat ID for a member (for absence alerts). Called when member messages the bot with their phone.
+   */
+  async updateTelegramChatId(tenantId: string, regNo: number, telegramChatId: string): Promise<void> {
+    await this.memberModel.updateOne(
+      { tenantId, regNo },
+      { $set: { telegramChatId } },
+    );
   }
 
   /**

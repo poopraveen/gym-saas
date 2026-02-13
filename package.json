@@ -6,6 +6,7 @@
     "build": "nest build",
     "seed": "ts-node src/scripts/seed.ts",
     "reset-admin": "ts-node src/scripts/reset-admin.ts",
+    "check:telegram": "ts-node src/scripts/check-telegram-tenants.ts",
     "import:gym-users": "ts-node src/scripts/import-gym-users.ts",
     "capture-pitch-screenshots": "node scripts/capture-pitch-screenshots.mjs",
     "start": "node dist/main",

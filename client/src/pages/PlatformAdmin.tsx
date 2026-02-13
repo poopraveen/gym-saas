@@ -16,6 +16,9 @@ type TenantDetails = {
   isActive?: boolean;
   defaultTheme?: string;
   branding?: Record<string, unknown>;
+  telegramBotToken?: string;
+  telegramChatId?: string;
+  telegramGroupInviteLink?: string;
   createdAt?: string;
   updatedAt?: string;
   adminUser?: { email: string; name?: string; role: string } | null;
@@ -33,6 +36,9 @@ export default function PlatformAdmin() {
     subdomain: '',
     adminEmail: '',
     adminPassword: '',
+    telegramBotToken: '',
+    telegramChatId: '',
+    telegramGroupInviteLink: '',
   });
   const [resetModal, setResetModal] = useState<{ tenantId: string; email: string } | null>(null);
   const [resetPassword, setResetPassword] = useState('');
@@ -41,6 +47,9 @@ export default function PlatformAdmin() {
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
   const [showOnboardingGuide, setShowOnboardingGuide] = useState(false);
   const [pitchPdfDownloadingId, setPitchPdfDownloadingId] = useState<string | null>(null);
+  const [telegramEdit, setTelegramEdit] = useState({ telegramBotToken: '', telegramChatId: '', telegramGroupInviteLink: '' });
+  const [telegramSaving, setTelegramSaving] = useState(false);
+  const [telegramConfigPreview, setTelegramConfigPreview] = useState<{ groupInviteLink?: string; hasBot: boolean } | null>(null);
 
   useEffect(() => {
     if (storage.getRole() !== 'SUPER_ADMIN') {
@@ -63,10 +72,13 @@ export default function PlatformAdmin() {
         subdomain: createForm.subdomain || undefined,
         adminEmail: createForm.adminEmail,
         adminPassword: createForm.adminPassword,
+        telegramBotToken: createForm.telegramBotToken.trim() || undefined,
+        telegramChatId: createForm.telegramChatId.trim() || undefined,
+        telegramGroupInviteLink: createForm.telegramGroupInviteLink.trim() || undefined,
       });
       setCreateOpen(false);
       setCreatedCredentials({ email: createForm.adminEmail, password: createForm.adminPassword });
-      setCreateForm({ name: '', slug: '', subdomain: '', adminEmail: '', adminPassword: '' });
+      setCreateForm({ name: '', slug: '', subdomain: '', adminEmail: '', adminPassword: '', telegramBotToken: '', telegramChatId: '', telegramGroupInviteLink: '' });
       const list = await api.platform.listTenants();
       setTenants(list as Tenant[]);
     } catch (err) {
@@ -90,13 +102,44 @@ export default function PlatformAdmin() {
   const handleTenantRowClick = async (tenantId: string) => {
     setDetailLoading(true);
     setDetailModal(null);
+    setTelegramConfigPreview(null);
+    setTelegramEdit({ telegramBotToken: '', telegramChatId: '', telegramGroupInviteLink: '' });
     try {
-      const details = await api.platform.getTenant(tenantId) as TenantDetails;
+      const [details, config] = await Promise.all([
+        api.platform.getTenant(tenantId) as Promise<TenantDetails>,
+        api.platform.getTenantTelegramConfig(tenantId).catch(() => null),
+      ]);
       setDetailModal(details);
+      setTelegramEdit({
+        telegramBotToken: '',
+        telegramChatId: details.telegramChatId ?? '',
+        telegramGroupInviteLink: details.telegramGroupInviteLink ?? '',
+      });
+      setTelegramConfigPreview(config);
     } catch {
       setError('Failed to load tenant details');
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleSaveTelegram = async () => {
+    if (!detailModal) return;
+    setTelegramSaving(true);
+    setError('');
+    try {
+      const dto: Record<string, string> = {
+        telegramChatId: telegramEdit.telegramChatId.trim(),
+        telegramGroupInviteLink: telegramEdit.telegramGroupInviteLink.trim(),
+      };
+      if (telegramEdit.telegramBotToken.trim()) dto.telegramBotToken = telegramEdit.telegramBotToken.trim();
+      await api.platform.updateTenant(detailModal._id, dto);
+      setDetailModal((m) => m ? { ...m, ...dto } : null);
+      api.platform.getTenantTelegramConfig(detailModal._id).then(setTelegramConfigPreview).catch(() => {});
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update Telegram');
+    } finally {
+      setTelegramSaving(false);
     }
   };
 
@@ -260,6 +303,27 @@ export default function PlatformAdmin() {
                 onChange={(e) => setCreateForm((f) => ({ ...f, adminPassword: e.target.value }))}
                 required
               />
+              <hr className="modal-hr" />
+              <h4 className="modal-section-title">Telegram (optional)</h4>
+              <label>Telegram Bot Token</label>
+              <input
+                type="password"
+                value={createForm.telegramBotToken}
+                onChange={(e) => setCreateForm((f) => ({ ...f, telegramBotToken: e.target.value }))}
+                placeholder="From @BotFather"
+              />
+              <label>Telegram Chat ID (owner/group)</label>
+              <input
+                value={createForm.telegramChatId}
+                onChange={(e) => setCreateForm((f) => ({ ...f, telegramChatId: e.target.value }))}
+                placeholder="For absence summary"
+              />
+              <label>Telegram Group Invite Link</label>
+              <input
+                value={createForm.telegramGroupInviteLink}
+                onChange={(e) => setCreateForm((f) => ({ ...f, telegramGroupInviteLink: e.target.value }))}
+                placeholder="https://t.me/joinchat/... (for QR in gym admin)"
+              />
               <div className="modal-actions">
                 <button type="button" onClick={() => setCreateOpen(false)}>Cancel</button>
                 <button type="submit">Create</button>
@@ -303,6 +367,46 @@ export default function PlatformAdmin() {
                   </>
                 )}
               </dl>
+            </div>
+            <div className="detail-section">
+              <h4>Telegram</h4>
+              <p className="detail-hint">Stored per tenant. On Save we register the webhook so the bot can receive &quot;Hi&quot; / phone. <strong>Set PUBLIC_API_URL</strong> on Render (e.g. https://gym-saas-api.onrender.com) or the bot will not get messages.</p>
+              <div className="telegram-status-row">
+                <span className="telegram-status-label">QR in gym Telegram tab:</span>
+                <span className={detailModal.telegramGroupInviteLink ? 'telegram-status-ok' : 'telegram-status-missing'}>
+                  {detailModal.telegramGroupInviteLink ? '✓ Will show (link saved)' : '✗ Won’t show — add Group Invite Link below and Save'}
+                </span>
+              </div>
+              {telegramConfigPreview != null && (
+                <div className="telegram-status-row telegram-preview-row">
+                  <span className="telegram-status-label">API preview (what gym admin sees):</span>
+                  <span className={telegramConfigPreview.groupInviteLink ? 'telegram-status-ok' : 'telegram-status-missing'}>
+                    {telegramConfigPreview.groupInviteLink ? '✓ QR will show' : '✗ QR won’t show'}
+                  </span>
+                </div>
+              )}
+              <label>Bot Token</label>
+              <input
+                type="password"
+                value={telegramEdit.telegramBotToken}
+                onChange={(e) => setTelegramEdit((t) => ({ ...t, telegramBotToken: e.target.value }))}
+                placeholder={detailModal.telegramBotToken ? '•••••••• (leave blank to keep)' : 'From @BotFather'}
+              />
+              <label>Chat ID (owner/group)</label>
+              <input
+                value={telegramEdit.telegramChatId}
+                onChange={(e) => setTelegramEdit((t) => ({ ...t, telegramChatId: e.target.value }))}
+                placeholder="For absence summary"
+              />
+              <label>Group Invite Link (for QR)</label>
+              <input
+                value={telegramEdit.telegramGroupInviteLink}
+                onChange={(e) => setTelegramEdit((t) => ({ ...t, telegramGroupInviteLink: e.target.value }))}
+                placeholder="https://t.me/joinchat/..."
+              />
+              <button type="button" className="btn-primary" onClick={handleSaveTelegram} disabled={telegramSaving}>
+                {telegramSaving ? 'Saving…' : 'Save Telegram'}
+              </button>
             </div>
             <div className="detail-section">
               <h4>Admin login</h4>
