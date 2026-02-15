@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { storage } from './api/client';
 import GlobalLoader from './components/GlobalLoader';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PlatformAdmin from './pages/PlatformAdmin';
@@ -40,6 +41,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <GlobalLoader />
+      <PWAInstallPrompt />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/checkin" element={<CheckIn />} />

@@ -1,0 +1,111 @@
+.pwa-install-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: pwa-install-fade-in 0.25s ease-out;
+}
+
+@keyframes pwa-install-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pwa-install-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  animation: pwa-install-scale-in 0.3s ease-out;
+}
+
+@keyframes pwa-install-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pwa-install-icon {
+  width: 56px;
+  height: 28px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary, #3b82f6);
+}
+
+.pwa-install-dumbbell {
+  width: 100%;
+  height: 100%;
+}
+
+.pwa-install-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.pwa-install-desc {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.25rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.pwa-install-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pwa-install-btn {
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: filter 0.15s;
+}
+
+.pwa-install-btn:active {
+  filter: brightness(0.95);
+}
+
+.pwa-install-btn-primary {
+  background: var(--primary, #3b82f6);
+  color: #fff;
+}
+
+.pwa-install-btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.pwa-install-btn-secondary {
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.pwa-install-btn-secondary:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
