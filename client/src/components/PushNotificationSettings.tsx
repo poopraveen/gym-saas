@@ -2,13 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import './PushNotificationSettings.css';
 
-/** Base64url decode to Uint8Array for VAPID applicationServerKey */
+/** Base64url decode to Uint8Array for VAPID applicationServerKey. Must be 65 bytes (uncompressed P-256). */
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const normalized = String(base64String).replace(/\s+/g, '').trim();
+  if (!normalized) throw new Error('VAPID public key is empty.');
+  const padding = '='.repeat((4 - (normalized.length % 4)) % 4);
+  const base64 = (normalized + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   const output = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; ++i) output[i] = rawData.charCodeAt(i);
+  if (output.length !== 65) {
+    throw new Error(
+      'VAPID public key from server is invalid (expected 65 bytes, got ' + output.length + '). ' +
+      'Ask the admin to set VAPID_PUBLIC_KEY correctly. Generate new keys with: npx web-push generate-vapid-keys',
+    );
+  }
   return output;
 }
 

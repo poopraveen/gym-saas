@@ -261,9 +261,12 @@ export class NotificationsService {
     return this.pushSubscriptionModel.countDocuments({ tenantId });
   }
 
-  /** Get VAPID public key for push subscription (frontend uses this in pushManager.subscribe). */
+  /** Get VAPID public key for push subscription (frontend uses this in pushManager.subscribe). Normalizes so env with newlines/spaces works. */
   getVapidPublicKey(): string | null {
-    return this.configService.get<string>('VAPID_PUBLIC_KEY') || null;
+    const raw = this.configService.get<string>('VAPID_PUBLIC_KEY');
+    if (!raw || typeof raw !== 'string') return null;
+    const key = raw.replace(/\s+/g, '').trim();
+    return key.length > 0 ? key : null;
   }
 
   /** Save or update push subscription for a user (one doc per endpoint; same user can have multiple devices). */
