@@ -5,6 +5,16 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+/** API origin (e.g. https://gym-saas-api.onrender.com) for Telegram webhook when deployed. */
+export function getApiBaseOrigin(): string | undefined {
+  if (typeof API_BASE !== 'string' || !API_BASE.startsWith('http')) return undefined;
+  try {
+    return new URL(API_BASE).origin;
+  } catch {
+    return undefined;
+  }
+}
+
 function isNetworkError(e: unknown): boolean {
   if (e instanceof TypeError && e.message?.toLowerCase().includes('fetch')) return true;
   if (e instanceof Error && (e.message === 'Failed to fetch' || e.message === 'Load failed')) return true;
@@ -477,7 +487,11 @@ export const api = {
     registerWebhook: (webhookUrl?: string) =>
       request<{ ok: boolean; error?: string; webhookUrl?: string | null; tenantId?: string | null }>('/notifications/register-webhook', {
         method: 'POST',
-        body: JSON.stringify(webhookUrl != null && webhookUrl.trim() !== '' ? { webhookUrl: webhookUrl.trim() } : {}),
+        body: JSON.stringify(
+          webhookUrl != null && webhookUrl.trim() !== ''
+            ? { webhookUrl: webhookUrl.trim() }
+            : { suggestedBaseUrl: getApiBaseOrigin() },
+        ),
       }),
     getWebhookInfo: () =>
       request<{ tenantId: string; webhookPath: string; webhookUrl: string | null }>('/notifications/webhook-info'),

@@ -60,7 +60,7 @@ export class NotificationsController {
   @Post('register-webhook')
   async registerWebhook(
     @TenantId() tenantId: string,
-    @Body() body?: { webhookUrl?: string },
+    @Body() body?: { webhookUrl?: string; suggestedBaseUrl?: string },
   ) {
     const tenant = await this.tenantsService.findById(tenantId) as Record<string, unknown> | null;
     const botToken = tenant?.telegramBotToken as string | undefined;
@@ -82,7 +82,19 @@ export class NotificationsController {
         webhookUrl = `${base}${expectedPath}`;
       }
     } else {
-      const base = (this.configService.get<string>('PUBLIC_API_URL') || this.configService.get<string>('FRONTEND_URL') || '').replace(/\/$/, '');
+      let base = (this.configService.get<string>('PUBLIC_API_URL') || this.configService.get<string>('FRONTEND_URL') || '').replace(/\/$/, '');
+      // In cloud, frontend can send the API origin (from VITE_API_URL) so webhook works even when PUBLIC_API_URL is not set
+      if ((!base || !base.startsWith('https://')) && typeof body?.suggestedBaseUrl === 'string') {
+        const suggested = body.suggestedBaseUrl.trim();
+        if (suggested.startsWith('https://')) {
+          try {
+            const u = new URL(suggested);
+            base = u.origin;
+          } catch {
+            base = '';
+          }
+        }
+      }
       if (!base || !base.startsWith('https://')) {
         return {
           ok: false,
@@ -120,7 +132,7 @@ export class NotificationsController {
   /** Get the webhook URL and tenant ID for this gym (for manual setWebhook). No auth side effects. */
   @Get('webhook-info')
   async webhookInfo(@TenantId() tenantId: string) {
-    const base = (this.configService.get<string>('PUBLIC_API_URL') || this.configService.get<string>('FRONTEND_URL') || '').replace(/\/$/, '');
+    let base = (this.configService.get<string>('PUBLIC_API_URL') || this.configService.get<string>('FRONTEND_URL') || '').replace(/\/$/, '');
     const webhookPath = `/api/notifications/telegram-webhook/${tenantId}`;
     const webhookUrl = base && base.startsWith('https://') ? `${base}${webhookPath}` : null;
     return { tenantId, webhookPath, webhookUrl };
