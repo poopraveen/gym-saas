@@ -4,6 +4,9 @@
   "description": "Multi-tenant Gym Management SaaS - NestJS + RBAC",
   "scripts": {
     "build": "nest build",
+    "tunnel": "ngrok http 3000",
+    "free-port": "npx --yes kill-port 3000",
+    "dev:telegram": "node scripts/telegram-tunnel.mjs",
     "seed": "ts-node src/scripts/seed.ts",
     "reset-admin": "ts-node src/scripts/reset-admin.ts",
     "check:telegram": "ts-node src/scripts/check-telegram-tenants.ts",

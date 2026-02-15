@@ -5,6 +5,17 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+function isNetworkError(e: unknown): boolean {
+  if (e instanceof TypeError && e.message?.toLowerCase().includes('fetch')) return true;
+  if (e instanceof Error && (e.message === 'Failed to fetch' || e.message === 'Load failed')) return true;
+  return false;
+}
+
+function networkErrorMessage(): string {
+  const base = API_BASE.startsWith('http') ? API_BASE : `${typeof window !== 'undefined' ? window.location.origin : ''}${API_BASE}`;
+  return `Cannot reach the server at ${base}. Is the API running? (e.g. npm run start:dev in the project root)`;
+}
+
 /** Callbacks for global loader (mask UI during API calls). Set by GlobalLoader on mount. */
 let loaderStart: (() => void) | null = null;
 let loaderEnd: (() => void) | null = null;
@@ -48,8 +59,15 @@ async function request<T>(
     if (tenantId) headers['X-Tenant-ID'] = tenantId;
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-    const text = await res.text();
+    let res: Response;
+    let text: string;
+    try {
+      res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+      text = await res.text();
+    } catch (e) {
+      if (isNetworkError(e)) throw new Error(networkErrorMessage());
+      throw e;
+    }
     if (!res.ok) {
       throw new Error(text || res.statusText);
     }
@@ -74,8 +92,15 @@ async function requestPublic<T>(path: string, options: RequestInit = {}): Promis
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const text = await res.text();
+  let res: Response;
+  let text: string;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    text = await res.text();
+  } catch (e) {
+    if (isNetworkError(e)) throw new Error(networkErrorMessage());
+    throw e;
+  }
   if (!res.ok) throw new Error(text || res.statusText);
   if (!text || text.trim() === '') return null as T;
   try {
@@ -443,10 +468,17 @@ export const api = {
         q ? `/notifications/telegram-attempts?${q}` : '/notifications/telegram-attempts',
       );
     },
+    deleteTelegramAttempt: (id: string) =>
+      request<{ ok: boolean; error?: string }>(`/notifications/telegram-attempts/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
     getTelegramConfig: () =>
       request<{ groupInviteLink?: string; hasBot: boolean }>('/notifications/telegram-config'),
-    registerWebhook: () =>
-      request<{ ok: boolean; error?: string; webhookUrl?: string | null; tenantId?: string | null }>('/notifications/register-webhook', { method: 'POST' }),
+    registerWebhook: (webhookUrl?: string) =>
+      request<{ ok: boolean; error?: string; webhookUrl?: string | null; tenantId?: string | null }>('/notifications/register-webhook', {
+        method: 'POST',
+        body: JSON.stringify(webhookUrl != null && webhookUrl.trim() !== '' ? { webhookUrl: webhookUrl.trim() } : {}),
+      }),
     getWebhookInfo: () =>
       request<{ tenantId: string; webhookPath: string; webhookUrl: string | null }>('/notifications/webhook-info'),
   },

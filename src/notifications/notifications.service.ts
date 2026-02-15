@@ -110,8 +110,15 @@ export class NotificationsService {
   ): Promise<boolean> {
     const tenant = await this.tenantsService.findById(tenantId);
     const t = tenant as Record<string, unknown> | null;
+    if (!t) {
+      this.logger.warn(`handleTelegramWebhookForTenant: tenant not found tenantId=${tenantId}`);
+      return false;
+    }
     const botToken = t?.telegramBotToken as string | undefined;
-    if (!botToken) return false;
+    if (!botToken) {
+      this.logger.warn(`handleTelegramWebhookForTenant: no bot token tenantId=${tenantId}`);
+      return false;
+    }
 
     const message = update?.message;
     const chatId = message?.chat?.id;
@@ -160,6 +167,15 @@ export class NotificationsService {
 
     await this.telegramService.sendMessage(String(chatId), reply, botToken);
     return true;
+  }
+
+  /** Delete one Telegram opt-in attempt by id (tenant-scoped). */
+  async deleteTelegramAttempt(tenantId: string, attemptId: string): Promise<boolean> {
+    const result = await this.telegramOptInModel.deleteOne({
+      _id: attemptId,
+      tenantId,
+    });
+    return result.deletedCount === 1;
   }
 
   /** List Telegram opt-in attempts for a tenant (admin view to confirm who tried to set up). */

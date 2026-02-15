@@ -75,7 +75,7 @@ export default function Layout({
       ]
     : [
         { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-        { id: 'main', label: 'People', icon: '👥' },
+        { id: 'main', label: 'Reg Members', icon: '👥' },
         { id: 'add', label: 'Add Member', icon: '➕' },
         { id: 'enquiries', label: 'Enquiry Members', icon: '📋' },
         { id: 'checkin', label: 'Attendance', icon: '✓' },

@@ -40,6 +40,43 @@ function getStatus(dueDate: Date | null, joinDate: Date | null): StatusType {
   return daysSinceJoin <= 30 ? 'new' : 'valid';
 }
 
+/** Days since last check-in (positive). No check-in = 999. */
+function getDaysAbsent(m: Member): number {
+  const last = m.lastCheckInTime as string | undefined;
+  if (!last || !String(last).trim()) return 999;
+  const d = new Date(String(last));
+  if (isNaN(d.getTime())) return 999;
+  const days = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, days);
+}
+
+function isExpired(m: Member): boolean {
+  const due = m.dueDate as Date | undefined;
+  if (!due) return false;
+  return differenceInDays(new Date(due), new Date()) < 0;
+}
+
+/** Fee amount for revenue-at-risk (default 1000 if missing). */
+function getMemberFee(m: Member): number {
+  const fee = Number((m as Record<string, unknown>)['Fees Amount'] ?? (m as Record<string, unknown>).feesAmount) || 0;
+  return fee > 0 ? fee : 1000;
+}
+
+/** Sort key: renewal priority (higher absence first, new member <30d, PT plan). */
+function renewalPrioritySort(a: Member, b: Member): number {
+  const daysA = getDaysAbsent(a);
+  const daysB = getDaysAbsent(b);
+  if (daysB !== daysA) return daysB - daysA;
+  const joinA = a.joinDate ? differenceInDays(new Date(), new Date(a.joinDate as string)) : 999;
+  const joinB = b.joinDate ? differenceInDays(new Date(), new Date(b.joinDate as string)) : 999;
+  const newA = joinA <= 30 ? 1 : 0;
+  const newB = joinB <= 30 ? 1 : 0;
+  if (newB !== newA) return newB - newA;
+  const ptA = /pt|personal/i.test(String((a as Record<string, unknown>)['Typeof pack'] ?? (a as Record<string, unknown>).typeofPack ?? '')) ? 1 : 0;
+  const ptB = /pt|personal/i.test(String((b as Record<string, unknown>)['Typeof pack'] ?? (b as Record<string, unknown>).typeofPack ?? '')) ? 1 : 0;
+  return ptB - ptA;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [allMembers, setAllMembers] = useState<Member[]>([]);
@@ -60,7 +97,7 @@ export default function Dashboard() {
   const [regNoInput, setRegNoInput] = useState('');
   const [activeNav, setActiveNav] = useState<'dashboard' | 'main' | 'add' | 'checkin' | 'finance'>('main');
   const [filter, setFilter] = useState<'all' | 'men' | 'women'>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusType | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
   const [sortBy, setSortBy] = useState<'default' | 'expired' | 'soon' | 'valid' | 'new'>('default');
   const [searchQuery, setSearchQuery] = useState('');
   const [membersPage, setMembersPage] = useState(1);
@@ -115,16 +152,16 @@ export default function Dashboard() {
 
   const statusCounts = {
     all: listForCounts.length,
+    active: listForCounts.filter((r) => (r.status as StatusType) !== 'expired').length,
     expired: listForCounts.filter((r) => (r.status as StatusType) === 'expired').length,
-    soon: listForCounts.filter((r) => (r.status as StatusType) === 'soon').length,
-    valid: listForCounts.filter((r) => (r.status as StatusType) === 'valid').length,
-    new: listForCounts.filter((r) => (r.status as StatusType) === 'new').length,
   };
 
   const filteredMembers = (() => {
     let list = listForCounts;
-    if (statusFilter !== 'all') {
-      list = list.filter((r) => (r.status as StatusType) === statusFilter);
+    if (statusFilter === 'active') {
+      list = list.filter((r) => (r.status as StatusType) !== 'expired');
+    } else if (statusFilter === 'expired') {
+      list = list.filter((r) => (r.status as StatusType) === 'expired');
     }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
@@ -153,22 +190,62 @@ export default function Dashboard() {
   const totalMembersCount = filteredMembers.length;
   const totalPages = Math.max(1, Math.ceil(totalMembersCount / membersPageSize));
 
-  const inactive7Count = allMembers.filter((m) => {
-    const last = m.lastCheckInTime as string | undefined;
-    if (!last || !String(last).trim()) return true;
-    const d = new Date(String(last));
-    if (isNaN(d.getTime())) return true;
-    const days = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
-    return days > 7;
-  }).length;
-  const renewalsDue3Members = allMembers.filter((m) => {
+  const inactive7Count = allMembers.filter((m) => getDaysAbsent(m) > 7).length;
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+  const renewalsDueToday = allMembers.filter((m) => {
     const due = m.dueDate as Date | undefined;
     if (!due) return false;
-    const d = new Date(due);
-    const days = (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-    return days >= 0 && days <= 3;
+    const dueStart = new Date(due).setHours(0, 0, 0, 0);
+    return dueStart === todayStart;
+  }).sort(renewalPrioritySort);
+  const renewalsDueIn3Days = allMembers.filter((m) => {
+    const due = m.dueDate as Date | undefined;
+    if (!due) return false;
+    const daysToDue = differenceInDays(new Date(due), new Date());
+    return daysToDue >= 0 && daysToDue <= 3;
+  }).sort(renewalPrioritySort);
+  const renewalsDue3Members = renewalsDueIn3Days;
+  const renewalsDue3Count = renewalsDueIn3Days.length;
+  const revenueAtRiskDueToday = renewalsDueToday.reduce((s, m) => s + getMemberFee(m), 0);
+  const revenueAtRiskDueIn3 = renewalsDueIn3Days.reduce((s, m) => s + getMemberFee(m), 0);
+
+  const activeMembersOnly = allMembers.filter((m) => !isExpired(m));
+  const absent5DaysList = activeMembersOnly.filter((m) => {
+    const d = getDaysAbsent(m);
+    return d >= 5 && d < 7;
+  }).sort(renewalPrioritySort);
+  const absent7DaysList = activeMembersOnly.filter((m) => getDaysAbsent(m) >= 7).sort(renewalPrioritySort);
+  const absentTodayTotal = absent5DaysList.length + absent7DaysList.length;
+
+  const missedRenewals1_7 = allMembers.filter((m) => {
+    const due = m.dueDate as Date | undefined;
+    if (!due) return false;
+    const daysExpired = differenceInDays(new Date(), new Date(due));
+    return daysExpired >= 1 && daysExpired <= 7;
   });
-  const renewalsDue3Count = renewalsDue3Members.length;
+  const missedRenewals8_30 = allMembers.filter((m) => {
+    const due = m.dueDate as Date | undefined;
+    if (!due) return false;
+    const daysExpired = differenceInDays(new Date(), new Date(due));
+    return daysExpired >= 8 && daysExpired <= 30;
+  });
+  const missedRenewals31_90 = allMembers.filter((m) => {
+    const due = m.dueDate as Date | undefined;
+    if (!due) return false;
+    const daysExpired = differenceInDays(new Date(), new Date(due));
+    return daysExpired >= 31 && daysExpired <= 90;
+  });
+  const missedRenewalsTotal = missedRenewals1_7.length + missedRenewals8_30.length + missedRenewals31_90.length;
+  const revenueRecovery = missedRenewals1_7.reduce((s, m) => s + getMemberFee(m), 0)
+    + missedRenewals8_30.reduce((s, m) => s + getMemberFee(m), 0)
+    + missedRenewals31_90.reduce((s, m) => s + getMemberFee(m), 0);
+
+  const todayActionsWhatsApp = renewalsDueToday.length;
+  const todayActionsFollowUp = missedRenewals1_7.length;
+  const todayActionsCall = activeMembersOnly.filter((m) => getDaysAbsent(m) >= 7 && (m.status as string) === 'soon').length;
+
   const todayAttendanceCount = checkinTable.length;
   const effectivePage = Math.min(membersPage, totalPages) || 1;
   const paginatedMembers = filteredMembers.slice(
@@ -179,6 +256,7 @@ export default function Dashboard() {
   useEffect(() => {
     setMembersPage(1);
   }, [filter, statusFilter, sortBy, searchQuery]);
+  const regMembersTotal = allMembers.length;
 
   const loadFinance = async () => {
     if (activeNav === 'dashboard') setDashboardLoading(true);
@@ -418,35 +496,150 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <div className="dashboard-cards dashboard-cards-grid">
-              <div className="dash-card dash-card-1 dash-card-clickable" onClick={() => handleNavChange('add')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handleNavChange('add')}>
-                <span className="dc-label">Register members</span>
-                <span className="dc-value">{(finance?.totalMembers ?? allMembers.length ?? 0).toLocaleString()}</span>
-                <span className="dc-action">Add member →</span>
+            <>
+              {/* 1) Today's Actions */}
+              <section className="dash-section">
+                <h2 className="dash-section-title">Today&apos;s Actions</h2>
+                <p className="dash-section-sub">Based on Absent &gt;7 days, Renewals today, Missed renewals &lt;7 days</p>
+                <div className="today-actions-row">
+                  <div className="today-action-card">
+                    <span className="ta-count">WhatsApp {todayActionsWhatsApp} members</span>
+                    <span className="ta-desc">Renewal today</span>
+                  </div>
+                  <div className="today-action-card">
+                    <span className="ta-count">Follow up {todayActionsFollowUp} missed renewals</span>
+                    <span className="ta-desc">Recent</span>
+                  </div>
+                  <div className="today-action-card">
+                    <span className="ta-count">Call {todayActionsCall} members</span>
+                    <span className="ta-desc">Absent 7+ days, expiry soon</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* 2) Renewals Expiring Soon */}
+              <section className="dash-section">
+                <h2 className="dash-section-title">Renewals Expiring Soon</h2>
+                <p className="dash-section-sub">Potential Revenue at Risk: ₹{(revenueAtRiskDueIn3 || 0).toLocaleString()}</p>
+                <div className="renewals-soon-grid">
+                  <div className="renewals-soon-card">
+                    <h3>Due today: {renewalsDueToday.length} members</h3>
+                    <p className="revenue-risk">Revenue at risk: ₹{revenueAtRiskDueToday.toLocaleString()}</p>
+                    <p className="sort-hint">Sorted: higher absence, new member &lt;30 days, PT plan</p>
+                    <ul className="member-mini-list">
+                      {renewalsDueToday.slice(0, 5).map((m) => (
+                        <li key={String(m['Reg No:'])}>
+                          <span>{String(m.NAME ?? '—')}</span>
+                          <span className="days-absent">Absent: {getDaysAbsent(m)}d</span>
+                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} onClick={() => handleWhatsAppClick(m)} />
+                        </li>
+                      ))}
+                    </ul>
+                    {renewalsDueToday.length > 5 && <p className="more-hint">+{renewalsDueToday.length - 5} more</p>}
+                  </div>
+                  <div className="renewals-soon-card">
+                    <h3>Due in 3 days: {renewalsDueIn3Days.length} members</h3>
+                    <p className="revenue-risk">Revenue at risk: ₹{revenueAtRiskDueIn3.toLocaleString()}</p>
+                    <p className="sort-hint">Sorted: higher absence, new member &lt;30 days, PT plan</p>
+                    <ul className="member-mini-list">
+                      {renewalsDueIn3Days.slice(0, 5).map((m) => (
+                        <li key={String(m['Reg No:'])}>
+                          <span>{String(m.NAME ?? '—')}</span>
+                          <span className="days-absent">Absent: {getDaysAbsent(m)}d</span>
+                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} onClick={() => handleWhatsAppClick(m)} />
+                        </li>
+                      ))}
+                    </ul>
+                    {renewalsDueIn3Days.length > 5 && <p className="more-hint">+{renewalsDueIn3Days.length - 5} more</p>}
+                  </div>
+                </div>
+                <button type="button" className="btn-outline btn-view-renewals" onClick={() => setShowRenewalsDueModal(true)}>View full renewals list</button>
+              </section>
+
+              {/* 3) Absent Today */}
+              <section className="dash-section">
+                <h2 className="dash-section-title">Absent Today</h2>
+                <p className="dash-section-sub">Expired members are excluded. Total: {absentTodayTotal}</p>
+                <div className="absent-grid">
+                  <div className="absent-card absent-medium">
+                    <h3>Absent for 5 days: {absent5DaysList.length}</h3>
+                    <span className="risk-badge risk-medium">Medium Risk</span>
+                    <p className="sort-hint">Sorted by renewal priority, new member &lt;30 days, PT plan</p>
+                    <ul className="member-mini-list">
+                      {absent5DaysList.slice(0, 5).map((m) => (
+                        <li key={String(m['Reg No:'])}>
+                          <span>{String(m.NAME ?? '—')}</span>
+                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} onClick={() => handleWhatsAppClick(m)} />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="absent-card absent-high">
+                    <h3>Absent for 7 days: {absent7DaysList.length}</h3>
+                    <span className="risk-badge risk-high">High Risk</span>
+                    <p className="sort-hint">Sorted by renewal priority, new member &lt;30 days, PT plan</p>
+                    <ul className="member-mini-list">
+                      {absent7DaysList.slice(0, 5).map((m) => (
+                        <li key={String(m['Reg No:'])}>
+                          <span>{String(m.NAME ?? '—')}</span>
+                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} onClick={() => handleWhatsAppClick(m)} />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </section>
+
+              {/* 4) Missed Renewals */}
+              <section className="dash-section">
+                <h2 className="dash-section-title">Missed Renewals (Last 7 Days)</h2>
+                <p className="dash-section-sub">Potential Revenue Recovery: ₹{revenueRecovery.toLocaleString()}</p>
+                <div className="missed-renewals-row">
+                  <div className="missed-bucket high">
+                    <span className="bucket-count">Expired 1–7 days ago: {missedRenewals1_7.length}</span>
+                    <span className="bucket-tag">High chance</span>
+                  </div>
+                  <div className="missed-bucket medium">
+                    <span className="bucket-count">Expired 8–30 days ago: {missedRenewals8_30.length}</span>
+                    <span className="bucket-tag">Medium chance</span>
+                  </div>
+                  <div className="missed-bucket low">
+                    <span className="bucket-count">Expired 31–90 days ago: {missedRenewals31_90.length}</span>
+                    <span className="bucket-tag">Low chance</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* 5) Add earning + Tap to view */}
+              <section className="dash-section">
+                <div
+                  className="dash-card dash-earning dash-card-clickable"
+                  onClick={() => handleNavChange('finance')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && handleNavChange('finance')}
+                >
+                  <span className="dc-label">Add earning for this month</span>
+                  <span className="dc-value">₹{(finance?.monthlyFees ?? 0).toLocaleString()}</span>
+                  <span className="dc-action">Tap to view →</span>
+                  <span className="dc-sub">Includes New Memberships + Renewals</span>
+                </div>
+              </section>
+
+              {/* Legacy quick cards */}
+              <div className="dashboard-cards dashboard-cards-grid">
+                <div className="dash-card dash-card-1 dash-card-clickable" onClick={() => handleNavChange('add')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handleNavChange('add')}>
+                  <span className="dc-label">Reg Members</span>
+                  <span className="dc-value">{(finance?.totalMembers ?? allMembers.length ?? 0).toLocaleString()}</span>
+                  <span className="dc-action">Add member →</span>
+                </div>
+                <div className="dash-card dash-card-2">
+                  <span className="dc-label">Today attendance vs active</span>
+                  <span className="dc-value dc-value-split">{todayAttendanceCount} <span className="dc-sep">/</span> {(finance?.activeMembers ?? activeMembersOnly.length).toLocaleString()}</span>
+                  <span className="dc-sub">Check-ins today / Active members</span>
+                </div>
               </div>
-              <div className="dash-card dash-card-2">
-                <span className="dc-label">Today attendance vs active</span>
-                <span className="dc-value dc-value-split">{todayAttendanceCount} <span className="dc-sep">/</span> {(finance?.activeMembers ?? 0).toLocaleString()}</span>
-                <span className="dc-sub">Check-ins today / Active members</span>
-              </div>
-              <div className="dash-card dash-card-3">
-                <span className="dc-label">Inactive &gt;7 days</span>
-                <span className="dc-value">{inactive7Count.toLocaleString()}</span>
-                <span className="dc-sub">No check-in in last 7 days</span>
-              </div>
-              <div
-                className="dash-card dash-card-4 dash-card-clickable"
-                onClick={() => setShowRenewalsDueModal(true)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && setShowRenewalsDueModal(true)}
-              >
-                <span className="dc-label">Renewals due in 3 days</span>
-                <span className="dc-value">{renewalsDue3Count.toLocaleString()}</span>
-                <span className="dc-sub">Due within 3 days</span>
-                <span className="dc-action">View list →</span>
-              </div>
-            </div>
+            </>
           )}
         </div>
       )}
@@ -582,7 +775,7 @@ export default function Dashboard() {
         <div ref={peopleViewRef} className="people-view people-view-sticky">
           <div className="people-sticky-top">
             <div className="people-header">
-              <h1 className="page-title">People</h1>
+              <h1 className="page-title">Reg Members ({regMembersTotal})</h1>
               <div className="people-actions">
                 <button onClick={() => handleNavChange('add')} className="btn-add" aria-label="Add member" data-tour="people-add-member">
                   +
@@ -601,7 +794,7 @@ export default function Dashboard() {
                 />
               </div>
               <div className="status-filter-pills" data-tour="people-filter-status">
-                {(['all', 'expired', 'soon', 'valid', 'new'] as const).map((s) => (
+                {(['all', 'active', 'expired'] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
@@ -609,7 +802,7 @@ export default function Dashboard() {
                     onClick={() => setStatusFilter(s)}
                   >
                     <span className="status-pill-label">
-                      {s === 'all' ? 'All' : s === 'expired' ? 'Expired' : s === 'soon' ? 'Soon' : s === 'valid' ? 'Valid' : 'New'}
+                      {s === 'all' ? 'All' : s === 'active' ? 'Active' : 'Expired'}
                     </span>
                     <span className="status-pill-count">{statusCounts[s]}</span>
                   </button>

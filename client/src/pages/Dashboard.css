@@ -182,6 +182,8 @@
   color: white;
 }
 
+.status-pill-active { color: var(--text-primary); background: var(--input-bg); border: 1px solid var(--border); }
+.status-pill-active.active { background: var(--primary); color: white; border-color: var(--primary); }
 .status-pill-valid.active {
   border-color: white;
   box-shadow: 0 0 0 2px var(--pill-valid);
@@ -802,6 +804,109 @@
 .dash-card-2 { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(5, 150, 105, 0.1) 100%); }
 .dash-card-3 { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(234, 88, 12, 0.1) 100%); }
 .dash-card-4 { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(220, 38, 38, 0.1) 100%); }
+
+/* Dashboard sections: Today's Actions, Renewals, Absent, Missed, Earning */
+.dash-section {
+  margin-bottom: 28px;
+}
+.dash-section-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
+}
+.dash-section-sub {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+}
+.today-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.today-action-card {
+  flex: 1;
+  min-width: 160px;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ta-count { font-weight: 600; color: var(--text-primary); font-size: 0.95rem; }
+.ta-desc { font-size: 0.8rem; color: var(--text-secondary); }
+.renewals-soon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.renewals-soon-card {
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.renewals-soon-card h3 { margin: 0 0 8px 0; font-size: 1rem; color: var(--text-primary); }
+.revenue-risk { font-size: 0.9rem; font-weight: 600; color: var(--primary); margin: 0 0 4px 0; }
+.sort-hint { font-size: 0.75rem; color: var(--text-secondary); margin: 0 0 8px 0; }
+.member-mini-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.member-mini-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.member-mini-list li:last-child { border-bottom: none; }
+.days-absent { font-size: 0.8rem; color: var(--text-secondary); margin-left: auto; }
+.more-hint { font-size: 0.85rem; color: var(--text-secondary); margin: 8px 0 0 0; }
+.btn-view-renewals { margin-top: 8px; }
+.absent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.absent-card {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.absent-card h3 { margin: 0 0 8px 0; font-size: 1rem; }
+.absent-medium { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(234, 179, 8, 0.08) 100%); }
+.absent-high { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(220, 38, 38, 0.08) 100%); }
+.risk-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; margin-bottom: 8px; }
+.risk-medium { background: rgba(234, 179, 8, 0.2); color: var(--warning, #ca8a04); }
+.risk-high { background: rgba(220, 38, 38, 0.2); color: var(--error, #dc2626); }
+.missed-renewals-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.missed-bucket {
+  flex: 1;
+  min-width: 140px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.missed-bucket.high { background: rgba(220, 38, 38, 0.06); }
+.missed-bucket.medium { background: rgba(234, 179, 8, 0.06); }
+.missed-bucket.low { background: rgba(100, 116, 139, 0.08); }
+.bucket-count { font-weight: 500; font-size: 0.9rem; color: var(--text-primary); }
+.bucket-tag { font-size: 0.8rem; color: var(--text-secondary); }
+.dash-earning { background: linear-gradient(135deg, var(--card-bg) 0%, rgba(34, 197, 94, 0.1) 100%); }
 
 .dc-label {
   font-size: 0.9rem;

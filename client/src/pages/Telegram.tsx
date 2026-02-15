@@ -24,6 +24,8 @@ export default function Telegram() {
   const [activeNav, setActiveNav] = useState<string>('telegram');
   const [webhookStatus, setWebhookStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [webhookLoading, setWebhookLoading] = useState(false);
+  const [tunnelUrl, setTunnelUrl] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchData = () => {
     setLoading(true);
@@ -53,20 +55,41 @@ export default function Telegram() {
     fetchData();
   }, [navigate]);
 
-  const handleRegisterWebhook = () => {
+  const handleRegisterWebhook = (optionalUrl?: string) => {
     setWebhookStatus(null);
     setWebhookLoading(true);
+    const urlToSend = optionalUrl?.trim() || undefined;
     api.notifications
-      .registerWebhook()
+      .registerWebhook(urlToSend)
       .then((r) => {
         if (r.ok) {
-          setWebhookStatus({ ok: true, message: `Webhook registered. URL: ${r.webhookUrl ?? '(same)'}. Send "Hi" to your bot again.` });
+          setWebhookStatus({
+            ok: true,
+            message: `Webhook registered. Next: open your bot in a private chat (tap the bot → Start), send "Hi" or /start, then click Refresh attempts. In groups only /start works.`,
+          });
         } else {
           setWebhookStatus({ ok: false, message: r.error ?? 'Failed to register webhook.' });
         }
       })
       .catch((e) => setWebhookStatus({ ok: false, message: e?.message ?? 'Request failed.' }))
       .finally(() => setWebhookLoading(false));
+  };
+
+  const handleRegisterWithTunnelUrl = () => {
+    if (!webhookInfo || !tunnelUrl.trim()) return;
+    let base = tunnelUrl.trim().replace(/\/$/, '');
+    if (base.endsWith('.ngrok-free.d')) {
+      base = base.replace(/\.ngrok-free\.d$/, '.ngrok-free.dev');
+      setTunnelUrl(base);
+    }
+    const fullUrl = base.includes('/api/notifications/telegram-webhook/')
+      ? base
+      : `${base}${webhookInfo.webhookPath}`;
+    if (!fullUrl.startsWith('https://')) {
+      setWebhookStatus({ ok: false, message: 'URL must start with https://' });
+      return;
+    }
+    handleRegisterWebhook(fullUrl);
   };
 
   const handleNavChange = (id: string) => {
@@ -82,6 +105,23 @@ export default function Telegram() {
   const handleLogout = () => {
     storage.clear();
     navigate('/login');
+  };
+
+  const handleDeleteAttempt = (id: string) => {
+    api.notifications
+      .deleteTelegramAttempt(id)
+      .then((r) => {
+        if (r.ok) setDeletingId(id);
+        else setWebhookStatus({ ok: false, message: r.error ?? 'Delete failed' });
+      })
+      .catch((e) => setWebhookStatus({ ok: false, message: e?.message ?? 'Delete failed' }));
+  };
+
+  const handleRowTransitionEnd = (id: string) => {
+    if (deletingId === id) {
+      setAttempts((prev) => prev.filter((a) => a._id !== id));
+      setDeletingId(null);
+    }
   };
 
   const formatDate = (s: string) => {
@@ -105,17 +145,26 @@ export default function Telegram() {
   return (
     <Layout activeNav={activeNav as any} onNavChange={handleNavChange} onLogout={handleLogout}>
       <div className="telegram-page">
-        <h1 className="page-title">Telegram</h1>
+        <h1 className="page-title telegram-page-title">Telegram</h1>
         <p className="telegram-intro">
-          Share the Telegram group link or QR code with members who want to enroll for absence alerts. See who has messaged the bot below.
+          Invite members to your Telegram group and let them message the bot to sign up for absence alerts. Share the QR or link below, then see who&apos;s signed up.
         </p>
 
         {loading ? (
-          <p className="telegram-loading">Loading…</p>
+          <div className="telegram-loading-wrap" aria-hidden>
+            <div className="telegram-loading-icon">
+              <svg viewBox="0 0 48 24" className="telegram-gym-icon" aria-hidden>
+                <rect x="2" y="8" width="8" height="8" rx="2" fill="currentColor" />
+                <rect x="38" y="8" width="8" height="8" rx="2" fill="currentColor" />
+                <rect x="10" y="10" width="28" height="4" rx="1" fill="currentColor" />
+              </svg>
+            </div>
+            <p className="telegram-loading-text">Loading Telegram setup…</p>
+          </div>
         ) : (
           <>
             {config?.groupInviteLink && (
-              <section className="telegram-card telegram-qr-card">
+              <section className="telegram-card telegram-qr-card telegram-card-enter">
                 <h2 className="telegram-card-title">Present to members who want to enroll for absence alerts</h2>
                 <p className="telegram-hint">Share this QR code or link with members so they can join the Telegram group. Then they message the bot with their registered phone number to get absence reminders (3+ days no visit).</p>
                 <div className="telegram-qr-row">
@@ -149,7 +198,7 @@ export default function Telegram() {
             )}
 
             {config && !config.groupInviteLink && config.hasBot && (
-              <section className="telegram-card telegram-qr-card telegram-setup-required">
+              <section className="telegram-card telegram-qr-card telegram-setup-required telegram-card-enter">
                 <h2 className="telegram-card-title">QR code for group link – setup required</h2>
                 <p className="telegram-hint">Your Telegram bot is set up, but the <strong>group invite link</strong> is not saved yet. Without it, the QR code cannot be shown here.</p>
                 <div className="telegram-setup-steps">
@@ -166,38 +215,53 @@ export default function Telegram() {
             )}
 
             {config && !config.hasBot && (
-              <section className="telegram-card">
+              <section className="telegram-card telegram-card-enter">
                 <p className="telegram-hint">No Telegram bot configured for this gym. Super Admin can set <strong>Telegram bot token</strong> and <strong>group invite link</strong> when creating or editing the tenant.</p>
               </section>
             )}
 
-            <section className="telegram-card">
-              <h2 className="telegram-card-title">Who tried to set up (Telegram opt-in attempts)</h2>
-              <p className="telegram-hint">When someone sends &quot;Hi&quot; or their phone number to your gym&apos;s bot (e.g. in private chat or in the group), they appear here. Confirm who has registered for absence alerts.</p>
+            <section className="telegram-card telegram-card-attempts telegram-card-enter">
+              <h2 className="telegram-card-title">Absence alert sign-ups</h2>
+              <p className="telegram-hint">When members message your gym&apos;s bot with &quot;Hi&quot; or their phone number (in the group or in private chat), they show up here. You can see who has registered for 3/7/14‑day absence reminders.</p>
               {config?.hasBot && (
-                <div className="telegram-webhook-actions">
-                  <p className="telegram-webhook-hint">
-                    If you message the bot but nothing appears here, the server may not have the webhook set. <strong>Re-register webhook</strong> only works when the API has <strong>PUBLIC_API_URL</strong> set (e.g. on Render). From localhost, use the deployed app or set <code>PUBLIC_API_URL</code> in .env to your Render URL.
-                  </p>
-                  {webhookInfo && (
-                    <div className="telegram-webhook-url-note">
-                      <p>Webhook URL must include your tenant ID (not just <code>/telegram-webhook</code>).</p>
-                      {webhookInfo.webhookUrl ? (
-                        <p>Correct URL for this gym: <code className="telegram-webhook-code">{webhookInfo.webhookUrl}</code></p>
-                      ) : (
-                        <p>Path: <code className="telegram-webhook-code">{webhookInfo.webhookPath}</code> — set <strong>PUBLIC_API_URL</strong> on the server to see full URL.</p>
-                      )}
-                      <p className="telegram-webhook-manual">Manual set: <code>https://api.telegram.org/bot&lt;BOT_TOKEN&gt;/setWebhook?url=&lt;WEBHOOK_URL_ABOVE&gt;</code></p>
-                    </div>
-                  )}
-                  <div className="telegram-webhook-buttons">
-                    <button type="button" className="telegram-btn telegram-btn-register" onClick={handleRegisterWebhook} disabled={webhookLoading}>
+                <div className="telegram-tip-box">
+                  <span className="telegram-tip-icon" aria-hidden>💬</span>
+                  <span>In groups, ask members to send <strong>/start</strong> to the bot. In private chat they can send &quot;Hi&quot; or their phone number.</span>
+                </div>
+              )}
+              {config?.hasBot && (
+                <div className="telegram-actions-row">
+                  <div className="telegram-actions-buttons">
+                    <button type="button" className="telegram-btn telegram-btn-refresh" onClick={fetchData} disabled={loading}>
+                      Refresh list
+                    </button>
+                    <button type="button" className="telegram-btn telegram-btn-register" onClick={() => handleRegisterWebhook()} disabled={webhookLoading}>
                       {webhookLoading ? 'Registering…' : 'Re-register webhook'}
                     </button>
-                    <button type="button" className="telegram-btn telegram-btn-refresh" onClick={fetchData} disabled={loading}>
-                      Refresh attempts
-                    </button>
                   </div>
+                  <p className="telegram-actions-hint">Messages not showing? Try <strong>Re-register webhook</strong>.</p>
+                  {webhookInfo && !webhookInfo.webhookUrl && (
+                    <details className="telegram-dev-details">
+                      <summary>Local testing (developer)</summary>
+                      <div className="telegram-paste-url-row">
+                        <input
+                          type="url"
+                          placeholder="https://xxxx.ngrok-free.dev"
+                          value={tunnelUrl}
+                          onChange={(e) => setTunnelUrl(e.target.value)}
+                          className="telegram-paste-url-input"
+                        />
+                        <button
+                          type="button"
+                          className="telegram-btn telegram-btn-register"
+                          onClick={handleRegisterWithTunnelUrl}
+                          disabled={webhookLoading || !tunnelUrl.trim()}
+                        >
+                          {webhookLoading ? 'Registering…' : 'Register with this URL'}
+                        </button>
+                      </div>
+                    </details>
+                  )}
                   {webhookStatus && (
                     <p className={`telegram-webhook-result ${webhookStatus.ok ? 'telegram-webhook-ok' : 'telegram-webhook-err'}`}>
                       {webhookStatus.message}
@@ -206,7 +270,10 @@ export default function Telegram() {
                 </div>
               )}
               {attempts.length === 0 ? (
-                <p className="telegram-empty">No attempts yet. Message your gym&apos;s bot (e.g. &quot;Hi&quot; or /start), then send your phone number. If it still doesn&apos;t appear, use &quot;Re-register webhook&quot; above and ensure PUBLIC_API_URL is set on the server.</p>
+                <div className="telegram-empty-state">
+                  <span className="telegram-empty-icon" aria-hidden>📋</span>
+                  <p className="telegram-empty">No sign-ups yet. When members message your bot, they&apos;ll appear here. Click <strong>Refresh list</strong> to check.</p>
+                </div>
               ) : (
                 <div className="telegram-table-wrap">
                   <table className="telegram-table">
@@ -217,11 +284,16 @@ export default function Telegram() {
                         <th>Message</th>
                         <th>Status</th>
                         <th>Date</th>
+                        <th className="telegram-th-action">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {attempts.map((a) => (
-                        <tr key={a._id}>
+                        <tr
+                          key={a._id}
+                          className={deletingId === a._id ? 'telegram-row-deleting' : ''}
+                          onTransitionEnd={() => handleRowTransitionEnd(a._id)}
+                        >
                           <td className="telegram-td-chat">{a.telegramChatId}</td>
                           <td>{a.phoneAttempted || '—'}</td>
                           <td className="telegram-td-msg">{a.messageText || '—'}</td>
@@ -229,6 +301,17 @@ export default function Telegram() {
                             <span className={`telegram-status telegram-status-${a.status}`}>{a.status}</span>
                           </td>
                           <td className="telegram-td-date">{formatDate(a.createdAt)}</td>
+                          <td className="telegram-td-action">
+                            <button
+                              type="button"
+                              className="telegram-btn-delete"
+                              onClick={() => handleDeleteAttempt(a._id)}
+                              disabled={deletingId !== null}
+                              title="Delete attempt"
+                            >
+                              Delete
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

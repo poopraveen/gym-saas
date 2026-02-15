@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Logger } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 
 /** Telegram sends updates with message, edited_message, etc. Use loose type so validation does not strip payload. */
@@ -16,6 +16,13 @@ export class TelegramWebhookController {
 
   constructor(private readonly notificationsService: NotificationsService) {}
 
+  /** GET so you can open the webhook URL in a browser to verify ngrok → API is reachable. Telegram only sends POST. */
+  @Get('telegram-webhook/:tenantId')
+  telegramWebhookGet(@Param('tenantId') tenantId: string) {
+    this.logger.log(`Telegram webhook GET (health check) tenantId=${tenantId}`);
+    return { ok: true, message: 'Webhook endpoint. Telegram sends POST here when someone messages the bot.' };
+  }
+
   @Post('telegram-webhook/:tenantId')
   async telegramWebhook(
     @Param('tenantId') tenantId: string,
@@ -24,9 +31,12 @@ export class TelegramWebhookController {
     const message = body?.message ?? body?.edited_message;
     const text = typeof message?.text === 'string' ? message.text : undefined;
     const chatId = message?.chat?.id;
-    this.logger.log(`Telegram webhook tenantId=${tenantId} chatId=${chatId} text=${text ? `"${String(text).slice(0, 80)}"` : '(none)'}`);
+    this.logger.log(`Telegram webhook POST tenantId=${tenantId} chatId=${chatId} text=${text ? `"${String(text).slice(0, 80)}"` : '(none)'}`);
     try {
-      await this.notificationsService.handleTelegramWebhookForTenant(tenantId, { message });
+      const handled = await this.notificationsService.handleTelegramWebhookForTenant(tenantId, { message });
+      if (!handled) {
+        this.logger.warn(`Telegram webhook not handled: tenantId=${tenantId} (tenant not found or no bot token?)`);
+      }
     } catch (e) {
       this.logger.warn('Telegram webhook error', e);
     }

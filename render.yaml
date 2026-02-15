@@ -16,3 +16,5 @@ services:
         value: 7d
       - key: CORS_ORIGIN
         sync: false
+      - key: PUBLIC_API_URL
+        sync: false

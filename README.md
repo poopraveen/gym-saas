@@ -130,6 +130,35 @@ The JSON files (`file.json`, `attendance.json`) are not MongoDB. You’d need a 
 | STAFF | Check-in, limited access |
 | MEMBER | Self-service only |
 
+## If the API fails with "EADDRINUSE: address already in use :::3000"
+
+Port 3000 is already in use (often a previous API instance). Free it and restart:
+
+```bash
+npm run free-port
+npm run start:dev
+```
+
+Or stop the other process (e.g. Ctrl+C in the terminal where the API is running).
+
+## Test Telegram webhook locally (ngrok)
+
+Telegram can only send webhooks to a public HTTPS URL. To test from your machine:
+
+1. **Terminal 1 – start the tunnel**
+   ```bash
+   npm run tunnel
+   ```
+   This runs `ngrok http 3000`. Leave it running. (If your API uses another port, run `ngrok http <port>` instead.)
+
+2. **Terminal 2 – start the API with the tunnel URL**
+   ```bash
+   npm run dev:telegram
+   ```
+   This reads the ngrok URL from ngrok’s local API and starts the backend with `PUBLIC_API_URL` set to that URL.
+
+3. Open the app (e.g. http://localhost:5173), go to **Telegram**, click **Re-register webhook**, then message your bot (e.g. `/start` in private chat). Click **Refresh attempts** to see the attempt.
+
 ## Environment
 
 See `.env.example` for variables. Never commit real secrets.
