@@ -19,7 +19,8 @@ export class AttendanceService {
     const member = list.find((m) => Number(m['Reg No:']) === regNo) as unknown as Member;
     if (!member) return null;
 
-    const dueRaw = member['DUE DATE'] ?? (member as any).dueDate;
+    const m = member as unknown as Record<string, unknown>;
+    const dueRaw = m['DUE DATE'] ?? m.dueDate;
     if (dueRaw != null) {
       const due = new Date(dueRaw as number | string);
       if (!isNaN(due.getTime()) && due < new Date()) {
@@ -111,8 +112,9 @@ export class AttendanceService {
     const list = await this.membersService.list(tenantId);
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    const validList = list.filter((m) => {
-      const dueRaw = m['DUE DATE'] ?? (m as any).dueDate;
+    const validList = list.filter((row) => {
+      const r = row as unknown as Record<string, unknown>;
+      const dueRaw = r['DUE DATE'] ?? r.dueDate;
       if (dueRaw == null) return true;
       const due = new Date(dueRaw as number | string);
       if (isNaN(due.getTime())) return true;
