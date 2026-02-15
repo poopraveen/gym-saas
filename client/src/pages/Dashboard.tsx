@@ -77,6 +77,24 @@ function renewalPrioritySort(a: Member, b: Member): number {
   return ptB - ptA;
 }
 
+/** Prefill message for WhatsApp renewal follow-up (manual 3-day / due-today). */
+function getRenewalPrefillMessage(m: Member, type: 'today' | '3days'): string {
+  const name = String(m.NAME ?? '').trim() || 'there';
+  if (type === 'today') {
+    return `Hi ${name}, your gym membership is due for renewal today. Please renew at your earliest to avoid any interruption. Thank you!`;
+  }
+  return `Hi ${name}, your gym membership is expiring in 3 days. Please renew at your earliest to avoid any interruption. Thank you!`;
+}
+
+/** Prefill message for WhatsApp when reaching out to absent members (5 or 7 days). */
+function getAbsentPrefillMessage(m: Member, days: 5 | 7): string {
+  const name = String(m.NAME ?? '').trim() || 'there';
+  if (days === 5) {
+    return `Hi ${name}, we noticed you haven't visited in 5 days. We'd love to see you back at the gym. Is everything okay? Let us know if you need anything!`;
+  }
+  return `Hi ${name}, we missed you! You haven't visited in a week. We're here when you're ready to get back. Need help with your routine or schedule? Just reply!`;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [allMembers, setAllMembers] = useState<Member[]>([]);
@@ -446,7 +464,7 @@ export default function Dashboard() {
               <button type="button" className="renewals-modal-close" onClick={() => setShowRenewalsDueModal(false)} aria-label="Close">×</button>
             </div>
             <div className="renewals-modal-body">
-              <p className="renewals-modal-hint">Members whose due date is within the next 3 days. Use WhatsApp to follow up.</p>
+              <p className="renewals-modal-hint">Members whose membership is due in the next 3 days. Tap WhatsApp to send a renewal reminder (message is prefilled).</p>
               <div className="renewals-table-wrap">
                 <table className="renewals-table">
                   <thead>
@@ -466,6 +484,7 @@ export default function Dashboard() {
                         <td className="renewals-td-action">
                           <WhatsAppButton
                             phone={String(m['Phone Number'] ?? '')}
+                            message={getRenewalPrefillMessage(m, '3days')}
                             onClick={() => { setShowRenewalsDueModal(false); handleWhatsAppClick(m); }}
                           />
                           <button
@@ -500,19 +519,19 @@ export default function Dashboard() {
               {/* 1) Today's Actions */}
               <section className="dash-section">
                 <h2 className="dash-section-title">Today&apos;s Actions</h2>
-                <p className="dash-section-sub">Based on Absent &gt;7 days, Renewals today, Missed renewals &lt;7 days</p>
+                <p className="dash-section-sub">Quick counts: who to WhatsApp for renewal today, who to follow up (recent missed renewals), and who to call (absent a week or more with expiry soon)</p>
                 <div className="today-actions-row">
                   <div className="today-action-card">
                     <span className="ta-count">WhatsApp {todayActionsWhatsApp} members</span>
-                    <span className="ta-desc">Renewal today</span>
+                    <span className="ta-desc">Membership due today</span>
                   </div>
                   <div className="today-action-card">
                     <span className="ta-count">Follow up {todayActionsFollowUp} missed renewals</span>
-                    <span className="ta-desc">Recent</span>
+                    <span className="ta-desc">Recently expired — best chance to win back</span>
                   </div>
                   <div className="today-action-card">
                     <span className="ta-count">Call {todayActionsCall} members</span>
-                    <span className="ta-desc">Absent 7+ days, expiry soon</span>
+                    <span className="ta-desc">Absent 7+ days and membership expiring soon</span>
                   </div>
                 </div>
               </section>
@@ -520,18 +539,18 @@ export default function Dashboard() {
               {/* 2) Renewals Expiring Soon */}
               <section className="dash-section">
                 <h2 className="dash-section-title">Renewals Expiring Soon</h2>
-                <p className="dash-section-sub">Potential Revenue at Risk: ₹{(revenueAtRiskDueIn3 || 0).toLocaleString()}</p>
+                <p className="dash-section-sub">Revenue at risk if they don&apos;t renew: ₹{(revenueAtRiskDueIn3 || 0).toLocaleString()}</p>
                 <div className="renewals-soon-grid">
                   <div className="renewals-soon-card">
                     <h3>Due today: {renewalsDueToday.length} members</h3>
                     <p className="revenue-risk">Revenue at risk: ₹{revenueAtRiskDueToday.toLocaleString()}</p>
-                    <p className="sort-hint">Sorted: higher absence, new member &lt;30 days, PT plan</p>
+                    <p className="sort-hint">Order: members absent longer, newer members, and PT first — prioritise these when you contact.</p>
                     <ul className="member-mini-list">
                       {renewalsDueToday.slice(0, 5).map((m) => (
                         <li key={String(m['Reg No:'])}>
                           <span>{String(m.NAME ?? '—')}</span>
                           <span className="days-absent">Absent: {getDaysAbsent(m)}d</span>
-                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} onClick={() => handleWhatsAppClick(m)} />
+                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} message={getRenewalPrefillMessage(m, 'today')} onClick={() => handleWhatsAppClick(m)} />
                         </li>
                       ))}
                     </ul>
@@ -540,49 +559,49 @@ export default function Dashboard() {
                   <div className="renewals-soon-card">
                     <h3>Due in 3 days: {renewalsDueIn3Days.length} members</h3>
                     <p className="revenue-risk">Revenue at risk: ₹{revenueAtRiskDueIn3.toLocaleString()}</p>
-                    <p className="sort-hint">Sorted: higher absence, new member &lt;30 days, PT plan</p>
+                    <p className="sort-hint">Order: members absent longer, newer members, and PT first — prioritise these when you contact.</p>
                     <ul className="member-mini-list">
                       {renewalsDueIn3Days.slice(0, 5).map((m) => (
                         <li key={String(m['Reg No:'])}>
                           <span>{String(m.NAME ?? '—')}</span>
                           <span className="days-absent">Absent: {getDaysAbsent(m)}d</span>
-                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} onClick={() => handleWhatsAppClick(m)} />
+                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} message={getRenewalPrefillMessage(m, '3days')} onClick={() => handleWhatsAppClick(m)} />
                         </li>
                       ))}
                     </ul>
                     {renewalsDueIn3Days.length > 5 && <p className="more-hint">+{renewalsDueIn3Days.length - 5} more</p>}
                   </div>
                 </div>
-                <button type="button" className="btn-outline btn-view-renewals" onClick={() => setShowRenewalsDueModal(true)}>View full renewals list</button>
+                <button type="button" className="btn-outline btn-view-renewals" onClick={() => setShowRenewalsDueModal(true)}>View full list &amp; WhatsApp all</button>
               </section>
 
               {/* 3) Absent Today */}
               <section className="dash-section">
                 <h2 className="dash-section-title">Absent Today</h2>
-                <p className="dash-section-sub">Expired members are excluded. Total: {absentTodayTotal}</p>
+                <p className="dash-section-sub">Active members who didn&apos;t check in today (expired excluded). Total: {absentTodayTotal}</p>
                 <div className="absent-grid">
                   <div className="absent-card absent-medium">
                     <h3>Absent for 5 days: {absent5DaysList.length}</h3>
-                    <span className="risk-badge risk-medium">Medium Risk</span>
-                    <p className="sort-hint">Sorted by renewal priority, new member &lt;30 days, PT plan</p>
+                    <span className="risk-badge risk-medium">Worth a check-in</span>
+                    <p className="sort-hint">Reach out first to those absent longest, newer members, and PT—they need attention sooner.</p>
                     <ul className="member-mini-list">
                       {absent5DaysList.slice(0, 5).map((m) => (
                         <li key={String(m['Reg No:'])}>
                           <span>{String(m.NAME ?? '—')}</span>
-                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} onClick={() => handleWhatsAppClick(m)} />
+                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} message={getAbsentPrefillMessage(m, 5)} onClick={() => handleWhatsAppClick(m)} />
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div className="absent-card absent-high">
                     <h3>Absent for 7 days: {absent7DaysList.length}</h3>
-                    <span className="risk-badge risk-high">High Risk</span>
-                    <p className="sort-hint">Sorted by renewal priority, new member &lt;30 days, PT plan</p>
+                    <span className="risk-badge risk-high">Prioritise follow-up</span>
+                    <p className="sort-hint">Reach out first to those absent longest, newer members, and PT—they need attention sooner.</p>
                     <ul className="member-mini-list">
                       {absent7DaysList.slice(0, 5).map((m) => (
                         <li key={String(m['Reg No:'])}>
                           <span>{String(m.NAME ?? '—')}</span>
-                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} onClick={() => handleWhatsAppClick(m)} />
+                          <WhatsAppButton phone={String(m['Phone Number'] ?? '')} message={getAbsentPrefillMessage(m, 7)} onClick={() => handleWhatsAppClick(m)} />
                         </li>
                       ))}
                     </ul>
@@ -592,20 +611,20 @@ export default function Dashboard() {
 
               {/* 4) Missed Renewals */}
               <section className="dash-section">
-                <h2 className="dash-section-title">Missed Renewals (Last 7 Days)</h2>
-                <p className="dash-section-sub">Potential Revenue Recovery: ₹{revenueRecovery.toLocaleString()}</p>
+                <h2 className="dash-section-title">Missed Renewals</h2>
+                <p className="dash-section-sub">Revenue you can recover by following up: ₹{revenueRecovery.toLocaleString()}</p>
                 <div className="missed-renewals-row">
                   <div className="missed-bucket high">
                     <span className="bucket-count">Expired 1–7 days ago: {missedRenewals1_7.length}</span>
-                    <span className="bucket-tag">High chance</span>
+                    <span className="bucket-tag">Best chance to win back</span>
                   </div>
                   <div className="missed-bucket medium">
                     <span className="bucket-count">Expired 8–30 days ago: {missedRenewals8_30.length}</span>
-                    <span className="bucket-tag">Medium chance</span>
+                    <span className="bucket-tag">Worth a follow-up</span>
                   </div>
                   <div className="missed-bucket low">
                     <span className="bucket-count">Expired 31–90 days ago: {missedRenewals31_90.length}</span>
-                    <span className="bucket-tag">Low chance</span>
+                    <span className="bucket-tag">Older lapses</span>
                   </div>
                 </div>
               </section>
@@ -619,24 +638,24 @@ export default function Dashboard() {
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && handleNavChange('finance')}
                 >
-                  <span className="dc-label">Add earning for this month</span>
+                  <span className="dc-label">This month&apos;s earnings</span>
                   <span className="dc-value">₹{(finance?.monthlyFees ?? 0).toLocaleString()}</span>
                   <span className="dc-action">Tap to view →</span>
-                  <span className="dc-sub">Includes New Memberships + Renewals</span>
+                  <span className="dc-sub">This month&apos;s fees (new + renewals)</span>
                 </div>
               </section>
 
               {/* Legacy quick cards */}
               <div className="dashboard-cards dashboard-cards-grid">
                 <div className="dash-card dash-card-1 dash-card-clickable" onClick={() => handleNavChange('add')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && handleNavChange('add')}>
-                  <span className="dc-label">Reg Members</span>
+                  <span className="dc-label">Registered members</span>
                   <span className="dc-value">{(finance?.totalMembers ?? allMembers.length ?? 0).toLocaleString()}</span>
                   <span className="dc-action">Add member →</span>
                 </div>
                 <div className="dash-card dash-card-2">
-                  <span className="dc-label">Today attendance vs active</span>
+                  <span className="dc-label">Today&apos;s check-ins vs active members</span>
                   <span className="dc-value dc-value-split">{todayAttendanceCount} <span className="dc-sep">/</span> {(finance?.activeMembers ?? activeMembersOnly.length).toLocaleString()}</span>
-                  <span className="dc-sub">Check-ins today / Active members</span>
+                  <span className="dc-sub">Who came in today / Total active</span>
                 </div>
               </div>
             </>
@@ -665,7 +684,7 @@ export default function Dashboard() {
             <div className="mc-header">
               <div>
                 <h3>Monthly Collection Details</h3>
-                <p className="mc-subtitle">Fees collected per month (based on member join date)</p>
+                <p className="mc-subtitle">Fees collected each month (new members + renewals)</p>
               </div>
               {finance?.monthlyCollections && finance.monthlyCollections.length > 0 && (
                 <button
@@ -775,7 +794,7 @@ export default function Dashboard() {
         <div ref={peopleViewRef} className="people-view people-view-sticky">
           <div className="people-sticky-top">
             <div className="people-header">
-              <h1 className="page-title">Reg Members ({regMembersTotal})</h1>
+              <h1 className="page-title">Registered members ({regMembersTotal})</h1>
               <div className="people-actions">
                 <button onClick={() => handleNavChange('add')} className="btn-add" aria-label="Add member" data-tour="people-add-member">
                   +

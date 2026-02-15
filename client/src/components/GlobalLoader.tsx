@@ -19,7 +19,13 @@ export default function GlobalLoader() {
 
   return (
     <div className="global-loader-overlay" aria-busy="true" aria-live="polite" role="status">
-      <div className="global-loader-spinner" />
+      <div className="global-loader-icon">
+        <svg viewBox="0 0 48 24" className="global-loader-dumbbell" aria-hidden>
+          <rect x="2" y="8" width="8" height="8" rx="2" fill="currentColor" />
+          <rect x="38" y="8" width="8" height="8" rx="2" fill="currentColor" />
+          <rect x="10" y="10" width="28" height="4" rx="1" fill="currentColor" />
+        </svg>
+      </div>
       <span className="global-loader-label">Loading…</span>
     </div>
   );

@@ -1,26 +1,33 @@
 import React from 'react';
 import './WhatsAppButton.css';
 
-/** Formats phone for wa.me: remove spaces, ensure country code (default +91) */
-function toWaMe(phone: string | number, countryCode = '91'): string {
+/** Formats phone for wa.me: remove spaces, ensure country code (default +91). Optional text param prefills the chat message. */
+function toWaMe(phone: string | number, countryCode = '91', prefillMessage?: string): string {
   const s = String(phone).replace(/\D/g, '');
   const digits = s.startsWith(countryCode) ? s : `${countryCode}${s}`;
-  return `https://wa.me/${digits}`;
+  const base = `https://wa.me/${digits}`;
+  if (prefillMessage && prefillMessage.trim()) {
+    return `${base}?text=${encodeURIComponent(prefillMessage.trim())}`;
+  }
+  return base;
 }
 
 export default function WhatsAppButton({
   phone,
   countryCode = '91',
   title = 'Chat on WhatsApp',
+  message,
   onClick,
 }: {
   phone: string | number;
   countryCode?: string;
   title?: string;
+  /** Prefill the WhatsApp chat with this message (e.g. renewal follow-up). */
+  message?: string;
   onClick?: () => void;
 }) {
   if (!phone) return null;
-  const href = toWaMe(phone, countryCode);
+  const href = toWaMe(phone, countryCode, message);
 
   return (
     <a
