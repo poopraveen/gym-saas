@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Query,
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
@@ -42,6 +43,18 @@ export class AttendanceController {
     return this.attendanceService.checkIn(tenantId, Number(regNo));
   }
 
+  /** Remove today's check-in for a member so they can re-enter. */
+  @Post('remove-today')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  removeTodayCheckIn(
+    @TenantId() tenantId: string,
+    @Body() body: { regNo: number },
+  ) {
+    if (body.regNo == null) throw new BadRequestException('regNo required');
+    return this.attendanceService.removeTodayCheckIn(tenantId, Number(body.regNo));
+  }
+
   /** Get QR check-in URL and token for this tenant (staff dashboard). Token valid 24h. */
   @Get('qr-payload')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -54,7 +67,15 @@ export class AttendanceController {
     return { url, token };
   }
 
-  /** Public: check-in by QR token (member scans QR and enters Reg No). No auth. */
+  /** Public: list members (name + regNo) for QR check-in page autocomplete. Token required. */
+  @Get('checkin-qr-members')
+  async getCheckInQRMembers(@Query('t') token: string) {
+    if (!token) return { members: [] };
+    const members = await this.attendanceService.getMembersForQRCheckIn(token);
+    return { members };
+  }
+
+  /** Public: check-in by QR token (member scans QR, selects by name or enters Reg No). No auth. */
   @Post('checkin-qr')
   async checkInByQR(@Body() body: { token: string; regNo: number }) {
     const { token, regNo } = body || {};

@@ -112,7 +112,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [regNoInput, setRegNoInput] = useState('');
+  const [checkinSearchQuery, setCheckinSearchQuery] = useState('');
+  const [selectedMemberForCheckIn, setSelectedMemberForCheckIn] = useState<Member | null>(null);
+  const [checkinDropdownOpen, setCheckinDropdownOpen] = useState(false);
+  const checkinInputRef = useRef<HTMLInputElement>(null);
+  const checkinDropdownRef = useRef<HTMLDivElement>(null);
   const [activeNav, setActiveNav] = useState<'dashboard' | 'main' | 'add' | 'checkin' | 'finance'>('main');
   const [filter, setFilter] = useState<'all' | 'men' | 'women'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
@@ -353,18 +357,53 @@ export default function Dashboard() {
     if (membersPage > totalPages && totalPages >= 1) setMembersPage(totalPages);
   }, [totalPages, membersPage]);
 
+  useEffect(() => {
+    if (activeNav !== 'checkin' || !checkinDropdownOpen) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (checkinInputRef.current?.contains(target) || checkinDropdownRef.current?.contains(target)) return;
+      setCheckinDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [activeNav, checkinDropdownOpen]);
+
   const handleCheckIn = async () => {
-    const regNo = parseInt(regNoInput, 10);
-    if (isNaN(regNo)) return;
+    const member = selectedMemberForCheckIn;
+    const regNo = member != null ? Number(member['Reg No:']) : NaN;
+    if (!member || isNaN(regNo)) return;
     try {
       await api.legacy.checkIn({ 'Reg No:': regNo });
-      setRegNoInput('');
+      setSelectedMemberForCheckIn(null);
+      setCheckinSearchQuery('');
+      setCheckinDropdownOpen(false);
       loadList();
       loadCheckIn();
     } catch (err) {
       alert('Check-in failed: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   };
+
+  /** Members matching check-in search (name, Reg No, or phone). Exact Reg No first when query is digits-only. */
+  const checkinSearchMatches = (() => {
+    if (!checkinSearchQuery.trim()) return [];
+    const q = checkinSearchQuery.trim().toLowerCase();
+    const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
+    const filtered = allMembers.filter(
+      (m) =>
+        (m.NAME as string)?.toLowerCase().includes(q) ||
+        String(m['Reg No:'] || '').includes(q) ||
+        String(m['Phone Number'] || '').includes(q),
+    );
+    const sorted = !isNaN(qNum)
+      ? [...filtered].sort((a, b) => {
+          const aExact = Number(a['Reg No:']) === qNum ? 1 : 0;
+          const bExact = Number(b['Reg No:']) === qNum ? 1 : 0;
+          return bExact - aExact;
+        })
+      : filtered;
+    return sorted.slice(0, 15);
+  })();
 
   const handleAddMember = async (data: Record<string, unknown>) => {
     await api.legacy.upsert(data, false);
@@ -751,14 +790,70 @@ export default function Dashboard() {
         <div className="people-view">
           <h1 className="page-title">Attendance</h1>
           <div className="checkin-section">
-            <div className="checkin-row">
-              <input
-                placeholder="Registration ID"
-                value={regNoInput}
-                onChange={(e) => setRegNoInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCheckIn()}
-              />
-              <button onClick={handleCheckIn} className="btn-primary">
+            <div className="checkin-row checkin-row-autocomplete">
+              <div className="checkin-autocomplete-wrap">
+                <input
+                  ref={checkinInputRef}
+                  type="text"
+                  placeholder="Type name or Reg. No. — autocomplete will suggest"
+                  value={checkinSearchQuery}
+                  onChange={(e) => {
+                    setCheckinSearchQuery(e.target.value);
+                    setCheckinDropdownOpen(true);
+                    if (!e.target.value.trim()) setSelectedMemberForCheckIn(null);
+                  }}
+                  onFocus={() => setCheckinDropdownOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (selectedMemberForCheckIn) handleCheckIn();
+                      else if (checkinSearchMatches.length === 1) {
+                        setSelectedMemberForCheckIn(checkinSearchMatches[0]);
+                        setCheckinSearchQuery(String(checkinSearchMatches[0].NAME));
+                        setCheckinDropdownOpen(false);
+                      }
+                    }
+                    if (e.key === 'Escape') setCheckinDropdownOpen(false);
+                  }}
+                  aria-autocomplete="list"
+                  aria-expanded={checkinDropdownOpen}
+                  aria-controls="checkin-dropdown"
+                />
+                {checkinDropdownOpen && checkinSearchQuery.trim() && (
+                  <div
+                    id="checkin-dropdown"
+                    ref={checkinDropdownRef}
+                    className="checkin-dropdown"
+                    role="listbox"
+                  >
+                    {checkinSearchMatches.length === 0 ? (
+                      <div className="checkin-dropdown-item checkin-dropdown-empty">No member found</div>
+                    ) : (
+                      checkinSearchMatches.map((m) => (
+                        <button
+                          key={String(m['Reg No:'])}
+                          type="button"
+                          role="option"
+                          className={`checkin-dropdown-item ${selectedMemberForCheckIn?.['Reg No:'] === m['Reg No:'] ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedMemberForCheckIn(m);
+                            setCheckinSearchQuery(String(m.NAME ?? ''));
+                            setCheckinDropdownOpen(false);
+                            checkinInputRef.current?.focus();
+                          }}
+                        >
+                          {m.NAME} #{m['Reg No:']}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={handleCheckIn}
+                className="btn-primary"
+                disabled={!selectedMemberForCheckIn}
+                title={selectedMemberForCheckIn ? `Check in ${selectedMemberForCheckIn.NAME}` : 'Select a member first'}
+              >
                 Check In
               </button>
             </div>
@@ -775,13 +870,32 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-            <div className="chips">
+            <div className="chips chips-with-actions">
               {checkinTable.length === 0 ? (
                 <div className="empty-state">No check-ins today</div>
               ) : (
                 checkinTable.map((row) => (
-                  <span key={String(row['Reg No:'])} className="chip">
-                    #{row['Reg No:']} {row.NAME}
+                  <span key={String(row['Reg No:'])} className="chip chip-with-action">
+                    <span className="chip-text">#{row['Reg No:']} {row.NAME}</span>
+                    <button
+                      type="button"
+                      className="chip-remove"
+                      onClick={async () => {
+                        const regNo = Number(row['Reg No:']);
+                        if (isNaN(regNo)) return;
+                        try {
+                          await api.attendance.removeTodayCheckIn(regNo);
+                          loadList();
+                          loadCheckIn();
+                        } catch (err) {
+                          alert('Failed to remove: ' + (err instanceof Error ? err.message : 'Unknown'));
+                        }
+                      }}
+                      title="Remove today's attendance so they can check in again"
+                      aria-label={`Remove attendance for ${row.NAME}`}
+                    >
+                      ×
+                    </button>
                   </span>
                 ))
               )}

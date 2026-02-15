@@ -228,11 +228,15 @@ export const api = {
   attendance: {
     qrPayload: () =>
       request<{ url: string; token: string }>('/attendance/qr-payload'),
+    getCheckInQRMembers: (token: string) =>
+      requestPublic<{ members: { regNo: number; name: string }[] }>(`/attendance/checkin-qr-members?t=${encodeURIComponent(token)}`),
     checkInByQR: (token: string, regNo: number) =>
       requestPublic<{ success: boolean; name?: string }>('/attendance/checkin-qr', {
         method: 'POST',
         body: JSON.stringify({ token, regNo }),
       }),
+    removeTodayCheckIn: (regNo: number) =>
+      request<unknown>('/attendance/remove-today', { method: 'POST', body: JSON.stringify({ regNo }) }),
   },
   platform: {
     listTenants: () => request<unknown[]>('/platform/tenants'),

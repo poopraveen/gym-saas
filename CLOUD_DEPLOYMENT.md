@@ -55,7 +55,19 @@ After changing `VITE_API_URL`, **redeploy** the frontend so the new value is bak
 
 ---
 
-## 5. Optional: Same Repo, Different Env
+## 5. Telegram webhook not working in cloud?
+
+If it works locally (with ngrok) but not after deploy:
+
+1. **Set `PUBLIC_API_URL`** in Render to your **exact** API URL, e.g. `https://gym-saas-api.onrender.com` (no trailing slash, HTTPS).
+2. **Re-register the webhook** from the **deployed** app: log in → **Telegram** page → click **Re-register webhook**. That tells Telegram to send updates to your production URL. (If `PUBLIC_API_URL` is not set, the app still sends the API base from the frontend when you click Re-register.)
+3. **Check the endpoint is reachable**: open `https://YOUR-RENDER-URL/api/notifications/telegram-webhook/YOUR_TENANT_ID` in a browser. If the service was sleeping, you may see Render’s **“SERVICE WAKING UP”** / “ALLOCATING COMPUTE RESOURCES” page first — that’s the cold-start screen, not your app. Wait 30–60 seconds, then **refresh** the same URL; you should then see `{"ok":true,"message":"Webhook endpoint..."}`. If you still get 404 or a timeout after the service is awake, the API or route is wrong.
+4. **Cold start**: On Render **free** tier the API sleeps after inactivity, so the first request can show “SERVICE WAKING UP” and Telegram may timeout. On a **paid** plan (e.g. $7 Starter) the service stays on, so you should only see that screen right after a deploy or restart; once the instance is up, the webhook and Telegram should work reliably.
+
+---
+
+## 6. Optional: Same Repo, Different Env
 
 - **Local:** Keep using `.env` with `PUBLIC_API_URL=https://xxxx.ngrok-free.dev` when testing Telegram with ngrok.
 - **Cloud:** Render and Vercel use their own env vars; they never read your local `.env`. So no need to change your local `.env` when you deploy; just set the correct values in Render and Vercel.
+

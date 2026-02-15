@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 
 /** Telegram sends updates with message, edited_message, etc. Use loose type so validation does not strip payload. */
@@ -7,8 +7,7 @@ type TelegramUpdate = Record<string, any>;
 
 /**
  * Public Telegram webhook per tenant. Telegram calls this when someone messages the tenant's bot.
- * User should message the bot in private (or use /start in group) and send their registered phone to opt in.
- * Webhook URL is set when tenant saves Telegram in Platform Admin (requires PUBLIC_API_URL).
+ * No auth – Telegram servers POST here. In cloud: set PUBLIC_API_URL and click "Re-register webhook" from the app.
  */
 @Controller('notifications')
 export class TelegramWebhookController {
@@ -16,14 +15,16 @@ export class TelegramWebhookController {
 
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  /** GET so you can open the webhook URL in a browser to verify ngrok → API is reachable. Telegram only sends POST. */
+  /** GET so you can open the webhook URL in a browser to verify it's reachable. Telegram only sends POST. */
   @Get('telegram-webhook/:tenantId')
   telegramWebhookGet(@Param('tenantId') tenantId: string) {
     this.logger.log(`Telegram webhook GET (health check) tenantId=${tenantId}`);
     return { ok: true, message: 'Webhook endpoint. Telegram sends POST here when someone messages the bot.' };
   }
 
+  /** Accept any Telegram payload; do not reject extra properties (forbidNonWhitelisted would break Telegram's POST). */
   @Post('telegram-webhook/:tenantId')
+  @UsePipes(new ValidationPipe({ forbidNonWhitelisted: false, whitelist: false }))
   async telegramWebhook(
     @Param('tenantId') tenantId: string,
     @Body() body: TelegramUpdate,

@@ -39,6 +39,33 @@ export class AttendanceService {
     return this.membersService.list(tenantId);
   }
 
+  /** Remove today's check-in for a member so they can check in again. Clears lastCheckInTime and decrements monthly count. */
+  async removeTodayCheckIn(tenantId: string, regNo: number): Promise<Member | null> {
+    const list = await this.membersService.list(tenantId);
+    const member = list.find((m) => Number(m['Reg No:']) === regNo) as unknown as Member;
+    if (!member) return null;
+
+    const lastStr = (member.lastCheckInTime as string) || '';
+    const today = new Date().toLocaleDateString();
+    const isToday = lastStr.split(',')[0]?.trim() === today;
+    if (!isToday) return member;
+
+    const now = new Date();
+    const monthKey = String(now.getMonth());
+    const monthlyAttendance = { ...((member.monthlyAttendance || {}) as Record<string, number>) };
+    const current = monthlyAttendance[monthKey] || 0;
+    if (current > 0) monthlyAttendance[monthKey] = current - 1;
+
+    await this.membersService.upsert(tenantId, {
+      ...member,
+      lastCheckInTime: '',
+      monthlyAttendance,
+      lastUpdateDateTime: String(now.getTime()),
+    } as Record<string, unknown>, false);
+
+    return { ...member, lastCheckInTime: '', monthlyAttendance };
+  }
+
   /** Create a signed token for QR check-in (valid 24h). Token payload: tenantId + expiry. */
   createQRToken(tenantId: string): string {
     const secret = this.configService.get<string>('JWT_SECRET') || 'qr-secret';
@@ -65,5 +92,16 @@ export class AttendanceService {
     } catch {
       return null;
     }
+  }
+
+  /** List member names and reg numbers for QR check-in page autocomplete (token must be valid). */
+  async getMembersForQRCheckIn(token: string): Promise<{ regNo: number; name: string }[]> {
+    const tenantId = this.verifyQRToken(token);
+    if (!tenantId) return [];
+    const list = await this.membersService.list(tenantId);
+    return list.map((m) => ({
+      regNo: Number(m['Reg No:']) || 0,
+      name: String(m.NAME ?? m.name ?? ''),
+    })).filter((m) => m.regNo && m.name.trim());
   }
 }
