@@ -8,11 +8,15 @@ import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
 import { TelegramWebhookController } from './telegram-webhook.controller';
 import { TelegramOptIn, TelegramOptInSchema } from './schemas/telegram-opt-in.schema';
+import { PushSubscriptionDoc, PushSubscriptionSchema } from './schemas/push-subscription.schema';
 
 @Module({
   imports: [
     ConfigModule,
-    MongooseModule.forFeature([{ name: TelegramOptIn.name, schema: TelegramOptInSchema }]),
+    MongooseModule.forFeature([
+      { name: TelegramOptIn.name, schema: TelegramOptInSchema },
+      { name: PushSubscriptionDoc.name, schema: PushSubscriptionSchema },
+    ]),
     TenantsModule,
     MembersModule,
   ],

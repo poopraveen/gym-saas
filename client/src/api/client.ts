@@ -495,6 +495,17 @@ export const api = {
       }),
     getWebhookInfo: () =>
       request<{ tenantId: string; webhookPath: string; webhookUrl: string | null }>('/notifications/webhook-info'),
+    getVapidPublicKey: () =>
+      request<{ publicKey: string | null }>('/notifications/vapid-public-key'),
+    savePushSubscription: (subscription: PushSubscriptionJSON, userAgent?: string) =>
+      request<{ ok: boolean; error?: string }>('/notifications/push-subscription', {
+        method: 'POST',
+        body: JSON.stringify({ subscription, userAgent: userAgent ?? navigator.userAgent }),
+      }),
+    removePushSubscription: () =>
+      request<{ ok: boolean; deleted?: number; error?: string }>('/notifications/push-subscription', {
+        method: 'DELETE',
+      }),
   },
 };
 

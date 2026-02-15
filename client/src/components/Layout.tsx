@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import { storage, api } from '../api/client';
 import { runDashboardTour, runEnquiriesTour } from '../utils/guidedTour';
 import Logo from './Logo';
+import PushNotificationSettings from './PushNotificationSettings';
 import './Layout.css';
 
 type NavItem = { id: string; label: string; icon: string };
@@ -157,6 +158,9 @@ export default function Layout({
               <span className="nav-label">Guide</span>
             </button>
           )}
+          <div className="drawer-push-settings">
+            <PushNotificationSettings />
+          </div>
           {!isMember && (
             <button type="button" className="nav-item" onClick={toggleTheme} data-tour="theme-toggle">
             <span className="nav-icon">{theme === 'light' ? '🌙' : '☀️'}</span>

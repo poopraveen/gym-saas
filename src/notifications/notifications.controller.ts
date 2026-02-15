@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, Param, Req, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -132,9 +132,48 @@ export class NotificationsController {
   /** Get the webhook URL and tenant ID for this gym (for manual setWebhook). No auth side effects. */
   @Get('webhook-info')
   async webhookInfo(@TenantId() tenantId: string) {
-    let base = (this.configService.get<string>('PUBLIC_API_URL') || this.configService.get<string>('FRONTEND_URL') || '').replace(/\/$/, '');
+    const base = (this.configService.get<string>('PUBLIC_API_URL') || this.configService.get<string>('FRONTEND_URL') || '').replace(/\/$/, '');
     const webhookPath = `/api/notifications/telegram-webhook/${tenantId}`;
     const webhookUrl = base && base.startsWith('https://') ? `${base}${webhookPath}` : null;
     return { tenantId, webhookPath, webhookUrl };
+  }
+
+  /** Get VAPID public key for push subscription (any authenticated user). */
+  @Get('vapid-public-key')
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.MEMBER)
+  getVapidPublicKey() {
+    const key = this.notificationsService.getVapidPublicKey();
+    return { publicKey: key };
+  }
+
+  /** Save push subscription for the current user (any authenticated user). */
+  @Post('push-subscription')
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.MEMBER)
+  async savePushSubscription(
+    @TenantId() tenantId: string,
+    @Req() req: { user: { userId: string } },
+    @Body() body: { subscription: { endpoint: string; keys: { p256dh: string; auth: string } }; userAgent?: string },
+  ) {
+    const userId = req.user?.userId;
+    if (!userId || !body?.subscription?.endpoint || !body?.subscription?.keys?.p256dh || !body?.subscription?.keys?.auth) {
+      return { ok: false, error: 'subscription with endpoint and keys required' };
+    }
+    await this.notificationsService.savePushSubscription(
+      tenantId,
+      userId,
+      body.subscription,
+      body.userAgent,
+    );
+    return { ok: true };
+  }
+
+  /** Remove push subscription(s) for the current user. */
+  @Delete('push-subscription')
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.MEMBER)
+  async removePushSubscription(@TenantId() tenantId: string, @Req() req: { user: { userId: string } }) {
+    const userId = req.user?.userId;
+    if (!userId) return { ok: false, error: 'Unauthorized' };
+    const deleted = await this.notificationsService.removePushSubscription(tenantId, userId);
+    return { ok: true, deleted };
   }
 }

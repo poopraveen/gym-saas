@@ -4,12 +4,12 @@
   min-height: 100vh;
 }
 
-/* Top bar - fixed at viewport top so it never scrolls away */
+/* Top bar - fixed at viewport top; safe-area so status bar (time/network) doesn't overlap in PWA */
 .topbar {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 20px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px)) 12px calc(20px + env(safe-area-inset-left, 0px));
   background: var(--card-bg);
   border-bottom: 1px solid var(--border);
   position: fixed;
@@ -124,7 +124,7 @@
   opacity: 1;
 }
 
-/* Drawer - closed by default */
+/* Drawer - closed by default; safe-area so menu doesn't sit under status bar in PWA */
 .drawer {
   position: fixed;
   top: 0;
@@ -132,6 +132,10 @@
   width: 280px;
   max-width: 85vw;
   height: 100vh;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
   display: flex;
@@ -164,6 +168,12 @@
   flex-shrink: 0;
   padding: 12px 0;
   border-top: 1px solid var(--border);
+}
+
+.drawer-push-settings {
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
 }
 
 .drawer-footer-brand {
@@ -220,11 +230,14 @@
   color: var(--error) !important;
 }
 
-/* Main content - solid panel so background image never shows through */
+/* Main content - solid panel; padding-top clears topbar + safe-area in PWA */
 .main-content {
   flex: 1;
   padding: 0;
-  padding-top: 56px; /* kept in sync with .topbar height so content is not under header */
+  padding-top: calc(56px + env(safe-area-inset-top, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   overflow: auto;
   background: var(--bg);
   position: relative;
@@ -279,10 +292,10 @@
   margin: 0 auto;
 }
 
-/* Responsive */
+/* Responsive - extra bottom padding so content isn't hidden by bottom nav + home indicator in PWA */
 @media (max-width: 768px) {
   .main-content-inner {
-    padding-bottom: 88px;
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -293,7 +306,7 @@
 
   .main-content-inner {
     padding: 16px;
-    padding-bottom: 88px;
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   }
 
   .drawer-overlay {
@@ -319,12 +332,12 @@
   }
 }
 
-/* Bottom navigation */
+/* Bottom navigation - safe-area so it sits above home indicator in PWA */
 .bottom-nav {
   display: flex;
   justify-content: center;
   gap: 8px;
-  padding: 12px 20px;
+  padding: 12px calc(20px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px));
   background: var(--card-bg);
   border-top: 1px solid var(--border);
   position: fixed;
@@ -362,11 +375,11 @@
   font-size: 1.35rem;
 }
 
-/* Floating scroll-to-top button */
+/* Floating scroll-to-top button - above bottom nav and home indicator in PWA */
 .fab-scroll-top {
   position: fixed;
-  bottom: 88px;
-  right: 20px;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  right: calc(20px + env(safe-area-inset-right, 0px));
   width: 48px;
   height: 48px;
   padding: 0;
@@ -396,8 +409,8 @@
 
 @media (min-width: 769px) {
   .fab-scroll-top {
-    bottom: 24px;
-    right: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    right: calc(24px + env(safe-area-inset-right, 0px));
   }
 }
 

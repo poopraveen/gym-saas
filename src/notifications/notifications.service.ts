@@ -1,10 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import * as webPush from 'web-push';
 import { TenantsService } from '../tenants/tenants.service';
 import { MembersService } from '../members/members.service';
 import { TelegramService } from './telegram.service';
 import { TelegramOptIn } from './schemas/telegram-opt-in.schema';
+import { PushSubscriptionDoc } from './schemas/push-subscription.schema';
 
 const ABSENT_DAYS = [3, 7, 14] as const;
 const MOTIVATION = {
@@ -18,11 +21,19 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
+    private readonly configService: ConfigService,
     private readonly tenantsService: TenantsService,
     private readonly membersService: MembersService,
     private readonly telegramService: TelegramService,
     @InjectModel(TelegramOptIn.name) private readonly telegramOptInModel: Model<TelegramOptIn>,
-  ) {}
+    @InjectModel(PushSubscriptionDoc.name) private readonly pushSubscriptionModel: Model<PushSubscriptionDoc>,
+  ) {
+    const publicKey = this.configService.get<string>('VAPID_PUBLIC_KEY');
+    const privateKey = this.configService.get<string>('VAPID_PRIVATE_KEY');
+    if (publicKey && privateKey) {
+      webPush.setVapidDetails('mailto:support@gym-saas.example.com', publicKey, privateKey);
+    }
+  }
 
   /** Run absence check for all tenants with Telegram chat ID; send alerts to gym owner. Uses per-tenant bot and chat from DB. */
   async runAbsenceCheck(): Promise<{ sent: number; skipped: number }> {
@@ -197,6 +208,79 @@ export class NotificationsService {
       status: (d as Record<string, unknown>).status,
       createdAt: (d as Record<string, unknown>).createdAt,
     }));
+  }
+
+  /** Get VAPID public key for push subscription (frontend uses this in pushManager.subscribe). */
+  getVapidPublicKey(): string | null {
+    return this.configService.get<string>('VAPID_PUBLIC_KEY') || null;
+  }
+
+  /** Save or update push subscription for a user (one doc per endpoint; same user can have multiple devices). */
+  async savePushSubscription(
+    tenantId: string,
+    userId: string,
+    subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+    userAgent?: string,
+  ): Promise<void> {
+    await this.pushSubscriptionModel.updateOne(
+      { endpoint: subscription.endpoint },
+      {
+        $set: {
+          tenantId,
+          userId,
+          endpoint: subscription.endpoint,
+          keys: subscription.keys,
+          userAgent: userAgent ?? undefined,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  /** Remove all push subscriptions for a user. */
+  async removePushSubscription(tenantId: string, userId: string): Promise<number> {
+    const result = await this.pushSubscriptionModel.deleteMany({ tenantId, userId });
+    return result.deletedCount ?? 0;
+  }
+
+  /**
+   * Send a push notification to a user. Call from your business logic (e.g. new enquiry, renewal reminder).
+   * Removes subscription on 410 Gone / 404 Not Found.
+   */
+  async sendPushToUser(
+    tenantId: string,
+    userId: string,
+    payload: { title: string; body?: string; url?: string },
+  ): Promise<{ sent: number; failed: number }> {
+    const publicKey = this.configService.get<string>('VAPID_PUBLIC_KEY');
+    const privateKey = this.configService.get<string>('VAPID_PRIVATE_KEY');
+    if (!publicKey || !privateKey) {
+      this.logger.warn('Push not configured: set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY');
+      return { sent: 0, failed: 0 };
+    }
+    const subs = await this.pushSubscriptionModel.find({ tenantId, userId }).lean();
+    let sent = 0;
+    let failed = 0;
+    const body = JSON.stringify({
+      title: payload.title,
+      body: payload.body ?? '',
+      url: payload.url ?? '/',
+    });
+    for (const sub of subs) {
+      const s = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+      try {
+        await webPush.sendNotification(s, body);
+        sent++;
+      } catch (err: unknown) {
+        const status = (err as { statusCode?: number })?.statusCode;
+        if (status === 410 || status === 404) {
+          await this.pushSubscriptionModel.deleteOne({ endpoint: sub.endpoint });
+        }
+        failed++;
+        this.logger.warn(`Push send failed userId=${userId} endpoint=${sub.endpoint} status=${status}`, err);
+      }
+    }
+    return { sent, failed };
   }
 
   /** Get Telegram config for current tenant (group invite link for QR, hasBot). */
