@@ -19,13 +19,23 @@
   z-index: 100;
 }
 
-/* PWA standalone: ensure header and drawer clear status bar (time/network) when safe-area is 0 or missing */
+/* Mobile / portrait: keep hamburger and menu below status bar (time, network) - safe-area can be 0 in browser */
+@media (max-width: 768px), (orientation: portrait) and (max-height: 900px) {
+  .topbar {
+    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 48px);
+  }
+  .drawer {
+    padding-top: max(env(safe-area-inset-top, 0px), 48px);
+  }
+}
+
+/* PWA standalone: ensure header and drawer clear status bar when safe-area is 0 or missing */
 @media (display-mode: standalone) {
   .topbar {
     padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 52px);
   }
   .drawer {
-    padding-top: max(env(safe-area-inset-top, 0px), 44px);
+    padding-top: max(env(safe-area-inset-top, 0px), 52px);
   }
 }
 

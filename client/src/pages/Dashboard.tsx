@@ -300,12 +300,19 @@ export default function Dashboard() {
     }
   };
 
+  /** True if lastCheckInTime is the same calendar day as today (client local). Handles ISO and legacy locale strings. */
+  const isCheckInToday = (lastCheckInTime: string | undefined): boolean => {
+    if (!lastCheckInTime || !String(lastCheckInTime).trim()) return false;
+    const parsed = new Date(lastCheckInTime);
+    if (!isValid(parsed)) return false;
+    return format(parsed, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+  };
+
   const loadCheckIn = async () => {
     try {
       const data = (await api.legacy.checkInList()) as Member[];
-      const today = new Date().toLocaleDateString();
       const withStatus = data
-        .filter((r) => r.lastCheckInTime && String(r.lastCheckInTime).split(',')[0] === today)
+        .filter((r) => isCheckInToday(r.lastCheckInTime as string))
         .map((row) => {
           const dueRaw = row['DUE DATE'] ? new Date(row['DUE DATE'] as number) : null;
           const joinRaw = row['Date of Joining'] ? new Date(row['Date of Joining'] as string | number) : null;

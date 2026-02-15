@@ -4,6 +4,21 @@ This doc lists everything required to implement and run web push notifications i
 
 ---
 
+## Quick setup: fix "Server has not configured push (VAPID keys)"
+
+1. **Generate keys** (from project root, where `web-push` is installed):
+   ```bash
+   node -e "const w=require('web-push'); const k=w.generateVAPIDKeys(); console.log('VAPID_PUBLIC_KEY='+k.publicKey); console.log('VAPID_PRIVATE_KEY='+k.privateKey);"
+   ```
+2. **Local:** Add the two output lines to your `.env` (do not commit `.env`).
+3. **Production (Render):** In your Render service → **Environment** → add:
+   - `VAPID_PUBLIC_KEY` = the public key from step 1  
+   - `VAPID_PRIVATE_KEY` = the private key from step 1  
+   Save and redeploy if the service was already running.
+4. Reload the app; the push settings section will show as configured and you can enable notifications.
+
+---
+
 ## 1. Overview
 
 - **Web Push** lets the backend send notifications to the user’s device even when the app tab is closed.

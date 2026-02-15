@@ -35,7 +35,7 @@ export class AttendanceService {
 
     await this.membersService.upsert(tenantId, {
       ...member,
-      lastCheckInTime: now.toLocaleString(),
+      lastCheckInTime: now.toISOString(),
       lastCheckInBy: checkedInBy ?? '',
       monthlyAttendance,
       lastUpdateDateTime: String(now.getTime()),
@@ -56,8 +56,11 @@ export class AttendanceService {
     if (!member) return null;
 
     const lastStr = (member.lastCheckInTime as string) || '';
-    const today = new Date().toLocaleDateString();
-    const isToday = lastStr.split(',')[0]?.trim() === today;
+    if (!lastStr.trim()) return member;
+    const parsed = new Date(lastStr);
+    const isToday =
+      !isNaN(parsed.getTime()) &&
+      parsed.toLocaleDateString('en-CA') === new Date().toLocaleDateString('en-CA');
     if (!isToday) return member;
 
     const now = new Date();
