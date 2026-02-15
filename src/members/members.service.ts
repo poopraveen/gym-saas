@@ -298,6 +298,15 @@ export class MembersService {
   }
 
   /**
+   * Find a member by Telegram chat ID (for attendance via Telegram). Returns legacy-shaped record or null.
+   */
+  async findByTelegramChatId(tenantId: string, telegramChatId: string): Promise<Record<string, unknown> | null> {
+    const doc = await this.memberModel.findOne({ tenantId, telegramChatId }).lean();
+    if (!doc) return null;
+    return mapToLegacy(doc as unknown as Member);
+  }
+
+  /**
    * Set Telegram chat ID for a member (for absence alerts). Called when member messages the bot with their phone.
    */
   async updateTelegramChatId(tenantId: string, regNo: number, telegramChatId: string): Promise<void> {

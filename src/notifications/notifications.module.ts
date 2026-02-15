@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TenantsModule } from '../tenants/tenants.module';
 import { MembersModule } from '../members/members.module';
+import { AttendanceModule } from '../attendance/attendance.module';
 import { TelegramService } from './telegram.service';
 import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
@@ -19,6 +20,7 @@ import { PushSubscriptionDoc, PushSubscriptionSchema } from './schemas/push-subs
     ]),
     TenantsModule,
     MembersModule,
+    AttendanceModule,
   ],
   controllers: [NotificationsController, TelegramWebhookController],
   providers: [TelegramService, NotificationsService],

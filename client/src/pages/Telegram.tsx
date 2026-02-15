@@ -166,7 +166,7 @@ export default function Telegram() {
             {config?.groupInviteLink && (
               <section className="telegram-card telegram-qr-card telegram-card-enter">
                 <h2 className="telegram-card-title">Present to members who want to enroll for absence alerts</h2>
-                <p className="telegram-hint">Share this QR code or link with members so they can join the Telegram group. Then they message the bot with their registered phone number to get absence reminders (3+ days no visit).</p>
+                <p className="telegram-hint">Share this QR code or link with members so they can join the Telegram group. They message the bot with their <strong>registered phone number</strong> to enroll. After that, they can send <strong>attendance</strong> or <strong>present</strong> anytime to mark their visit for the day (shows in the Attendance tab with date & time). They also get absence reminders if they don’t visit for 3+ days.</p>
                 <div className="telegram-qr-row">
                   <div className="telegram-qr-wrap">
                     <QRCodeSVG
@@ -221,8 +221,8 @@ export default function Telegram() {
             )}
 
             <section className="telegram-card telegram-card-attempts telegram-card-enter">
-              <h2 className="telegram-card-title">Absence alert sign-ups</h2>
-              <p className="telegram-hint">When members message your gym&apos;s bot with &quot;Hi&quot; or their phone number (in the group or in private chat), they show up here. You can see who has registered for 3/7/14‑day absence reminders.</p>
+              <h2 className="telegram-card-title">Absence alert sign-ups &amp; attendance</h2>
+              <p className="telegram-hint">When members message your gym&apos;s bot with their phone number (in the group or in private chat), they show up here. Once enrolled, they can send <strong>attendance</strong> or <strong>present</strong> to mark their visit for the day—it appears in the <strong>Attendance</strong> tab with date and time. You can see who has registered for 3/7/14‑day absence reminders.</p>
               {config?.hasBot && (
                 <div className="telegram-tip-box">
                   <span className="telegram-tip-icon" aria-hidden>💬</span>

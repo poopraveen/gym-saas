@@ -71,3 +71,4 @@ export class Member extends Document {
 
 export const MemberSchema = SchemaFactory.createForClass(Member);
 MemberSchema.index({ tenantId: 1, regNo: 1 }, { unique: true });
+MemberSchema.index({ tenantId: 1, telegramChatId: 1 }, { sparse: true });

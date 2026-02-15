@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './PWAInstallPrompt.css';
 
 const DISMISS_STORAGE_KEY = 'gym_pwa_install_dismissed';
+const LAST_STANDALONE_KEY = 'gym_pwa_last_standalone';
 const DISMISS_HIDE_DAYS = 7;
 
 /** iOS (iPhone/iPad) does not fire beforeinstallprompt; show manual "Add to Home Screen" instructions. */
@@ -29,14 +30,22 @@ export default function PWAInstallPrompt() {
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     if (alreadyInstalled) {
+      localStorage.setItem(LAST_STANDALONE_KEY, String(Date.now()));
       setIsInstalled(true);
       return;
+    }
+
+    // In browser: if they had the app before (lastSeenStandalone set), they may have removed it – clear dismiss so we ask again
+    if (localStorage.getItem(LAST_STANDALONE_KEY)) {
+      localStorage.removeItem(LAST_STANDALONE_KEY);
+      localStorage.removeItem(DISMISS_STORAGE_KEY);
     }
 
     const dismissedAt = localStorage.getItem(DISMISS_STORAGE_KEY);
     if (dismissedAt) {
       const elapsed = Date.now() - Number(dismissedAt);
       if (elapsed < DISMISS_HIDE_DAYS * 24 * 60 * 60 * 1000) return;
+      localStorage.removeItem(DISMISS_STORAGE_KEY);
     }
 
     const onBeforeInstall = (e: Event) => {

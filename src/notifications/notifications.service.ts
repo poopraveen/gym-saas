@@ -5,6 +5,7 @@ import { Model } from 'mongoose';
 import * as webPush from 'web-push';
 import { TenantsService } from '../tenants/tenants.service';
 import { MembersService } from '../members/members.service';
+import { AttendanceService } from '../attendance/attendance.service';
 import { TelegramService } from './telegram.service';
 import { TelegramOptIn } from './schemas/telegram-opt-in.schema';
 import { PushSubscriptionDoc } from './schemas/push-subscription.schema';
@@ -24,6 +25,7 @@ export class NotificationsService {
     private readonly configService: ConfigService,
     private readonly tenantsService: TenantsService,
     private readonly membersService: MembersService,
+    private readonly attendanceService: AttendanceService,
     private readonly telegramService: TelegramService,
     @InjectModel(TelegramOptIn.name) private readonly telegramOptInModel: Model<TelegramOptIn>,
     @InjectModel(PushSubscriptionDoc.name) private readonly pushSubscriptionModel: Model<PushSubscriptionDoc>,
@@ -111,9 +113,25 @@ export class NotificationsService {
     return { sent, skipped };
   }
 
+  /** True if the message is an attendance command (e.g. "attendance", "present", "/attendance"). */
+  private isAttendanceCommand(text: string): boolean {
+    const t = text.toLowerCase().trim().replace(/\s+/g, ' ');
+    return (
+      t === 'attendance' ||
+      t === 'present' ||
+      t === 'check in' ||
+      t === 'checkin' ||
+      t === 'mark' ||
+      t === '/attendance' ||
+      t === '/present' ||
+      t === '/checkin'
+    );
+  }
+
   /**
-   * Handle Telegram webhook for one tenant (path: /telegram-webhook/:tenantId). Logs attempt, matches phone within tenant, replies.
-   * User can send /start or Hi first, then send registered phone (digits only or with country code) to opt in for 3/7/14-day reminders.
+   * Handle Telegram webhook for one tenant (path: /telegram-webhook/:tenantId).
+   * - If sender is already enrolled (telegramChatId linked): "attendance" / "present" marks check-in for today and replies with date/time.
+   * - Otherwise: opt-in flow (send phone to register for absence alerts).
    */
   async handleTelegramWebhookForTenant(
     tenantId: string,
@@ -135,12 +153,33 @@ export class NotificationsService {
     const chatId = message?.chat?.id;
     const rawText = (message?.text || '').trim();
     if (chatId == null) return false;
-    // Accept /start, "hi", or any text (empty treated as no reply)
     const text = rawText || ' ';
-    const digits = text.replace(/\D/g, '');
-    const phoneAttempted = digits.length >= 8 ? digits : undefined;
     const gymName = (t?.name as string) || 'this gym';
 
+    // Already enrolled member: mark attendance when they send "attendance" / "present" etc.
+    const existingMember = await this.membersService.findByTelegramChatId(tenantId, String(chatId));
+    if (existingMember) {
+      if (this.isAttendanceCommand(text)) {
+        const regNo = Number((existingMember['Reg No:'] ?? existingMember.regNo) || 0);
+        if (regNo) {
+          await this.attendanceService.checkIn(tenantId, regNo);
+          const now = new Date();
+          const dateTimeStr = now.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+          const reply = `✅ Attendance marked for ${dateTimeStr}. It will show in the gym's attendance tab.`;
+          await this.telegramService.sendMessage(String(chatId), reply, botToken);
+          this.logger.log(`Telegram attendance marked tenantId=${tenantId} chatId=${chatId} regNo=${regNo}`);
+          return true;
+        }
+      }
+      const reply =
+        "You're already registered. Send <b>attendance</b> or <b>present</b> to mark your visit for today.";
+      await this.telegramService.sendMessage(String(chatId), reply, botToken);
+      return true;
+    }
+
+    // New user: opt-in flow (phone number to link for absence alerts)
+    const digits = text.replace(/\D/g, '');
+    const phoneAttempted = digits.length >= 8 ? digits : undefined;
     let optInDoc: { _id: unknown } | null = null;
     try {
       optInDoc = await this.telegramOptInModel.create({
@@ -168,12 +207,19 @@ export class NotificationsService {
             { $set: { memberId, status: 'confirmed' } },
           );
         }
-        reply = "You're registered for absence alerts! If you don't visit the gym for 3+ days, we'll send you a reminder here.";
+        reply =
+          "You're registered! Send <b>attendance</b> or <b>present</b> anytime to mark your visit for the day. You'll also get absence reminders if you don't visit for 3+ days.";
       } else {
         reply = `You're not part of ${escapeHtml(gymName)}. Please use the mobile number registered at the gym, or contact the gym to join.`;
       }
     } else {
-      reply = "Hi! To get absence alerts (when you're away 3+ days), send your registered gym mobile number — digits only or with country code (e.g. 93436035 or +65 9343 6035). We match by phone number on file.";
+      if (this.isAttendanceCommand(text)) {
+        reply =
+          "To mark attendance, you need to <b>enroll first</b>. Send your registered gym mobile number (digits only or with country code). After you're enrolled, send <b>attendance</b> or <b>present</b> to mark your visit for the day.";
+      } else {
+        reply =
+          "Hi! To enroll and mark attendance, send your <b>registered gym mobile number</b> (digits only or with country code). After that you can send <b>attendance</b> or <b>present</b> to mark your visit for the day.";
+      }
     }
 
     await this.telegramService.sendMessage(String(chatId), reply, botToken);

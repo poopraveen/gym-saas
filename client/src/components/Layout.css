@@ -19,6 +19,16 @@
   z-index: 100;
 }
 
+/* PWA standalone: ensure header and drawer clear status bar (time/network) when safe-area is 0 or missing */
+@media (display-mode: standalone) {
+  .topbar {
+    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 52px);
+  }
+  .drawer {
+    padding-top: max(env(safe-area-inset-top, 0px), 44px);
+  }
+}
+
 .menu-btn {
   display: flex;
   flex-direction: column;
@@ -241,6 +251,13 @@
   overflow: auto;
   background: var(--bg);
   position: relative;
+}
+
+/* PWA standalone: match main padding to taller topbar so content isn't under header/status bar */
+@media (display-mode: standalone) {
+  .main-content {
+    padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 104px);
+  }
 }
 
 .motivation-bg {
