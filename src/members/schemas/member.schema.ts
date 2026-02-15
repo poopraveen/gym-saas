@@ -55,6 +55,10 @@ export class Member extends Document {
   @Prop()
   lastCheckInTime?: string;
 
+  /** Who recorded this check-in (staff name or "QR" for member self check-in). */
+  @Prop()
+  lastCheckInBy?: string;
+
   @Prop()
   comments?: string;
 

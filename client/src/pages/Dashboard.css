@@ -807,6 +807,61 @@
   flex: 0 1 auto;
 }
 
+.chip-by {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  font-weight: normal;
+}
+
+.checkin-validity-note {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: 10px 14px;
+  background: var(--hover-bg);
+  border-radius: 8px;
+  border-left: 3px solid var(--primary);
+}
+
+.checkin-validity-note strong {
+  color: var(--text-primary);
+}
+
+.chip-validity .chip-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.chip-due {
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+  animation: chip-due-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes chip-due-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.chip-due-valid {
+  background: rgba(34, 197, 94, 0.2);
+  color: #16a34a;
+}
+
+.chip-due-soon {
+  background: rgba(234, 179, 8, 0.25);
+  color: #ca8a04;
+}
+
+.chip-due-new {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--primary);
+}
+
 .chip-remove {
   flex-shrink: 0;
   width: 22px;

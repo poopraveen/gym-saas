@@ -34,13 +34,13 @@ export class AttendanceController {
   @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
   checkIn(
     @TenantId() tenantId: string,
-    @Body() body: { newUserData?: { 'Reg No:': number }; regNo?: number },
+    @Body() body: { newUserData?: { 'Reg No:': number }; regNo?: number; checkedInBy?: string },
   ) {
     const regNo =
       body.newUserData?.['Reg No:'] ??
       body.regNo;
     if (regNo == null) throw new BadRequestException('regNo required');
-    return this.attendanceService.checkIn(tenantId, Number(regNo));
+    return this.attendanceService.checkIn(tenantId, Number(regNo), body.checkedInBy);
   }
 
   /** Remove today's check-in for a member so they can re-enter. */
@@ -82,7 +82,7 @@ export class AttendanceController {
     if (!token || regNo == null) throw new BadRequestException('token and regNo required');
     const tenantId = this.attendanceService.verifyQRToken(token);
     if (!tenantId) throw new BadRequestException('Invalid or expired QR code. Please scan the latest QR at the gym.');
-    const member = await this.attendanceService.checkIn(tenantId, Number(regNo));
+    const member = await this.attendanceService.checkIn(tenantId, Number(regNo), 'QR');
     if (!member) throw new BadRequestException('Registration number not found.');
     return { success: true, name: (member as any).name || (member as any).NAME };
   }

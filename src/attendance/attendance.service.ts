@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
 import { MembersService } from '../members/members.service';
@@ -13,11 +13,19 @@ export class AttendanceService {
     private readonly configService: ConfigService,
   ) {}
 
-  /** Check-in updates member and returns check-in list. */
-  async checkIn(tenantId: string, regNo: number): Promise<Member | null> {
+  /** Check-in updates member and returns check-in list. checkedInBy = staff name or "QR" for self check-in. Rejects expired membership. */
+  async checkIn(tenantId: string, regNo: number, checkedInBy?: string): Promise<Member | null> {
     const list = await this.membersService.list(tenantId);
     const member = list.find((m) => Number(m['Reg No:']) === regNo) as unknown as Member;
     if (!member) return null;
+
+    const dueRaw = member['DUE DATE'] ?? (member as any).dueDate;
+    if (dueRaw != null) {
+      const due = new Date(dueRaw as number | string);
+      if (!isNaN(due.getTime()) && due < new Date()) {
+        throw new BadRequestException('Membership expired. Please contact gym admin to renew.');
+      }
+    }
 
     const now = new Date();
     const monthKey = String(now.getMonth());
@@ -27,6 +35,7 @@ export class AttendanceService {
     await this.membersService.upsert(tenantId, {
       ...member,
       lastCheckInTime: now.toLocaleString(),
+      lastCheckInBy: checkedInBy ?? '',
       monthlyAttendance,
       lastUpdateDateTime: String(now.getTime()),
     } as Record<string, unknown>, false);
@@ -59,11 +68,12 @@ export class AttendanceService {
     await this.membersService.upsert(tenantId, {
       ...member,
       lastCheckInTime: '',
+      lastCheckInBy: '',
       monthlyAttendance,
       lastUpdateDateTime: String(now.getTime()),
     } as Record<string, unknown>, false);
 
-    return { ...member, lastCheckInTime: '', monthlyAttendance };
+    return { ...member, lastCheckInTime: '', lastCheckInBy: '', monthlyAttendance } as unknown as Member;
   }
 
   /** Create a signed token for QR check-in (valid 24h). Token payload: tenantId + expiry. */
@@ -94,12 +104,21 @@ export class AttendanceService {
     }
   }
 
-  /** List member names and reg numbers for QR check-in page autocomplete (token must be valid). */
+  /** List member names and reg numbers for QR check-in page autocomplete (token must be valid). Only members with valid membership (due date not passed). */
   async getMembersForQRCheckIn(token: string): Promise<{ regNo: number; name: string }[]> {
     const tenantId = this.verifyQRToken(token);
     if (!tenantId) return [];
     const list = await this.membersService.list(tenantId);
-    return list.map((m) => ({
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const validList = list.filter((m) => {
+      const dueRaw = m['DUE DATE'] ?? (m as any).dueDate;
+      if (dueRaw == null) return true;
+      const due = new Date(dueRaw as number | string);
+      if (isNaN(due.getTime())) return true;
+      return due >= todayStart;
+    });
+    return validList.map((m) => ({
       regNo: Number(m['Reg No:']) || 0,
       name: String(m.NAME ?? m.name ?? ''),
     })).filter((m) => m.regNo && m.name.trim());

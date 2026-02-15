@@ -206,10 +206,10 @@ export const api = {
         body: JSON.stringify({ newUserData, deleteFlag }),
       }),
     checkInList: () => request<unknown[]>('/legacy/checkinlist'),
-    checkIn: (newUserData: { 'Reg No:': number }) =>
+    checkIn: (data: { 'Reg No:': number; checkedInBy?: string }) =>
       request('/legacy/checkin', {
         method: 'POST',
-        body: JSON.stringify({ newUserData }),
+        body: JSON.stringify({ newUserData: { 'Reg No:': data['Reg No:'] }, checkedInBy: data.checkedInBy }),
       }),
     backup: () => request<unknown[]>('/legacy/backup'),
     getNextReceiptId: () =>

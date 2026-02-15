@@ -304,10 +304,20 @@ export default function Dashboard() {
     try {
       const data = (await api.legacy.checkInList()) as Member[];
       const today = new Date().toLocaleDateString();
-      const filtered = data
+      const withStatus = data
         .filter((r) => r.lastCheckInTime && String(r.lastCheckInTime).split(',')[0] === today)
+        .map((row) => {
+          const dueRaw = row['DUE DATE'] ? new Date(row['DUE DATE'] as number) : null;
+          const joinRaw = row['Date of Joining'] ? new Date(row['Date of Joining'] as string | number) : null;
+          const due = dueRaw && isValid(dueRaw) ? dueRaw : null;
+          const join = joinRaw && isValid(joinRaw) ? joinRaw : null;
+          const status = getStatus(due, join);
+          const memberId = (row as Record<string, unknown>).memberId as string || `GYM-${new Date().getFullYear()}-${String(row['Reg No:']).padStart(5, '0')}`;
+          return { ...row, status, dueDate: due, joinDate: join, memberId };
+        })
+        .filter((r) => (r.status as StatusType) !== 'expired')
         .sort((a, b) => new Date(b.lastCheckInTime as string).getTime() - new Date(a.lastCheckInTime as string).getTime());
-      setCheckinTable(filtered);
+      setCheckinTable(withStatus);
     } catch {}
   };
 
@@ -373,7 +383,10 @@ export default function Dashboard() {
     const regNo = member != null ? Number(member['Reg No:']) : NaN;
     if (!member || isNaN(regNo)) return;
     try {
-      await api.legacy.checkIn({ 'Reg No:': regNo });
+      await api.legacy.checkIn({
+        'Reg No:': regNo,
+        checkedInBy: storage.getUserName() || undefined,
+      });
       setSelectedMemberForCheckIn(null);
       setCheckinSearchQuery('');
       setCheckinDropdownOpen(false);
@@ -384,12 +397,13 @@ export default function Dashboard() {
     }
   };
 
-  /** Members matching check-in search (name, Reg No, or phone). Exact Reg No first when query is digits-only. */
+  /** Members matching check-in search (name, Reg No, or phone). Only valid members. Exact Reg No first when query is digits-only. */
   const checkinSearchMatches = (() => {
     if (!checkinSearchQuery.trim()) return [];
     const q = checkinSearchQuery.trim().toLowerCase();
     const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
-    const filtered = allMembers.filter(
+    const validMembers = allMembers.filter((m) => (m.status as StatusType) !== 'expired');
+    const filtered = validMembers.filter(
       (m) =>
         (m.NAME as string)?.toLowerCase().includes(q) ||
         String(m['Reg No:'] || '').includes(q) ||
@@ -870,34 +884,51 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            <p className="checkin-validity-note">
+              Only valid members are shown. <strong>Membership expired?</strong> Please contact gym admin to renew.
+            </p>
             <div className="chips chips-with-actions">
               {checkinTable.length === 0 ? (
                 <div className="empty-state">No check-ins today</div>
               ) : (
-                checkinTable.map((row) => (
-                  <span key={String(row['Reg No:'])} className="chip chip-with-action">
-                    <span className="chip-text">#{row['Reg No:']} {row.NAME}</span>
-                    <button
-                      type="button"
-                      className="chip-remove"
-                      onClick={async () => {
-                        const regNo = Number(row['Reg No:']);
-                        if (isNaN(regNo)) return;
-                        try {
-                          await api.attendance.removeTodayCheckIn(regNo);
-                          loadList();
-                          loadCheckIn();
-                        } catch (err) {
-                          alert('Failed to remove: ' + (err instanceof Error ? err.message : 'Unknown'));
-                        }
-                      }}
-                      title="Remove today's attendance so they can check in again"
-                      aria-label={`Remove attendance for ${row.NAME}`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))
+                checkinTable.map((row) => {
+                  const status = row.status as StatusType;
+                  const dueDate = row.dueDate as Date | null | undefined;
+                  return (
+                    <span key={String(row['Reg No:'])} className="chip chip-with-action chip-validity">
+                      <span className="chip-text">
+                        #{row['Reg No:']} {row.NAME}
+                        {(row as Record<string, unknown>).lastCheckInBy && (
+                          <span className="chip-by"> (by {(row as Record<string, unknown>).lastCheckInBy as string})</span>
+                        )}
+                        {dueDate && (
+                          <span className={`chip-due chip-due-${status}`} title={status === 'soon' ? 'Due within 5 days' : status === 'valid' ? 'Active' : 'New member'}>
+                            Due: {format(dueDate, 'dd MMM yyyy')}
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className="chip-remove"
+                        onClick={async () => {
+                          const regNo = Number(row['Reg No:']);
+                          if (isNaN(regNo)) return;
+                          try {
+                            await api.attendance.removeTodayCheckIn(regNo);
+                            loadList();
+                            loadCheckIn();
+                          } catch (err) {
+                            alert('Failed to remove: ' + (err instanceof Error ? err.message : 'Unknown'));
+                          }
+                        }}
+                        title="Remove today's attendance so they can check in again"
+                        aria-label={`Remove attendance for ${row.NAME}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })
               )}
             </div>
           </div>

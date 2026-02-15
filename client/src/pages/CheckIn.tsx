@@ -9,6 +9,7 @@ export default function CheckIn() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('t') || '';
   const [members, setMembers] = useState<QRMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<QRMember | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -20,15 +21,22 @@ export default function CheckIn() {
   useEffect(() => {
     if (!token) {
       setMessage({ type: 'error', text: 'Invalid link. Please scan the QR code at the gym.' });
+      setMembersLoading(false);
       return;
     }
     setMessage(null);
-    api.attendance.getCheckInQRMembers(token).then((r) => setMembers(r.members || [])).catch(() => setMembers([]));
+    setMembersLoading(true);
+    api.attendance
+      .getCheckInQRMembers(token)
+      .then((r) => setMembers(r.members || []))
+      .catch(() => setMembers([]))
+      .finally(() => setMembersLoading(false));
   }, [token]);
 
+  /** Show filtered list when typing, or first 15 when focused with no query (so tap/click shows list). */
   const matches = (() => {
-    if (!searchQuery.trim()) return [];
     const q = searchQuery.trim().toLowerCase();
+    if (!q) return members.slice(0, 15);
     const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
     const filtered = members.filter(
       (m) => m.name.toLowerCase().includes(q) || String(m.regNo).includes(q),
@@ -120,10 +128,14 @@ export default function CheckIn() {
               aria-autocomplete="list"
               aria-expanded={dropdownOpen}
             />
-            {dropdownOpen && searchQuery.trim() && (
+            {dropdownOpen && (searchQuery.trim() || members.length > 0) && (
               <div ref={dropdownRef} className="checkin-dropdown" role="listbox">
-                {matches.length === 0 ? (
-                  <div className="checkin-dropdown-item checkin-dropdown-empty">No match — type your Reg. No. and tap Check In</div>
+                {membersLoading ? (
+                  <div className="checkin-dropdown-item checkin-dropdown-empty">Loading…</div>
+                ) : matches.length === 0 ? (
+                  <div className="checkin-dropdown-item checkin-dropdown-empty">
+                    {members.length === 0 ? 'Enter your Reg. No. below and tap Check In.' : 'No match — type your Reg. No. and tap Check In'}
+                  </div>
                 ) : (
                   matches.map((m) => (
                     <button

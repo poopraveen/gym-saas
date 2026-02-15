@@ -63,11 +63,11 @@ export class LegacyController {
   }
 
   @Post('checkin')
-  async checkIn(@Req() req: any, @Body() body: { newUserData?: { 'Reg No:': number } }) {
+  async checkIn(@Req() req: any, @Body() body: { newUserData?: { 'Reg No:': number }; regNo?: number; checkedInBy?: string }) {
     const tenantId = this.tenantId(req);
-    const regNo = body.newUserData?.['Reg No:'];
-    if (regNo == null) throw new Error('newUserData.Reg No: required');
-    return this.attendanceService.checkIn(tenantId, Number(regNo));
+    const regNo = body.newUserData?.['Reg No:'] ?? body.regNo;
+    if (regNo == null) throw new Error('regNo required');
+    return this.attendanceService.checkIn(tenantId, Number(regNo), body.checkedInBy);
   }
 
   @Get('finance')
