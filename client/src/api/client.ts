@@ -231,7 +231,12 @@ export const api = {
     getCheckInQRMembers: (token: string) =>
       requestPublic<{ members: { regNo: number; name: string }[] }>(`/attendance/checkin-qr-members?t=${encodeURIComponent(token)}`),
     checkInByQR: (token: string, regNo: number) =>
-      requestPublic<{ success: boolean; name?: string }>('/attendance/checkin-qr', {
+      requestPublic<{
+        success: boolean;
+        name?: string;
+        memberSummary?: { name: string; dueDate?: string; phoneNumber?: string; typeofPack?: string };
+        checkInTime?: string;
+      }>('/attendance/checkin-qr', {
         method: 'POST',
         body: JSON.stringify({ token, regNo }),
       }),
@@ -509,6 +514,13 @@ export const api = {
     removePushSubscription: () =>
       request<{ ok: boolean; deleted?: number; error?: string }>('/notifications/push-subscription', {
         method: 'DELETE',
+      }),
+    getSubscriberCount: () =>
+      request<{ subscriberCount: number }>('/notifications/subscriber-count'),
+    sendBroadcast: (payload: { title: string; body?: string; url?: string }) =>
+      request<{ ok: boolean; error?: string; sent: number; failed: number; subscriberCount?: number }>('/notifications/send-broadcast', {
+        method: 'POST',
+        body: JSON.stringify(payload),
       }),
   },
 };

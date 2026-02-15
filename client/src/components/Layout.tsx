@@ -18,7 +18,7 @@ export default function Layout({
   onLogout,
 }: {
   children: React.ReactNode;
-  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries' | 'onboarding' | 'nutrition-ai' | 'medical-history' | 'workout-plan' | 'telegram';
+  activeNav: 'dashboard' | 'main' | 'add' | 'checkin' | 'finance' | 'enquiries' | 'onboarding' | 'nutrition-ai' | 'medical-history' | 'workout-plan' | 'telegram' | 'notifications';
   onNavChange: (id: string) => void;
   onLogout: () => void;
 }) {
@@ -84,6 +84,7 @@ export default function Layout({
         { id: 'onboarding', label: 'Onboarding', icon: '👋' },
         { id: 'nutrition-ai', label: 'Nutrition AI', icon: '🥗' },
         { id: 'telegram', label: 'Telegram', icon: '✈️' },
+        { id: 'notifications', label: 'Notifications', icon: '🔔' },
       ];
 
   const closeDrawer = () => setDrawerOpen(false);

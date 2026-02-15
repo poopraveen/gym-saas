@@ -813,6 +813,24 @@
   font-weight: normal;
 }
 
+.chip-time {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.chip-details {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+.chip-phone::before { content: '📞 '; }
+.chip-pack::before { content: 'Pack: '; font-weight: 600; }
+
 .checkin-validity-note {
   margin: 0 0 12px 0;
   font-size: 0.9rem;

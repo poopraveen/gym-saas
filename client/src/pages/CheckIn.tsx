@@ -1,9 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { format, isValid } from 'date-fns';
 import { api, getApiErrorMessage } from '../api/client';
 import './CheckIn.css';
 
 type QRMember = { regNo: number; name: string };
+
+type MemberSummary = {
+  name: string;
+  dueDate?: string;
+  phoneNumber?: string;
+  typeofPack?: string;
+};
 
 export default function CheckIn() {
   const [searchParams] = useSearchParams();
@@ -15,6 +23,10 @@ export default function CheckIn() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [lastCheckInInfo, setLastCheckInInfo] = useState<{
+    memberSummary: MemberSummary;
+    checkInTime?: string;
+  } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -60,9 +72,13 @@ export default function CheckIn() {
     }
     setSubmitting(true);
     setMessage(null);
+    setLastCheckInInfo(null);
     try {
       const res = await api.attendance.checkInByQR(token, regNo);
       setMessage({ type: 'success', text: res.name ? `Welcome, ${res.name}! Check-in recorded. You’ll appear in the gym’s Attendance tab.` : 'Check-in recorded.' });
+      if (res.memberSummary) {
+        setLastCheckInInfo({ memberSummary: res.memberSummary, checkInTime: res.checkInTime });
+      }
       setSearchQuery('');
       setSelectedMember(null);
       setDropdownOpen(false);
@@ -95,75 +111,123 @@ export default function CheckIn() {
     );
   }
 
+  const showForm = message?.type !== 'success';
+
   return (
     <div className="checkin-page">
       <div className="checkin-card">
         <h1>Gym Check-in</h1>
-        <p className="checkin-hint">Type your name or Reg. No. — autocomplete will suggest you. Select yourself and tap Check In.</p>
-        <form onSubmit={handleSubmit}>
-          <div className="checkin-autocomplete-wrap">
-            <input
-              ref={inputRef}
-              type="text"
-              inputMode="text"
-              placeholder="Type name or Reg. No. — autocomplete will suggest"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setDropdownOpen(true);
-                if (!e.target.value.trim()) setSelectedMember(null);
-              }}
-              onFocus={() => setDropdownOpen(true)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && matches.length === 1 && !selectedMember) {
-                  setSelectedMember(matches[0]);
-                  setSearchQuery(matches[0].name);
-                  setDropdownOpen(false);
-                }
-                if (e.key === 'Escape') setDropdownOpen(false);
-              }}
-              disabled={submitting}
-              autoFocus
-              className="checkin-input"
-              aria-autocomplete="list"
-              aria-expanded={dropdownOpen}
-            />
-            {dropdownOpen && (searchQuery.trim() || members.length > 0) && (
-              <div ref={dropdownRef} className="checkin-dropdown" role="listbox">
-                {membersLoading ? (
-                  <div className="checkin-dropdown-item checkin-dropdown-empty">Loading…</div>
-                ) : matches.length === 0 ? (
-                  <div className="checkin-dropdown-item checkin-dropdown-empty">
-                    {members.length === 0 ? 'Enter your Reg. No. below and tap Check In.' : 'No match — type your Reg. No. and tap Check In'}
+        {showForm ? (
+          <>
+            <p className="checkin-hint">Type your name or Reg. No. — autocomplete will suggest you. Select yourself and tap Check In.</p>
+            <form onSubmit={handleSubmit}>
+              <div className="checkin-autocomplete-wrap">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  inputMode="text"
+                  placeholder="Type name or Reg. No. — autocomplete will suggest"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setDropdownOpen(true);
+                    if (!e.target.value.trim()) setSelectedMember(null);
+                  }}
+                  onFocus={() => setDropdownOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && matches.length === 1 && !selectedMember) {
+                      setSelectedMember(matches[0]);
+                      setSearchQuery(matches[0].name);
+                      setDropdownOpen(false);
+                    }
+                    if (e.key === 'Escape') setDropdownOpen(false);
+                  }}
+                  disabled={submitting}
+                  autoFocus
+                  className="checkin-input"
+                  aria-autocomplete="list"
+                  aria-expanded={dropdownOpen}
+                />
+                {dropdownOpen && (searchQuery.trim() || members.length > 0) && (
+                  <div ref={dropdownRef} className="checkin-dropdown" role="listbox">
+                    {membersLoading ? (
+                      <div className="checkin-dropdown-item checkin-dropdown-empty">Loading…</div>
+                    ) : matches.length === 0 ? (
+                      <div className="checkin-dropdown-item checkin-dropdown-empty">
+                        {members.length === 0 ? 'Enter your Reg. No. below and tap Check In.' : 'No match — type your Reg. No. and tap Check In'}
+                      </div>
+                    ) : (
+                      matches.map((m) => (
+                        <button
+                          key={m.regNo}
+                          type="button"
+                          role="option"
+                          className={`checkin-dropdown-item ${selectedMember?.regNo === m.regNo ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedMember(m);
+                            setSearchQuery(m.name);
+                            setDropdownOpen(false);
+                          }}
+                        >
+                          {m.name} #{m.regNo}
+                        </button>
+                      ))
+                    )}
                   </div>
-                ) : (
-                  matches.map((m) => (
-                    <button
-                      key={m.regNo}
-                      type="button"
-                      role="option"
-                      className={`checkin-dropdown-item ${selectedMember?.regNo === m.regNo ? 'selected' : ''}`}
-                      onClick={() => {
-                        setSelectedMember(m);
-                        setSearchQuery(m.name);
-                        setDropdownOpen(false);
-                      }}
-                    >
-                      {m.name} #{m.regNo}
-                    </button>
-                  ))
                 )}
               </div>
+              <button type="submit" disabled={submitting} className="checkin-btn">
+                {submitting ? 'Checking in…' : 'Check In'}
+              </button>
+            </form>
+            {message && message.type === 'error' && (
+              <p className="checkin-error">{message.text}</p>
             )}
-          </div>
-          <button type="submit" disabled={submitting} className="checkin-btn">
-            {submitting ? 'Checking in…' : 'Check In'}
-          </button>
-        </form>
-        {message && (
-          <p className={message.type === 'success' ? 'checkin-success' : 'checkin-error'}>
-            {message.text}
-          </p>
+          </>
+        ) : (
+          <>
+            {message && (
+              <p className="checkin-success">{message.text}</p>
+            )}
+            {lastCheckInInfo && (
+              <div className="checkin-summary" aria-label="Your details and reminder">
+                <h3 className="checkin-summary-title">Your details</h3>
+                <ul className="checkin-summary-list">
+                  <li><strong>Name:</strong> {lastCheckInInfo.memberSummary.name}</li>
+                  {lastCheckInInfo.memberSummary.phoneNumber && (
+                    <li><strong>Phone:</strong> {lastCheckInInfo.memberSummary.phoneNumber}</li>
+                  )}
+                  {lastCheckInInfo.memberSummary.typeofPack && (
+                    <li><strong>Pack:</strong> {lastCheckInInfo.memberSummary.typeofPack}</li>
+                  )}
+                  {lastCheckInInfo.memberSummary.dueDate && (() => {
+                    const d = new Date(lastCheckInInfo.memberSummary.dueDate);
+                    return isValid(d) ? (
+                      <li>
+                        <strong>Due date (renewal reminder):</strong>{' '}
+                        {format(d, 'dd MMM yyyy')} — renew before this date to avoid interruption.
+                      </li>
+                    ) : null;
+                  })()}
+                  {lastCheckInInfo.checkInTime && (
+                    <li><strong>Checked in at:</strong> {format(new Date(lastCheckInInfo.checkInTime), 'h:mm a')}</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            <button
+              type="button"
+              className="checkin-btn checkin-again-btn"
+              onClick={() => {
+                setMessage(null);
+                setLastCheckInInfo(null);
+                setSearchQuery('');
+                setSelectedMember(null);
+              }}
+            >
+              Check in again
+            </button>
+          </>
         )}
       </div>
     </div>

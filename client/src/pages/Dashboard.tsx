@@ -323,7 +323,9 @@ export default function Dashboard() {
           return { ...row, status, dueDate: due, joinDate: join, memberId };
         })
         .filter((r) => (r.status as StatusType) !== 'expired')
-        .sort((a, b) => new Date(b.lastCheckInTime as string).getTime() - new Date(a.lastCheckInTime as string).getTime());
+        .sort((a, b) =>
+          new Date((b as Record<string, unknown>).lastCheckInTime as string).getTime() -
+          new Date((a as Record<string, unknown>).lastCheckInTime as string).getTime());
       setCheckinTable(withStatus);
     } catch {}
   };
@@ -474,11 +476,15 @@ export default function Dashboard() {
       navigate('/telegram');
       return;
     }
+    if (id === 'notifications') {
+      navigate('/notifications');
+      return;
+    }
     if (id === 'add') {
       setActiveNav('add');
       setShowAddModal(true);
     } else {
-      setActiveNav(id as 'dashboard' | 'main' | 'checkin' | 'finance');
+      setActiveNav(id as 'dashboard' | 'main' | 'checkin' | 'finance' | 'notifications');
     }
   };
 
@@ -901,16 +907,33 @@ export default function Dashboard() {
                 checkinTable.map((row) => {
                   const status = row.status as StatusType;
                   const dueDate = row.dueDate as Date | null | undefined;
+                  const lastCheckInTime = row.lastCheckInTime as string | undefined;
+                  const checkInTimeFormatted =
+                    lastCheckInTime && isValid(new Date(lastCheckInTime))
+                      ? format(new Date(lastCheckInTime), 'h:mm a')
+                      : null;
+                  const r = row as Record<string, unknown>;
+                  const phone = (r['Phone Number'] ?? r.phoneNumber) as string | undefined;
+                  const pack = (r['Typeof pack'] ?? r.typeofPack) as string | undefined;
                   return (
-                    <span key={String(row['Reg No:'])} className="chip chip-with-action chip-validity">
+                    <span key={String(r['Reg No:'])} className="chip chip-with-action chip-validity">
                       <span className="chip-text">
-                        #{row['Reg No:']} {row.NAME}
-                        {(row as Record<string, unknown>).lastCheckInBy && (
-                          <span className="chip-by"> (by {(row as Record<string, unknown>).lastCheckInBy as string})</span>
+                        #{String(r['Reg No:'])} {String(r.NAME)}
+                        {checkInTimeFormatted && (
+                          <span className="chip-time" title="Check-in time"> @ {checkInTimeFormatted}</span>
+                        )}
+                        {(r.lastCheckInBy as string) && (
+                          <span className="chip-by"> (by {r.lastCheckInBy as string})</span>
                         )}
                         {dueDate && (
                           <span className={`chip-due chip-due-${status}`} title={status === 'soon' ? 'Due within 5 days' : status === 'valid' ? 'Active' : 'New member'}>
                             Due: {format(dueDate, 'dd MMM yyyy')}
+                          </span>
+                        )}
+                        {(phone || pack) && (
+                          <span className="chip-details">
+                            {phone && <span className="chip-phone">{phone}</span>}
+                            {pack && <span className="chip-pack">{pack}</span>}
                           </span>
                         )}
                       </span>

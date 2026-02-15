@@ -176,4 +176,28 @@ export class NotificationsController {
     const deleted = await this.notificationsService.removePushSubscription(tenantId, userId);
     return { ok: true, deleted };
   }
+
+  /** Get how many devices have push enabled for this gym (for admin UI). */
+  @Get('subscriber-count')
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  async getSubscriberCount(@TenantId() tenantId: string) {
+    const count = await this.notificationsService.getSubscriberCount(tenantId);
+    return { subscriberCount: count };
+  }
+
+  /** Send a push notification to all users in this gym who have push enabled (admin only). E.g. holiday, announcement. */
+  @Post('send-broadcast')
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  async sendBroadcast(
+    @TenantId() tenantId: string,
+    @Body() body: { title: string; body?: string; url?: string },
+  ) {
+    if (!body?.title?.trim()) return { ok: false, error: 'Title is required', sent: 0, failed: 0, subscriberCount: 0 };
+    const result = await this.notificationsService.sendPushToTenantSubscribers(tenantId, {
+      title: body.title.trim(),
+      body: body.body?.trim(),
+      url: body.url?.trim() || '/',
+    });
+    return { ok: true, sent: result.sent, failed: result.failed, subscriberCount: result.subscriberCount };
+  }
 }

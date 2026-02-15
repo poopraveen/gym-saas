@@ -13,6 +13,7 @@ import MedicalHistory from './pages/MedicalHistory';
 import WorkoutPlan from './pages/WorkoutPlan';
 import CheckIn from './pages/CheckIn';
 import Telegram from './pages/Telegram';
+import Notifications from './pages/Notifications';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!storage.getToken() || !storage.getTenantId()) {
@@ -99,6 +100,16 @@ export default function App() {
             <ProtectedRoute>
               <MemberRoute>
                 <Telegram />
+              </MemberRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <MemberRoute>
+                <Notifications />
               </MemberRoute>
             </ProtectedRoute>
           }

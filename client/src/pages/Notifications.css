@@ -1,0 +1,121 @@
+.notifications-page {
+  max-width: 520px;
+  padding: 20px;
+}
+
+.notifications-intro {
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
+  font-size: 0.95rem;
+}
+
+.notifications-subscriber-count {
+  margin: 0 0 16px 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.notifications-subscriber-count strong {
+  color: var(--primary);
+}
+
+.notifications-zero-hint {
+  margin: 0 0 20px 0;
+  padding: 16px;
+  background: var(--hover-bg, rgba(59, 130, 246, 0.08));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.notifications-zero-hint p {
+  margin: 0 0 8px 0;
+}
+
+.notifications-zero-hint p:last-child {
+  margin-bottom: 0;
+}
+
+.notifications-zero-hint ol {
+  margin: 8px 0 12px 0;
+  padding-left: 20px;
+}
+
+.notifications-zero-hint strong {
+  color: var(--text-primary);
+}
+
+.notifications-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notifications-label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.required {
+  color: var(--error, #ef4444);
+}
+
+.notifications-input,
+.notifications-textarea {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.notifications-input:focus,
+.notifications-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.notifications-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.notifications-error {
+  color: var(--error, #ef4444);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.notifications-result {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.notifications-result strong {
+  color: var(--primary);
+}
+
+.notifications-submit {
+  padding: 14px 20px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.notifications-submit:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.notifications-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

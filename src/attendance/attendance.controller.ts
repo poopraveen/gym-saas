@@ -84,6 +84,20 @@ export class AttendanceController {
     if (!tenantId) throw new BadRequestException('Invalid or expired QR code. Please scan the latest QR at the gym.');
     const member = await this.attendanceService.checkIn(tenantId, Number(regNo), 'QR');
     if (!member) throw new BadRequestException('Registration number not found.');
-    return { success: true, name: (member as any).name || (member as any).NAME };
+    const m = member as unknown as Record<string, unknown>;
+    const name = (m.name ?? m.NAME) as string;
+    const dueRaw = m['DUE DATE'] ?? m.dueDate;
+    const dueDate =
+      dueRaw != null && !isNaN(new Date(dueRaw as string | number).getTime())
+        ? new Date(dueRaw as string | number).toISOString()
+        : undefined;
+    const checkInTime = new Date().toISOString();
+    const memberSummary = {
+      name,
+      dueDate,
+      phoneNumber: (m['Phone Number'] ?? m.phoneNumber) as string | undefined,
+      typeofPack: (m['Typeof pack'] ?? m.typeofPack) as string | undefined,
+    };
+    return { success: true, name, memberSummary, checkInTime };
   }
 }

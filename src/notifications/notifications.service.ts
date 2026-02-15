@@ -256,6 +256,11 @@ export class NotificationsService {
     }));
   }
 
+  /** Get number of push subscriptions (devices) for this tenant. */
+  async getSubscriberCount(tenantId: string): Promise<number> {
+    return this.pushSubscriptionModel.countDocuments({ tenantId });
+  }
+
   /** Get VAPID public key for push subscription (frontend uses this in pushManager.subscribe). */
   getVapidPublicKey(): string | null {
     return this.configService.get<string>('VAPID_PUBLIC_KEY') || null;
@@ -327,6 +332,47 @@ export class NotificationsService {
       }
     }
     return { sent, failed };
+  }
+
+  /**
+   * Send a push notification to all users in the tenant who have enabled push (e.g. holiday, announcement).
+   * Removes invalid subscriptions on 410/404.
+   */
+  async sendPushToTenantSubscribers(
+    tenantId: string,
+    payload: { title: string; body?: string; url?: string },
+  ): Promise<{ sent: number; failed: number; subscriberCount: number }> {
+    const publicKey = this.configService.get<string>('VAPID_PUBLIC_KEY');
+    const privateKey = this.configService.get<string>('VAPID_PRIVATE_KEY');
+    if (!publicKey || !privateKey) {
+      this.logger.warn('Push not configured: set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY');
+      return { sent: 0, failed: 0, subscriberCount: 0 };
+    }
+    const subs = await this.pushSubscriptionModel.find({ tenantId }).lean();
+    const subscriberCount = subs.length;
+    let sent = 0;
+    let failed = 0;
+    const body = JSON.stringify({
+      title: payload.title,
+      body: payload.body ?? '',
+      url: payload.url ?? '/',
+    });
+    for (const sub of subs) {
+      const s = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+      try {
+        await webPush.sendNotification(s, body);
+        sent++;
+      } catch (err: unknown) {
+        const status = (err as { statusCode?: number })?.statusCode;
+        if (status === 410 || status === 404) {
+          await this.pushSubscriptionModel.deleteOne({ endpoint: sub.endpoint });
+        }
+        failed++;
+        this.logger.warn(`Push broadcast failed tenantId=${tenantId} endpoint=${sub.endpoint} status=${status}`, err);
+      }
+    }
+    this.logger.log(`Push broadcast tenantId=${tenantId} sent=${sent} failed=${failed} subscriberCount=${subscriberCount}`);
+    return { sent, failed, subscriberCount };
   }
 
   /** Get Telegram config for current tenant (group invite link for QR, hasBot). */
