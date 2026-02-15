@@ -143,6 +143,102 @@
   text-decoration: underline;
 }
 
+.telegram-webhook-actions {
+  margin: 0.75rem 0 1rem 0;
+  padding: 1rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.telegram-webhook-hint {
+  margin: 0 0 0.75rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.telegram-webhook-url-note {
+  margin: 0.5rem 0 0.75rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.telegram-webhook-url-note p {
+  margin: 0.35rem 0;
+}
+
+.telegram-webhook-code {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.25rem 0.4rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.telegram-webhook-manual {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.telegram-webhook-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.telegram-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.telegram-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+.telegram-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.telegram-btn-register {
+  background: var(--primary, #2563eb);
+  color: #fff;
+  border-color: var(--primary, #2563eb);
+}
+
+.telegram-btn-register:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.telegram-btn-refresh {
+  background: var(--card-bg);
+}
+
+.telegram-webhook-result {
+  margin: 0.75rem 0 0 0;
+  font-size: 0.9rem;
+  padding: 0.5rem 0;
+}
+
+.telegram-webhook-ok {
+  color: var(--success, #16a34a);
+}
+
+.telegram-webhook-err {
+  color: var(--error, #dc2626);
+}
+
 .telegram-empty {
   color: var(--text-secondary);
   font-size: 0.9rem;

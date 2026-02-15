@@ -102,6 +102,7 @@ export class NotificationsService {
 
   /**
    * Handle Telegram webhook for one tenant (path: /telegram-webhook/:tenantId). Logs attempt, matches phone within tenant, replies.
+   * User can send /start or Hi first, then send registered phone (digits only or with country code) to opt in for 3/7/14-day reminders.
    */
   async handleTelegramWebhookForTenant(
     tenantId: string,
@@ -114,9 +115,10 @@ export class NotificationsService {
 
     const message = update?.message;
     const chatId = message?.chat?.id;
-    const text = (message?.text || '').trim();
-    if (chatId == null || text === '') return false;
-
+    const rawText = (message?.text || '').trim();
+    if (chatId == null) return false;
+    // Accept /start, "hi", or any text (empty treated as no reply)
+    const text = rawText || ' ';
     const digits = text.replace(/\D/g, '');
     const phoneAttempted = digits.length >= 8 ? digits : undefined;
     const gymName = (t?.name as string) || 'this gym';
@@ -153,7 +155,7 @@ export class NotificationsService {
         reply = `You're not part of ${escapeHtml(gymName)}. Please use the mobile number registered at the gym, or contact the gym to join.`;
       }
     } else {
-      reply = "Hi! To get absence alerts (when you're away 3+ days), send your registered mobile number (with or without country code, e.g. 93436035 or +65 9343 6035).";
+      reply = "Hi! To get absence alerts (when you're away 3+ days), send your registered gym mobile number — digits only or with country code (e.g. 93436035 or +65 9343 6035). We match by phone number on file.";
     }
 
     await this.telegramService.sendMessage(String(chatId), reply, botToken);

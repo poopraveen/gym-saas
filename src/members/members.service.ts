@@ -264,21 +264,27 @@ export class MembersService {
   private static readonly COUNTRY_CODES = ['65', '91', '60', '1', '44', '81', '86', '82', '966', '971', '64', '61', '49', '33', '39', '34', '63', '62', '84', '66'];
 
   /**
-   * Find a member by phone: exact digits match, or match without country code (so +65 9343 6035 matches 93436035).
+   * Find a member by phone: digits-only match. Supports with/without country code; match by full digits or by last 8+ digits (suffix).
+   * So 93436035 matches member +65 9343 6035; only phone number match is required for successful opt-in.
    */
   async findByPhoneDigits(tenantId: string, phoneDigits: string): Promise<Member | null> {
     const digits = phoneDigits.replace(/\D/g, '');
     if (!digits || digits.length < 8) return null;
     const members = await this.memberModel.find({ tenantId }).lean();
     for (const m of members) {
-      const p = (m as Record<string, unknown>).phoneNumber as string | undefined;
+      const row = m as Record<string, unknown>;
+      const p = (row.phoneNumber ?? row['Phone Number']) as string | undefined;
       const memberDigits = phoneToDigits(p);
-      if (!memberDigits) continue;
+      if (!memberDigits || memberDigits.length < 8) continue;
       if (memberDigits === digits) return m as unknown as Member;
       const digitsNoCountry = this.stripCountryCode(digits);
       const memberNoCountry = this.stripCountryCode(memberDigits);
       if (digitsNoCountry && (digitsNoCountry === memberDigits || digitsNoCountry === memberNoCountry)) return m as unknown as Member;
       if (memberNoCountry && (memberNoCountry === digits || memberNoCountry === digitsNoCountry)) return m as unknown as Member;
+      // Suffix match: e.g. user 93436035, member 6593436035 → match; or user 6593436035, member 93436035 → match
+      const longer = digits.length >= memberDigits.length ? digits : memberDigits;
+      const shorter = digits.length < memberDigits.length ? digits : memberDigits;
+      if (shorter.length >= 8 && longer.endsWith(shorter)) return m as unknown as Member;
     }
     return null;
   }

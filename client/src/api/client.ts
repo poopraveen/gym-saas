@@ -445,6 +445,10 @@ export const api = {
     },
     getTelegramConfig: () =>
       request<{ groupInviteLink?: string; hasBot: boolean }>('/notifications/telegram-config'),
+    registerWebhook: () =>
+      request<{ ok: boolean; error?: string; webhookUrl?: string | null; tenantId?: string | null }>('/notifications/register-webhook', { method: 'POST' }),
+    getWebhookInfo: () =>
+      request<{ tenantId: string; webhookPath: string; webhookUrl: string | null }>('/notifications/webhook-info'),
   },
 };
 

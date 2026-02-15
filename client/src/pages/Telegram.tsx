@@ -19,26 +19,55 @@ export default function Telegram() {
   const navigate = useNavigate();
   const [config, setConfig] = useState<{ groupInviteLink?: string; hasBot: boolean } | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [webhookInfo, setWebhookInfo] = useState<{ tenantId: string; webhookPath: string; webhookUrl: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeNav, setActiveNav] = useState<string>('telegram');
+  const [webhookStatus, setWebhookStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+
+  const fetchData = () => {
+    setLoading(true);
+    Promise.all([
+      api.notifications.getTelegramConfig(),
+      api.notifications.listTelegramAttempts({ limit: 100 }),
+      api.notifications.getWebhookInfo().catch(() => null),
+    ])
+      .then(([c, list, info]) => {
+        setConfig(c);
+        setAttempts(Array.isArray(list) ? list : []);
+        setWebhookInfo(info ?? null);
+      })
+      .catch(() => {
+        setConfig(null);
+        setAttempts([]);
+        setWebhookInfo(null);
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     if (storage.getRole() === 'MEMBER') {
       navigate('/nutrition-ai');
       return;
     }
-    setLoading(true);
-    Promise.all([api.notifications.getTelegramConfig(), api.notifications.listTelegramAttempts({ limit: 100 })])
-      .then(([c, list]) => {
-        setConfig(c);
-        setAttempts(Array.isArray(list) ? list : []);
-      })
-      .catch(() => {
-        setConfig(null);
-        setAttempts([]);
-      })
-      .finally(() => setLoading(false));
+    fetchData();
   }, [navigate]);
+
+  const handleRegisterWebhook = () => {
+    setWebhookStatus(null);
+    setWebhookLoading(true);
+    api.notifications
+      .registerWebhook()
+      .then((r) => {
+        if (r.ok) {
+          setWebhookStatus({ ok: true, message: `Webhook registered. URL: ${r.webhookUrl ?? '(same)'}. Send "Hi" to your bot again.` });
+        } else {
+          setWebhookStatus({ ok: false, message: r.error ?? 'Failed to register webhook.' });
+        }
+      })
+      .catch((e) => setWebhookStatus({ ok: false, message: e?.message ?? 'Request failed.' }))
+      .finally(() => setWebhookLoading(false));
+  };
 
   const handleNavChange = (id: string) => {
     setActiveNav(id);
@@ -144,9 +173,40 @@ export default function Telegram() {
 
             <section className="telegram-card">
               <h2 className="telegram-card-title">Who tried to set up (Telegram opt-in attempts)</h2>
-              <p className="telegram-hint">When someone sends &quot;Hi&quot; or their phone number to your gym&apos;s bot, they appear here. Confirm who has registered for absence alerts.</p>
+              <p className="telegram-hint">When someone sends &quot;Hi&quot; or their phone number to your gym&apos;s bot (e.g. in private chat or in the group), they appear here. Confirm who has registered for absence alerts.</p>
+              {config?.hasBot && (
+                <div className="telegram-webhook-actions">
+                  <p className="telegram-webhook-hint">
+                    If you message the bot but nothing appears here, the server may not have the webhook set. <strong>Re-register webhook</strong> only works when the API has <strong>PUBLIC_API_URL</strong> set (e.g. on Render). From localhost, use the deployed app or set <code>PUBLIC_API_URL</code> in .env to your Render URL.
+                  </p>
+                  {webhookInfo && (
+                    <div className="telegram-webhook-url-note">
+                      <p>Webhook URL must include your tenant ID (not just <code>/telegram-webhook</code>).</p>
+                      {webhookInfo.webhookUrl ? (
+                        <p>Correct URL for this gym: <code className="telegram-webhook-code">{webhookInfo.webhookUrl}</code></p>
+                      ) : (
+                        <p>Path: <code className="telegram-webhook-code">{webhookInfo.webhookPath}</code> — set <strong>PUBLIC_API_URL</strong> on the server to see full URL.</p>
+                      )}
+                      <p className="telegram-webhook-manual">Manual set: <code>https://api.telegram.org/bot&lt;BOT_TOKEN&gt;/setWebhook?url=&lt;WEBHOOK_URL_ABOVE&gt;</code></p>
+                    </div>
+                  )}
+                  <div className="telegram-webhook-buttons">
+                    <button type="button" className="telegram-btn telegram-btn-register" onClick={handleRegisterWebhook} disabled={webhookLoading}>
+                      {webhookLoading ? 'Registering…' : 'Re-register webhook'}
+                    </button>
+                    <button type="button" className="telegram-btn telegram-btn-refresh" onClick={fetchData} disabled={loading}>
+                      Refresh attempts
+                    </button>
+                  </div>
+                  {webhookStatus && (
+                    <p className={`telegram-webhook-result ${webhookStatus.ok ? 'telegram-webhook-ok' : 'telegram-webhook-err'}`}>
+                      {webhookStatus.message}
+                    </p>
+                  )}
+                </div>
+              )}
               {attempts.length === 0 ? (
-                <p className="telegram-empty">No attempts yet. After members message your Telegram bot, they will appear here.</p>
+                <p className="telegram-empty">No attempts yet. Message your gym&apos;s bot (e.g. &quot;Hi&quot; or /start), then send your phone number. If it still doesn&apos;t appear, use &quot;Re-register webhook&quot; above and ensure PUBLIC_API_URL is set on the server.</p>
               ) : (
                 <div className="telegram-table-wrap">
                   <table className="telegram-table">
