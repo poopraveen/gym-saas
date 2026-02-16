@@ -12,6 +12,24 @@
 .face-capture-overlay--fullscreen {
   padding: 0;
   background: #000;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100%;
+  min-height: -webkit-fill-available;
+}
+
+/* Wrapper so video always fills viewport (no black bars) */
+.face-capture-video-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 .face-capture-modal {
@@ -23,12 +41,16 @@
   overflow: hidden;
 }
 
-/* Full-screen: video fills viewport with vivid, polished filter */
+/* Full-screen: video fills container and viewport with vivid filter */
 .face-capture-video--fullscreen {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  top: 50%;
+  left: 50%;
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+  transform: translate(-50%, -50%);
   object-fit: cover;
   display: block;
   filter: contrast(1.08) saturate(1.15) brightness(1.03);
@@ -103,6 +125,45 @@
   color: rgba(255, 255, 255, 0.9);
   font-size: 1rem;
   z-index: 1;
+}
+
+/* Animated hint: "Look at the camera" while camera is active */
+.face-capture-look-hint {
+  position: absolute;
+  bottom: 30%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+  animation: face-capture-hint-pulse 2.5s ease-in-out infinite;
+}
+
+.face-capture-look-hint-icon {
+  font-size: 2rem;
+  opacity: 0.9;
+}
+
+.face-capture-look-hint-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.03em;
+}
+
+@keyframes face-capture-hint-pulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
 }
 
 .face-capture-video {

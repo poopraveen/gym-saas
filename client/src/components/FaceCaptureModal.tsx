@@ -112,13 +112,21 @@ export default function FaceCaptureModal({
 
   return (
     <div className="face-capture-overlay face-capture-overlay--fullscreen" role="dialog" aria-modal="true" aria-label="Face capture">
-      <video ref={videoRef} className="face-capture-video face-capture-video--fullscreen" playsInline muted />
+      <div className="face-capture-video-container">
+        <video ref={videoRef} className="face-capture-video face-capture-video--fullscreen" playsInline muted />
+      </div>
       <div className="face-capture-header face-capture-header--overlay">
         <h3>{title}</h3>
         <button type="button" className="face-capture-close" onClick={onClose} aria-label="Close">&times;</button>
       </div>
       <div className="face-capture-video-wrap face-capture-video-wrap--fullscreen">
         {loading && <p className="face-capture-loading">Loading camera and face model…</p>}
+        {!loading && !error && (
+          <p className="face-capture-look-hint">
+            <span className="face-capture-look-hint-icon">👁</span>
+            <span className="face-capture-look-hint-text">Look at the camera</span>
+          </p>
+        )}
       </div>
       {error && <p className="face-capture-error face-capture-error--overlay">{error}</p>}
       <div className="face-capture-actions face-capture-actions--overlay">
