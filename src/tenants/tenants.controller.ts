@@ -9,10 +9,14 @@ import { Role } from '../common/constants/roles';
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
-  /** Public: resolve tenant by host or tenantId for branding (no auth). Use tenantId after login. */
+  /** Public: resolve tenant by host or tenantId for branding (no auth). Use tenantId after login. Never throws. */
   @Get('config')
-  getConfig(@Query('host') host: string, @Query('tenantId') tenantId: string) {
-    return this.tenantsService.getPublicConfig(host || undefined, tenantId || undefined);
+  async getConfig(@Query('host') host: string, @Query('tenantId') tenantId: string) {
+    try {
+      return await this.tenantsService.getPublicConfig(host || undefined, tenantId || undefined);
+    } catch {
+      return { name: 'Reps & Dips', theme: 'dark', allowsMedicalDocuments: false, medicalDocumentsLimit: 5 };
+    }
   }
 
   @Post()

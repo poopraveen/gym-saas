@@ -3,10 +3,12 @@ import { ValidationPipe } from '@nestjs/common';
 import * as dns from 'node:dns';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { MongoDuplicateKeyExceptionFilter } from './common/filters/mongo-duplicate.filter';
 
 async function bootstrap() {
   dns.setServers(['1.1.1.1', '8.8.8.8']);
   const app = await NestFactory.create(AppModule);
+  app.useGlobalFilters(new MongoDuplicateKeyExceptionFilter());
   const corsOrigin = process.env.CORS_ORIGIN;
   const devOrigins = [
     'http://localhost:3000',

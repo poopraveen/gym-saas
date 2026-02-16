@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Tenant, TenantBranding, ThemeType } from './schemas/tenant.schema';
@@ -50,50 +50,71 @@ export class TenantsService {
   ): Promise<Tenant> {
     const s = slug || name.toLowerCase().replace(/\s+/g, '-');
     const subdomain = options?.subdomain ?? s;
-    return this.tenantModel.create({
-      name,
-      slug: s,
-      subdomain,
-      defaultTheme: (options?.defaultTheme as 'light' | 'dark') || 'dark',
-      branding: options?.branding,
-    });
+    try {
+      return await this.tenantModel.create({
+        name,
+        slug: s,
+        subdomain,
+        defaultTheme: (options?.defaultTheme as 'light' | 'dark') || 'dark',
+        branding: options?.branding,
+      });
+    } catch (err: unknown) {
+      const code = (err as { code?: number })?.code;
+      if (code === 11000) {
+        throw new ConflictException('A tenant with this slug or subdomain already exists.');
+      }
+      throw err;
+    }
   }
 
-  /** Public config for login page or app (name, logo, background, theme). Use tenantId when available (after login). */
+  /** Public config for login page or app (name, logo, background, theme). Use tenantId when available (after login). Never throws: returns default on DB error. */
   async getPublicConfig(host?: string, tenantId?: string) {
-    let tenant: Record<string, unknown> | null = null;
-    if (tenantId) {
-      const byId = await this.findById(tenantId);
-      tenant = byId as Record<string, unknown> | null;
+    const defaultConfig = { name: 'Reps & Dips', theme: 'dark' as const, allowsMedicalDocuments: false, medicalDocumentsLimit: 5 };
+    try {
+      let tenant: Record<string, unknown> | null = null;
+      if (tenantId) {
+        const byId = await this.findById(tenantId);
+        tenant = byId as Record<string, unknown> | null;
+      }
+      if (!tenant && host && host !== 'localhost' && host !== '127.0.0.1') {
+        const byHost = await this.findBySubdomainOrDomain(host);
+        tenant = byHost as Record<string, unknown> | null;
+      }
+      if (!tenant) return defaultConfig;
+      const t = tenant as {
+        name?: string;
+        defaultTheme?: string;
+        branding?: { logo?: string; backgroundImage?: string; primaryColor?: string };
+        subscriptionTier?: SubscriptionTier;
+        settings?: { showFinanceTab?: boolean };
+      };
+      const tier = t.subscriptionTier ?? 'free';
+      const medicalDocumentsLimit = tier === 'premium' ? 30 : 5;
+      const showFinanceTab = t.settings?.showFinanceTab !== false;
+      return {
+        name: t.name || 'Gym',
+        theme: t.defaultTheme || 'dark',
+        logo: t.branding?.logo,
+        backgroundImage: t.branding?.backgroundImage,
+        primaryColor: t.branding?.primaryColor,
+        allowsMedicalDocuments: tier === 'premium',
+        medicalDocumentsLimit,
+        showFinanceTab,
+      };
+    } catch {
+      return defaultConfig;
     }
-    if (!tenant && host && host !== 'localhost' && host !== '127.0.0.1') {
-      const byHost = await this.findBySubdomainOrDomain(host);
-      tenant = byHost as Record<string, unknown> | null;
-    }
-    if (!tenant) {
-      return { name: 'Reps & Dips', theme: 'dark', allowsMedicalDocuments: false, medicalDocumentsLimit: 5 };
-    }
-    const t = tenant as {
-      name?: string;
-      defaultTheme?: string;
-      branding?: { logo?: string; backgroundImage?: string; primaryColor?: string };
-      subscriptionTier?: SubscriptionTier;
-    };
-    const tier = t.subscriptionTier ?? 'free';
-    const medicalDocumentsLimit = tier === 'premium' ? 30 : 5;
-    return {
-      name: t.name || 'Gym',
-      theme: t.defaultTheme || 'dark',
-      logo: t.branding?.logo,
-      backgroundImage: t.branding?.backgroundImage,
-      primaryColor: t.branding?.primaryColor,
-      allowsMedicalDocuments: tier === 'premium',
-      medicalDocumentsLimit,
-    };
   }
 
   async findAll() {
-    return this.tenantModel.find().lean();
+    const docs = await this.tenantModel.find().lean();
+    return (docs as unknown as Array<Record<string, unknown>>).map((d) => {
+      const out: Record<string, unknown> = { ...d };
+      if (out._id != null) out._id = String(out._id);
+      if (out.createdAt instanceof Date) out.createdAt = out.createdAt.toISOString();
+      if (out.updatedAt instanceof Date) out.updatedAt = out.updatedAt.toISOString();
+      return out;
+    });
   }
 
   async findById(id: string) {

@@ -11,7 +11,7 @@ import { TenantsService } from '../tenants/tenants.service';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+@Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.TRAINER, Role.MEMBER)
 export class NotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
@@ -138,12 +138,15 @@ export class NotificationsController {
     return { tenantId, webhookPath, webhookUrl };
   }
 
-  /** Get VAPID public key for push subscription (any authenticated user). */
+  /** Get VAPID public key for push subscription (any authenticated user). Returns null if not configured. */
   @Get('vapid-public-key')
-  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.MEMBER)
   getVapidPublicKey() {
-    const key = this.notificationsService.getVapidPublicKey();
-    return { publicKey: key };
+    try {
+      const key = this.notificationsService.getVapidPublicKey();
+      return { publicKey: key };
+    } catch {
+      return { publicKey: null };
+    }
   }
 
   /** Save push subscription for the current user (any authenticated user). */

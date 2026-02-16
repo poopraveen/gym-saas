@@ -7,6 +7,7 @@ import {
   Req,
   Query,
   Param,
+  Logger,
 } from '@nestjs/common';
 import { MembersService } from '../members/members.service';
 import { AttendanceService } from '../attendance/attendance.service';
@@ -25,6 +26,8 @@ import { Role } from '../common/constants/roles';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
 export class LegacyController {
+  private readonly logger = new Logger(LegacyController.name);
+
   constructor(
     private readonly membersService: MembersService,
     private readonly attendanceService: AttendanceService,
@@ -45,7 +48,12 @@ export class LegacyController {
 
   @Get('list')
   async list(@Req() req: any) {
-    return this.membersService.list(this.tenantId(req));
+    try {
+      return await this.membersService.list(this.tenantId(req));
+    } catch (err) {
+      this.logger.warn('legacy/list failed, returning []', (err as Error)?.message);
+      return [];
+    }
   }
 
   /** Lookup a single member by gym ID (e.g. GYM-2025-00001) or Reg No. Only onboarded members. */
