@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, Query, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Query, Param, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -14,7 +14,7 @@ import { SaveProfileDto } from './dto/profile.dto';
 /**
  * Member-facing calorie tracking.
  * All data isolated by tenant and user (from JWT).
- * Staff can view a member's progress via /calories/member/:memberUserId/*.
+ * Trainer can view a member's progress via /calories/member/:memberUserId/*.
  */
 @Controller('calories')
 @UseGuards(JwtAuthGuard)
@@ -134,41 +134,55 @@ export class CaloriesController {
   }
 
   /**
-   * Staff only: get a member's calorie progress (member onboarded for AI).
+   * Trainer only: get a member's calorie progress (member onboarded for AI).
    * GET /calories/member/:memberUserId/today
    */
   @Get('member/:memberUserId/today')
   @UseGuards(RolesGuard)
-  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.TRAINER)
   async getMemberToday(@Req() req: any, @Param('memberUserId') memberUserId: string) {
     const tenantId = this.tenantId(req);
-    if (!tenantId) throw new Error('Unauthorized');
-    await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    const currentUserId = this.userId(req);
+    const role = req.user?.role;
+    if (!tenantId || !currentUserId) throw new Error('Unauthorized');
+    if (role === Role.TRAINER) {
+      const allowed = await this.authService.isMemberAssignedToTrainer(tenantId, currentUserId, memberUserId);
+      if (!allowed) throw new ForbiddenException('Member is not assigned to you');
+    } else {
+      await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    }
     return this.caloriesService.getToday(tenantId, memberUserId);
   }
 
   /**
-   * Staff only: get a member's last 7 days summary.
+   * Trainer only: get a member's last 7 days summary.
    */
   @Get('member/:memberUserId/last-7-days')
   @UseGuards(RolesGuard)
-  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.TRAINER)
   async getMemberLast7Days(
     @Req() req: any,
     @Param('memberUserId') memberUserId: string,
   ): Promise<DaySummary[]> {
     const tenantId = this.tenantId(req);
-    if (!tenantId) throw new Error('Unauthorized');
-    await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    const currentUserId = this.userId(req);
+    const role = req.user?.role;
+    if (!tenantId || !currentUserId) throw new Error('Unauthorized');
+    if (role === Role.TRAINER) {
+      const allowed = await this.authService.isMemberAssignedToTrainer(tenantId, currentUserId, memberUserId);
+      if (!allowed) throw new ForbiddenException('Member is not assigned to you');
+    } else {
+      await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    }
     return this.caloriesService.getLast7Days(tenantId, memberUserId);
   }
 
   /**
-   * Staff only: get a member's calorie history for a date range.
+   * Trainer only: get a member's calorie history for a date range.
    */
   @Get('member/:memberUserId/history')
   @UseGuards(RolesGuard)
-  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.TRAINER)
   async getMemberHistory(
     @Req() req: any,
     @Param('memberUserId') memberUserId: string,
@@ -176,8 +190,15 @@ export class CaloriesController {
     @Query('to') to: string,
   ) {
     const tenantId = this.tenantId(req);
-    if (!tenantId) throw new Error('Unauthorized');
-    await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    const currentUserId = this.userId(req);
+    const role = req.user?.role;
+    if (!tenantId || !currentUserId) throw new Error('Unauthorized');
+    if (role === Role.TRAINER) {
+      const allowed = await this.authService.isMemberAssignedToTrainer(tenantId, currentUserId, memberUserId);
+      if (!allowed) throw new ForbiddenException('Member is not assigned to you');
+    } else {
+      await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    }
     const fromStr = from || new Date().toISOString().slice(0, 10);
     const toStr = to || new Date().toISOString().slice(0, 10);
     return this.caloriesService.getHistory(tenantId, memberUserId, fromStr, toStr);
@@ -214,22 +235,80 @@ export class CaloriesController {
   }
 
   /**
-   * Staff only: get a member's saved nutrition analysis for a date.
+   * Trainer only: get a member's saved nutrition analysis for a date.
    * GET /calories/member/:memberUserId/analysis?date=YYYY-MM-DD
    */
   @Get('member/:memberUserId/analysis')
   @UseGuards(RolesGuard)
-  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.TRAINER)
   async getMemberAnalysis(
     @Req() req: any,
     @Param('memberUserId') memberUserId: string,
     @Query('date') date: string,
   ) {
     const tenantId = this.tenantId(req);
-    if (!tenantId) throw new Error('Unauthorized');
-    await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    const currentUserId = this.userId(req);
+    const role = req.user?.role;
+    if (!tenantId || !currentUserId) throw new Error('Unauthorized');
+    if (role === Role.TRAINER) {
+      const allowed = await this.authService.isMemberAssignedToTrainer(tenantId, currentUserId, memberUserId);
+      if (!allowed) throw new ForbiddenException('Member is not assigned to you');
+    } else {
+      await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    }
     const dateStr = date || new Date().toISOString().slice(0, 10);
     return this.caloriesService.getAnalysis(tenantId, memberUserId, dateStr);
+  }
+
+  /**
+   * Trainer: add food (chat) on behalf of a member. TRAINER can only do this for assigned members.
+   */
+  @Post('member/:memberUserId/chat')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.TRAINER)
+  async chatOnBehalfOfMember(
+    @Req() req: any,
+    @Param('memberUserId') memberUserId: string,
+    @Body() body: ChatCalorieDto,
+  ): Promise<ChatCalorieResult> {
+    const tenantId = this.tenantId(req);
+    const currentUserId = this.userId(req);
+    const role = req.user?.role;
+    if (!tenantId || !currentUserId) throw new Error('Unauthorized');
+    if (role === Role.TRAINER) {
+      const allowed = await this.authService.isMemberAssignedToTrainer(tenantId, currentUserId, memberUserId);
+      if (!allowed) throw new ForbiddenException('Member is not assigned to you');
+    } else {
+      await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    }
+    return this.caloriesService.chat(tenantId, memberUserId, body.message || '', {
+      date: body.date,
+      existingItems: body.existingItems,
+    });
+  }
+
+  /**
+   * Trainer: set a day's entry (replace) on behalf of a member. TRAINER can only do this for assigned members.
+   */
+  @Patch('member/:memberUserId/entry')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.TRAINER)
+  async setEntryOnBehalfOfMember(
+    @Req() req: any,
+    @Param('memberUserId') memberUserId: string,
+    @Body() body: SetEntryDto,
+  ) {
+    const tenantId = this.tenantId(req);
+    const currentUserId = this.userId(req);
+    const role = req.user?.role;
+    if (!tenantId || !currentUserId) throw new Error('Unauthorized');
+    if (role === Role.TRAINER) {
+      const allowed = await this.authService.isMemberAssignedToTrainer(tenantId, currentUserId, memberUserId);
+      if (!allowed) throw new ForbiddenException('Member is not assigned to you');
+    } else {
+      await this.authService.assertMemberInTenant(tenantId, memberUserId);
+    }
+    return this.caloriesService.setEntry(tenantId, memberUserId, body.date, body.items ?? []);
   }
 
   /**

@@ -9,7 +9,7 @@ import { MembersModule } from '../members/members.module';
 
 /**
  * Member-facing calorie tracking + full nutrition analysis (one AI call).
- * Data isolated per tenant and user. Staff can view member progress.
+ * Data isolated per tenant and user. Trainer can view member progress.
  */
 @Module({
   imports: [

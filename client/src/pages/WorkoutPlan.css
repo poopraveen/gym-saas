@@ -104,6 +104,37 @@
   font-size: 0.95rem;
 }
 
+.wp-days-readonly .wp-day-row { grid-template-columns: 100px 1fr; }
+.wp-days-readonly .wp-day-input { border: none; background: transparent; padding: 0; }
+
+.wp-trainer-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.wp-trainer-member-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.wp-trainer-member-btn:hover { background: var(--hover-bg); }
+.wp-trainer-member-btn.selected { border-color: var(--primary); background: var(--hover-bg); }
+.wp-trainer-reg { color: var(--text-secondary); font-size: 0.9rem; }
+.wp-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.wp-log-item { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.wp-log-item .wp-log-date { color: var(--text-secondary); }
+.wp-log-item .wp-log-notes { width: 100%; color: var(--text-secondary); font-size: 0.85rem; }
+
 .wp-actions {
   margin-top: 0.75rem;
 }

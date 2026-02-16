@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format, parseISO, isValid, subDays } from 'date-fns';
 import {
   BarChart,
@@ -99,8 +99,10 @@ function NutrientScalesSection({
 
 export default function NutritionAI() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const role = storage.getRole();
   const isMember = role === 'MEMBER';
+  const isTrainer = role === 'TRAINER';
 
   const [me, setMe] = useState<{ createdAt?: string; role: string } | null>(null);
   const [onboardedDate, setOnboardedDate] = useState<string>(() =>
@@ -128,7 +130,7 @@ export default function NutritionAI() {
   const [copySourceDate, setCopySourceDate] = useState<string>('');
   const [copyTargetDates, setCopyTargetDates] = useState<string[]>([]);
   const [copying, setCopying] = useState(false);
-  /** Staff view: members onboarded for AI, search, and selected member progress */
+  /** Trainer view: members onboarded for AI, search, and selected member progress */
   const [memberSearch, setMemberSearch] = useState('');
   const [aiMembers, setAiMembers] = useState<AiMember[]>([]);
   const [aiMembersLoading, setAiMembersLoading] = useState(false);
@@ -139,10 +141,15 @@ export default function NutritionAI() {
     history: CalorieHistoryEntry[];
   } | null>(null);
   const [memberProgressLoading, setMemberProgressLoading] = useState(false);
-  /** Staff: selected member's nutrition report (saved in DB). */
+  /** Trainer: selected member's nutrition report (saved in DB). */
   const [memberReportDate, setMemberReportDate] = useState<string>(() => toDateOnly(new Date()));
   const [memberAnalysisResult, setMemberAnalysisResult] = useState<NutritionAnalysisResult | null>(null);
   const [memberAnalysisLoading, setMemberAnalysisLoading] = useState(false);
+  /** Trainer: add food on behalf of selected member */
+  const [onBehalfMessage, setOnBehalfMessage] = useState('');
+  const [onBehalfDate, setOnBehalfDate] = useState<string>(() => toDateOnly(new Date()));
+  const [onBehalfSubmitting, setOnBehalfSubmitting] = useState(false);
+  const [onBehalfError, setOnBehalfError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyRefreshInProgressRef = useRef(false);
 
@@ -253,6 +260,7 @@ export default function NutritionAI() {
 
   const searchMembers = async () => {
     if (isMember) return;
+    if (isTrainer) return; // Trainer list is fixed (assigned only), no search
     setAiMembersLoading(true);
     try {
       const list = await api.auth.getAiMembers(memberSearch.trim() || undefined);
@@ -266,9 +274,22 @@ export default function NutritionAI() {
 
   useEffect(() => {
     if (!isMember) {
-      api.auth.getAiMembers().then((list) => setAiMembers(list || [])).catch(() => setAiMembers([]));
+      if (isTrainer) {
+        api.auth.getMyAssignedMembers().then((list) => setAiMembers(list || [])).catch(() => setAiMembers([]));
+      } else {
+        api.auth.getAiMembers().then((list) => setAiMembers(list || [])).catch(() => setAiMembers([]));
+      }
     }
-  }, [isMember]);
+  }, [isMember, isTrainer]);
+
+  /** Trainer: preselect member from URL ?memberId= (e.g. from Trainer Dashboard). */
+  useEffect(() => {
+    if (!isTrainer || aiMembers.length === 0) return;
+    const memberId = searchParams.get('memberId');
+    if (!memberId) return;
+    const member = aiMembers.find((m) => m.id === memberId);
+    if (member) loadMemberProgress(member);
+  }, [isTrainer, aiMembers, searchParams]);
 
   /** Load reference foods for nutrition analysis (members only) */
   useEffect(() => {
@@ -362,7 +383,25 @@ export default function NutritionAI() {
     }
   };
 
-  /** Load selected member's saved nutrition report for a date (staff only). */
+  const submitOnBehalf = async () => {
+    if (!selectedMember?.id || !onBehalfMessage.trim()) return;
+    setOnBehalfError('');
+    setOnBehalfSubmitting(true);
+    try {
+      await api.calories.chatOnBehalfOfMember(selectedMember.id, {
+        message: onBehalfMessage.trim(),
+        date: onBehalfDate || undefined,
+      });
+      setOnBehalfMessage('');
+      await loadMemberProgress(selectedMember);
+    } catch (e) {
+      setOnBehalfError(getApiErrorMessage(e));
+    } finally {
+      setOnBehalfSubmitting(false);
+    }
+  };
+
+  /** Load selected member's saved nutrition report for a date (trainer only). */
   useEffect(() => {
     if (!selectedMember?.id || isMember) return;
     setMemberAnalysisLoading(true);
@@ -622,45 +661,51 @@ export default function NutritionAI() {
         {!isMember ? (
           <>
             <p className="nutrition-intro">
-              View progress of members onboarded for the AI campaign. Search by name or email, then select a member to see their calorie history one by one.
+              {isTrainer
+                ? 'View diet progress of your assigned members. Select a member to see their calorie history and add food on their behalf.'
+                : 'View progress of members onboarded for the AI campaign. Search by name or email, then select a member to see their calorie history one by one.'}
             </p>
-            <section className="nutrition-widget staff-members-widget">
-              <h2>Members onboarded for AI</h2>
-              <div className="staff-search-row">
-                <input
-                  type="text"
-                  className="staff-search-input"
-                  placeholder="Search by name or email..."
-                  value={memberSearch}
-                  onChange={(e) => setMemberSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && searchMembers()}
-                />
-                <button type="button" className="btn-primary" onClick={searchMembers} disabled={aiMembersLoading}>
-                  {aiMembersLoading ? 'Searching…' : 'Search'}
-                </button>
-              </div>
-              {aiMembers.length === 0 && !aiMembersLoading && (
-                <p className="staff-empty">No members found. Onboard members from the Onboarding page.</p>
+            <section className="nutrition-widget trainer-members-widget">
+              <h2>{isTrainer ? 'My assigned members' : 'Members onboarded for AI'}</h2>
+              {!isTrainer && (
+                <div className="trainer-search-row">
+                  <input
+                    type="text"
+                    className="trainer-search-input"
+                    placeholder="Search by name or email..."
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && searchMembers()}
+                  />
+                  <button type="button" className="btn-primary" onClick={searchMembers} disabled={aiMembersLoading}>
+                    {aiMembersLoading ? 'Searching…' : 'Search'}
+                  </button>
+                </div>
               )}
-              <ul className="staff-member-list">
+              {aiMembers.length === 0 && !aiMembersLoading && (
+                <p className="trainer-empty">
+                  {isTrainer ? 'No members assigned to you yet. Ask an admin to assign members from the Dashboard.' : 'No members found. Onboard members from the Onboarding page.'}
+                </p>
+              )}
+              <ul className="trainer-member-list">
                 {aiMembers.map((m) => (
-                  <li key={m.id} className="staff-member-item">
+                  <li key={m.id} className="trainer-member-item">
                     <button
                       type="button"
-                      className={`staff-member-btn ${selectedMember?.id === m.id ? 'selected' : ''}`}
+                      className={`trainer-member-btn ${selectedMember?.id === m.id ? 'selected' : ''}`}
                       onClick={() => loadMemberProgress(m)}
                       disabled={memberProgressLoading && selectedMember?.id === m.id}
                     >
-                      <span className="staff-member-name">{m.name || m.email}</span>
-                      {m.email !== m.name && <span className="staff-member-email">{m.email}</span>}
-                      {m.linkedRegNo != null && <span className="staff-member-reg">Reg #{m.linkedRegNo}</span>}
+                      <span className="trainer-member-name">{m.name || m.email}</span>
+                      {m.email !== m.name && <span className="trainer-member-email">{m.email}</span>}
+                      {m.linkedRegNo != null && <span className="trainer-member-reg">Reg #{m.linkedRegNo}</span>}
                     </button>
                   </li>
                 ))}
               </ul>
             </section>
             {selectedMember && (
-              <section className="nutrition-widget staff-progress-widget">
+              <section className="nutrition-widget trainer-progress-widget">
                 <h2>Progress: {selectedMember.name || selectedMember.email}</h2>
                 {memberProgressLoading ? (
                   <div className="nutrition-loading">Loading progress…</div>
@@ -681,6 +726,31 @@ export default function NutritionAI() {
                           </div>
                         ) : null;
                       })()}
+                    </div>
+                    <div className="on-behalf-block">
+                      <h3 className="on-behalf-title">Add food on behalf</h3>
+                      <p className="on-behalf-desc">Describe what they ate (e.g. &quot;2 roti, dal, rice&quot;). Entry will be added for the date below.</p>
+                      <div className="on-behalf-row">
+                        <input
+                          type="text"
+                          className="on-behalf-input"
+                          placeholder="e.g. 2 eggs, toast, banana"
+                          value={onBehalfMessage}
+                          onChange={(e) => setOnBehalfMessage(e.target.value)}
+                          disabled={onBehalfSubmitting}
+                        />
+                        <input
+                          type="date"
+                          className="on-behalf-date"
+                          value={onBehalfDate}
+                          onChange={(e) => setOnBehalfDate(e.target.value)}
+                          disabled={onBehalfSubmitting}
+                        />
+                        <button type="button" className="btn-primary on-behalf-btn" onClick={submitOnBehalf} disabled={onBehalfSubmitting || !onBehalfMessage.trim()}>
+                          {onBehalfSubmitting ? 'Adding…' : 'Add'}
+                        </button>
+                      </div>
+                      {onBehalfError && <p className="on-behalf-error">{onBehalfError}</p>}
                     </div>
                     <div className="last7-block">
                       <strong>Last 7 days</strong>
@@ -732,9 +802,9 @@ export default function NutritionAI() {
                       )}
                     </div>
                     {/* Member's saved nutrition report (from DB) */}
-                    <div className="staff-report-block">
-                      <h3 className="staff-report-title">Nutrition report</h3>
-                      <p className="staff-report-desc">Saved report for the selected date (generated when the member ran &quot;Analyze my day&quot;).</p>
+                    <div className="trainer-report-block">
+                      <h3 className="trainer-report-title">Nutrition report</h3>
+                      <p className="trainer-report-desc">Saved report for the selected date (generated when the member ran &quot;Analyze my day&quot;).</p>
                       <div className="analysis-date-row">
                         <label>Report date</label>
                         <input
@@ -748,8 +818,8 @@ export default function NutritionAI() {
                       {memberAnalysisLoading ? (
                         <div className="nutrition-loading">Loading report…</div>
                       ) : memberAnalysisResult ? (
-                        <section className="analysis-result-widget staff-analysis-result">
-                          <h2 className="staff-report-heading">Nutrition report — {safeDateStr(memberReportDate)}</h2>
+                        <section className="analysis-result-widget trainer-analysis-result">
+                          <h2 className="trainer-report-heading">Nutrition report — {safeDateStr(memberReportDate)}</h2>
                           <div className="daily-summary">
                             <h3>Daily total</h3>
                             <div className="daily-summary-grid">
@@ -903,7 +973,7 @@ export default function NutritionAI() {
                           )}
                         </section>
                       ) : (
-                        <p className="staff-report-empty">No saved report for this date. The member can run &quot;Analyze my day&quot; from their Nutrition AI page to generate one.</p>
+                        <p className="trainer-report-empty">No saved report for this date. The member can run &quot;Analyze my day&quot; from their Nutrition AI page to generate one.</p>
                       )}
                     </div>
                   </>

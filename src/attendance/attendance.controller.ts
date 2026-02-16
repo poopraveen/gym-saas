@@ -55,7 +55,7 @@ export class AttendanceController {
     return this.attendanceService.removeTodayCheckIn(tenantId, Number(body.regNo));
   }
 
-  /** Get QR check-in URL and token for this tenant (staff dashboard). Token valid 24h. */
+  /** Get QR check-in URL and token for this tenant (trainer/dashboard). Token valid 24h. */
   @Get('qr-payload')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)

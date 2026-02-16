@@ -165,11 +165,11 @@ export default function AddEnquiryModal({
             />
           </div>
           <div className="form-row">
-            <label>Assigned Staff / Trainer (optional)</label>
+            <label>Assigned Trainer (optional)</label>
             <input
               value={form.assignedStaff}
               onChange={(e) => setForm((f) => ({ ...f, assignedStaff: e.target.value }))}
-              placeholder="Staff name"
+              placeholder="Trainer name"
             />
           </div>
           <div className="form-row form-row-radio">

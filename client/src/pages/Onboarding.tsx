@@ -15,6 +15,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const role = storage.getRole();
   const canOnboardUser = role === 'TENANT_ADMIN' || role === 'MANAGER';
+  const canOnboardMember = role === 'TENANT_ADMIN' || role === 'MANAGER' || role === 'TRAINER';
 
   const [gymIdInput, setGymIdInput] = useState('');
   const [lookupMember, setLookupMember] = useState<Record<string, unknown> | null>(null);
@@ -24,7 +25,7 @@ export default function Onboarding() {
   const [onboardEmail, setOnboardEmail] = useState('');
   const [onboardPassword, setOnboardPassword] = useState('');
   const [onboardName, setOnboardName] = useState('');
-  const [onboardRole, setOnboardRole] = useState<'STAFF' | 'MANAGER'>('STAFF');
+  const [onboardRole, setOnboardRole] = useState<'STAFF' | 'MANAGER' | 'TRAINER'>('STAFF');
   const [onboardSubmitting, setOnboardSubmitting] = useState(false);
   const [onboardMessage, setOnboardMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
@@ -44,6 +45,15 @@ export default function Onboarding() {
   const [showPasswordResult, setShowPasswordResult] = useState<string | null>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<AiMember | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  /** For admin: trainers list and member→trainer assignments (only when canOnboardUser) */
+  const [trainers, setTrainers] = useState<Array<{ id: string; email: string; name?: string; createdAt?: string; assignedMemberCount: number }>>([]);
+  const [assignments, setAssignments] = useState<Record<string, string>>({}); // memberUserId -> trainerUserId
+  const [assigningMemberId, setAssigningMemberId] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [selectedTrainerForMember, setSelectedTrainerForMember] = useState<Record<string, string>>({}); // memberUserId -> trainerUserId (dropdown value)
+  const [deleteTrainerConfirm, setDeleteTrainerConfirm] = useState<{ id: string; email: string; name?: string } | null>(null);
+  const [deleteTrainerSubmitting, setDeleteTrainerSubmitting] = useState(false);
 
   const doLookup = useCallback(async (query: string) => {
     const q = query.trim();
@@ -104,6 +114,7 @@ export default function Onboarding() {
       setOnboardEmail('');
       setOnboardPassword('');
       setOnboardName('');
+      loadTrainersAndAssignments();
     } catch (err) {
       setOnboardMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to create user' });
     } finally {
@@ -113,7 +124,7 @@ export default function Onboarding() {
 
   const handleCreateMemberLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lookupMember || canOnboardUser === false) return;
+    if (!lookupMember || !canOnboardMember) return;
     const regNo = Number(lookupMember['Reg No:']);
     if (Number.isNaN(regNo)) {
       setMemberLoginMessage({ type: 'err', text: 'Invalid member' });
@@ -148,7 +159,7 @@ export default function Onboarding() {
   };
 
   const loadAiMembers = useCallback(async () => {
-    if (!canOnboardUser) return;
+    if (!canOnboardMember) return;
     setAiMembersLoading(true);
     try {
       const list = await api.auth.getAiMembers();
@@ -158,11 +169,72 @@ export default function Onboarding() {
     } finally {
       setAiMembersLoading(false);
     }
+  }, [canOnboardMember]);
+
+  const loadTrainersAndAssignments = useCallback(async () => {
+    if (!canOnboardUser) return;
+    try {
+      const [trainerList, assignmentList] = await Promise.all([
+        api.auth.getTrainers(),
+        api.auth.listTrainerAssignments(),
+      ]);
+      setTrainers(trainerList || []);
+      const map: Record<string, string> = {};
+      const selectedMap: Record<string, string> = {};
+      (assignmentList || []).forEach((a) => {
+        map[a.memberUserId] = a.trainerUserId;
+        selectedMap[a.memberUserId] = a.trainerUserId;
+      });
+      setAssignments(map);
+      setSelectedTrainerForMember(selectedMap);
+    } catch {
+      setTrainers([]);
+      setAssignments({});
+      setSelectedTrainerForMember({});
+    }
   }, [canOnboardUser]);
 
   useEffect(() => {
     loadAiMembers();
   }, [loadAiMembers]);
+
+  useEffect(() => {
+    if (canOnboardUser) loadTrainersAndAssignments();
+  }, [canOnboardUser, loadTrainersAndAssignments]);
+
+  /** Called when trainer dropdown changes: assign or unassign that member to the selected trainer. */
+  const handleTrainerSelectChange = async (memberUserId: string, newTrainerId: string) => {
+    setSelectedTrainerForMember((prev) => ({ ...prev, [memberUserId]: newTrainerId }));
+    setAssignError(null);
+    setAssigningMemberId(memberUserId);
+    try {
+      if (!newTrainerId) {
+        await api.auth.unassignMemberFromTrainer(memberUserId);
+      } else {
+        await api.auth.assignMemberToTrainer(newTrainerId, memberUserId);
+      }
+      await loadTrainersAndAssignments();
+    } catch (err) {
+      setAssignError(err instanceof Error ? err.message : 'Failed to update assignment');
+      setSelectedTrainerForMember((prev) => ({ ...prev, [memberUserId]: assignments[memberUserId] ?? '' }));
+    } finally {
+      setAssigningMemberId(null);
+    }
+  };
+
+  const handleConfirmDeleteTrainer = async () => {
+    if (!deleteTrainerConfirm || !canOnboardUser) return;
+    setDeleteTrainerSubmitting(true);
+    try {
+      await api.auth.deleteTrainer(deleteTrainerConfirm.id);
+      setDeleteTrainerConfirm(null);
+      await loadTrainersAndAssignments();
+    } catch (err) {
+      setOnboardMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to remove trainer' });
+    } finally {
+      setDeleteTrainerSubmitting(false);
+    }
+  };
 
   const handleOpenResetPassword = (user: AiMember) => {
     setResetPasswordUser(user);
@@ -276,7 +348,7 @@ export default function Onboarding() {
                 <dt>Due date</dt>
                 <dd>{safeFormat(lookupMember['DUE DATE'] as string, 'dd MMM yyyy')}</dd>
               </dl>
-              {canOnboardUser && (
+              {canOnboardMember && (
                 <form onSubmit={handleCreateMemberLogin} className="member-login-form" autoComplete="off">
                   <h3>Create member login</h3>
                   <p className="section-desc">They can log in later and see only Nutrition AI.</p>
@@ -322,11 +394,16 @@ export default function Onboarding() {
           )}
         </section>
 
-        {/* User management: members enrolled for AI – Tenant Admin / Manager only */}
-        {canOnboardUser && (
+        {/* User management: members enrolled for AI – Tenant Admin / Manager / Trainer */}
+        {canOnboardMember && (
           <section className="onboarding-section user-mgmt-section">
             <h2>Members enrolled for AI (Nutrition)</h2>
-            <p className="section-desc">Full control: reset password or remove login access. Passwords cannot be viewed; use Reset password to set a new one and share it with the member.</p>
+            <p className="section-desc">Full control: reset password or remove login access. Assign a trainer per member; the dropdown saves immediately. Passwords cannot be viewed; use Reset password to set a new one and share it with the member.</p>
+            {assignError && (
+              <div className="message-err" role="alert">
+                {assignError}
+              </div>
+            )}
             {aiMembersLoading ? (
               <p className="section-desc">Loading…</p>
             ) : aiMembers.length === 0 ? (
@@ -340,26 +417,61 @@ export default function Onboarding() {
                       <th>Name</th>
                       <th>Reg No</th>
                       <th>Enrolled</th>
+                      {canOnboardUser && <th>Trainer</th>}
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {aiMembers.map((u) => (
-                      <tr key={u.id}>
-                        <td>{u.email}</td>
-                        <td>{u.name || '—'}</td>
-                        <td>{u.linkedRegNo != null ? u.linkedRegNo : '—'}</td>
-                        <td>{u.createdAt ? safeFormat(u.createdAt, 'dd MMM yyyy') : '—'}</td>
-                        <td>
-                          <button type="button" className="btn-sm btn-reset" onClick={() => handleOpenResetPassword(u)}>
-                            Reset password
-                          </button>
-                          <button type="button" className="btn-sm btn-delete" onClick={() => setDeleteConfirmUser(u)}>
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {aiMembers.map((u) => {
+                      const currentTrainerId = assignments[u.id];
+                      const currentTrainer = currentTrainerId ? trainers.find((t) => t.id === currentTrainerId) : null;
+const selectedId = selectedTrainerForMember[u.id] ?? currentTrainerId ?? '';
+                                      const busy = assigningMemberId === u.id;
+                                      const selectedTrainer = selectedId ? trainers.find((t) => t.id === selectedId) : null;
+                                      return (
+                                        <tr key={u.id}>
+                                          <td>{u.email}</td>
+                                          <td>{u.name || '—'}</td>
+                                          <td>{u.linkedRegNo != null ? u.linkedRegNo : '—'}</td>
+                                          <td>{u.createdAt ? safeFormat(u.createdAt, 'dd MMM yyyy') : '—'}</td>
+                                          {canOnboardUser && (
+                                            <td className="trainer-cell">
+                                              <div className="trainer-assign-row">
+                                                <select
+                                                  value={selectedId}
+                                                  onChange={(e) => handleTrainerSelectChange(u.id, e.target.value)}
+                                                  disabled={busy}
+                                                  className="trainer-select"
+                                                  aria-label={`Assign trainer for ${u.name || u.email}`}
+                                                >
+                                                  <option value="">Select trainer</option>
+                                                  {trainers.map((t) => (
+                                                    <option key={t.id} value={t.id}>{t.name || t.email}</option>
+                                                  ))}
+                                                  {selectedId && !selectedTrainer && (
+                                                    <option value={selectedId}>(Assigned)</option>
+                                                  )}
+                                                </select>
+                                                {busy && <span className="trainer-assign-busy">…</span>}
+                                              </div>
+                                              {currentTrainer && (
+                                                <span className="trainer-current-label">Assigned: {currentTrainer.name || currentTrainer.email}</span>
+                                              )}
+                                            </td>
+                                          )}
+                          <td>
+                            <button type="button" className="btn-sm btn-reset" onClick={() => handleOpenResetPassword(u)}>
+                              Reset password
+                            </button>
+                            {canOnboardUser && (
+                              <button type="button" className="btn-sm btn-delete" onClick={() => setDeleteConfirmUser(u)}>
+                                Delete
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -400,9 +512,10 @@ export default function Onboarding() {
                 placeholder="Display name"
               />
               <label>Role</label>
-              <select value={onboardRole} onChange={(e) => setOnboardRole(e.target.value as 'STAFF' | 'MANAGER')}>
+              <select value={onboardRole} onChange={(e) => setOnboardRole(e.target.value as 'STAFF' | 'MANAGER' | 'TRAINER')}>
                 <option value="STAFF">Staff</option>
                 <option value="MANAGER">Manager</option>
+                <option value="TRAINER">Trainer</option>
               </select>
               <div className="form-actions">
                 <button type="submit" className="btn-primary" disabled={onboardSubmitting}>
@@ -415,6 +528,51 @@ export default function Onboarding() {
                 </div>
               )}
             </form>
+
+            {/* Trainers table – all trainers in the tenant */}
+            <div className="trainers-table-wrap">
+              <h3 className="trainers-table-title">Trainers</h3>
+              <p className="section-desc">All trainers in this tenant. Assign members to trainers in the &quot;Members enrolled for AI&quot; section below.</p>
+              {trainers.length === 0 ? (
+                <p className="trainers-empty">No trainers yet.</p>
+              ) : (
+                <div className="trainers-table-scroll">
+                  <table className="trainers-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Assigned members</th>
+                        <th>Added on</th>
+                        {canOnboardUser && <th>Actions</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trainers.map((t) => (
+                        <tr key={t.id}>
+                          <td>{t.name || '—'}</td>
+                          <td>{t.email}</td>
+                          <td>{t.assignedMemberCount}</td>
+                          <td>{t.createdAt ? safeFormat(t.createdAt, 'dd MMM yyyy') : '—'}</td>
+                          {canOnboardUser && (
+                            <td>
+                              <button
+                                type="button"
+                                className="btn-delete btn-sm"
+                                onClick={() => setDeleteTrainerConfirm({ id: t.id, email: t.email, name: t.name })}
+                                title="Remove trainer"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </section>
         )}
       </div>
@@ -473,6 +631,25 @@ export default function Onboarding() {
             </div>
             <div className="modal-actions">
               <button type="button" className="btn-primary" onClick={() => setShowPasswordResult(null)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete trainer confirmation */}
+      {deleteTrainerConfirm && (
+        <div className="onboarding-modal-overlay modal-overlay" onClick={() => !deleteTrainerSubmitting && setDeleteTrainerConfirm(null)}>
+          <div className="modal onboarding-modal-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Remove trainer?</h2>
+              <button type="button" className="modal-close" onClick={() => !deleteTrainerSubmitting && setDeleteTrainerConfirm(null)} aria-label="Close">×</button>
+            </div>
+            <p className="section-desc">
+              <strong>{deleteTrainerConfirm.name || deleteTrainerConfirm.email}</strong> ({deleteTrainerConfirm.email}) will no longer be able to log in. Their assigned members will be unassigned. You can add a new trainer later. Are you sure?
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => setDeleteTrainerConfirm(null)} disabled={deleteTrainerSubmitting}>Cancel</button>
+              <button type="button" className="btn-delete" onClick={handleConfirmDeleteTrainer} disabled={deleteTrainerSubmitting}>{deleteTrainerSubmitting ? 'Removing…' : 'Yes, remove trainer'}</button>
             </div>
           </div>
         </div>

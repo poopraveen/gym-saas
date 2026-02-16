@@ -1,0 +1,95 @@
+.trainer-dashboard {
+  padding: 1rem 1.25rem;
+  max-width: 640px;
+}
+
+.trainer-dashboard-title {
+  font-size: 1.35rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.trainer-dashboard-desc {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin: 0 0 1.5rem 0;
+}
+
+.trainer-dashboard-loading {
+  color: var(--text-secondary);
+  padding: 2rem;
+}
+
+.trainer-dashboard-empty {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.trainer-dashboard-empty-hint {
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.trainer-dashboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.trainer-dashboard-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.trainer-dashboard-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.trainer-dashboard-card-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.trainer-dashboard-card-email {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.trainer-dashboard-card-reg {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.trainer-dashboard-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.trainer-dashboard-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+}
+
+.trainer-dashboard-btn-icon {
+  display: inline-flex;
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.trainer-dashboard-btn-icon svg {
+  width: 100%;
+  height: 100%;
+}

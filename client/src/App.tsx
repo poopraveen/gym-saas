@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { storage } from './api/client';
 import GlobalLoader from './components/GlobalLoader';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
@@ -11,6 +11,7 @@ import Onboarding from './pages/Onboarding';
 import NutritionAI from './pages/NutritionAI';
 import MedicalHistory from './pages/MedicalHistory';
 import WorkoutPlan from './pages/WorkoutPlan';
+import TrainerDashboard from './pages/TrainerDashboard';
 import CheckIn from './pages/CheckIn';
 import Telegram from './pages/Telegram';
 import Notifications from './pages/Notifications';
@@ -18,6 +19,18 @@ import Notifications from './pages/Notifications';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!storage.getToken() || !storage.getTenantId()) {
     return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+/** Redirect TRAINER to / if they try to access any route other than allowed (/, nutrition-ai, workout-plan). */
+function TrainerRestrict({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  if (storage.getRole() === 'TRAINER') {
+    const path = location.pathname;
+    if (path !== '/' && path !== '/nutrition-ai' && path !== '/workout-plan') {
+      return <Navigate to="/" replace />;
+    }
   }
   return <>{children}</>;
 }
@@ -30,6 +43,11 @@ function MemberRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/nutrition-ai" replace />;
   }
   return <>{children}</>;
+}
+
+function DashboardOrTrainerDashboard() {
+  if (storage.getRole() === 'TRAINER') return <TrainerDashboard />;
+  return <Dashboard />;
 }
 
 function PlatformRoute({ children }: { children: React.ReactNode }) {
@@ -58,7 +76,9 @@ export default function App() {
           path="/enquiries"
           element={
             <ProtectedRoute>
-              <Enquiries />
+              <TrainerRestrict>
+                <Enquiries />
+              </TrainerRestrict>
             </ProtectedRoute>
           }
         />
@@ -82,7 +102,9 @@ export default function App() {
           path="/medical-history"
           element={
             <ProtectedRoute>
-              <MedicalHistory />
+              <TrainerRestrict>
+                <MedicalHistory />
+              </TrainerRestrict>
             </ProtectedRoute>
           }
         />
@@ -90,7 +112,9 @@ export default function App() {
           path="/workout-plan"
           element={
             <ProtectedRoute>
-              <WorkoutPlan />
+              <TrainerRestrict>
+                <WorkoutPlan />
+              </TrainerRestrict>
             </ProtectedRoute>
           }
         />
@@ -98,9 +122,11 @@ export default function App() {
           path="/telegram"
           element={
             <ProtectedRoute>
-              <MemberRoute>
-                <Telegram />
-              </MemberRoute>
+              <TrainerRestrict>
+                <MemberRoute>
+                  <Telegram />
+                </MemberRoute>
+              </TrainerRestrict>
             </ProtectedRoute>
           }
         />
@@ -108,9 +134,11 @@ export default function App() {
           path="/notifications"
           element={
             <ProtectedRoute>
-              <MemberRoute>
-                <Notifications />
-              </MemberRoute>
+              <TrainerRestrict>
+                <MemberRoute>
+                  <Notifications />
+                </MemberRoute>
+              </TrainerRestrict>
             </ProtectedRoute>
           }
         />
@@ -118,9 +146,11 @@ export default function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <MemberRoute>
-                <Dashboard />
-              </MemberRoute>
+              <TrainerRestrict>
+                <MemberRoute>
+                  <DashboardOrTrainerDashboard />
+                </MemberRoute>
+              </TrainerRestrict>
             </ProtectedRoute>
           }
         />

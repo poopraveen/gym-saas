@@ -23,7 +23,7 @@ function isNetworkError(e: unknown): boolean {
 
 function networkErrorMessage(): string {
   const base = API_BASE.startsWith('http') ? API_BASE : `${typeof window !== 'undefined' ? window.location.origin : ''}${API_BASE}`;
-  return `Cannot reach the server at ${base}. Is the API running? (e.g. npm run start:dev in the project root)`;
+  return `Cannot reach the API. Start the backend (in project root run: npm run start:dev). Ensure MongoDB is running.`;
 }
 
 /** Callbacks for global loader (mask UI during API calls). Set by GlobalLoader on mount. */
@@ -79,7 +79,15 @@ async function request<T>(
       throw e;
     }
     if (!res.ok) {
-      throw new Error(text || res.statusText);
+      let errMessage = res.statusText || 'Request failed';
+      try {
+        const json = text ? JSON.parse(text) : null;
+        if (json && typeof json.message === 'string') errMessage = json.message;
+        else if (json && Array.isArray(json.message)) errMessage = json.message[0] ?? errMessage;
+      } catch {
+        if (text && text.length < 200) errMessage = text;
+      }
+      throw new Error(errMessage);
     }
     if (!text || text.trim() === '') {
       return null as T;
@@ -111,7 +119,17 @@ async function requestPublic<T>(path: string, options: RequestInit = {}): Promis
     if (isNetworkError(e)) throw new Error(networkErrorMessage());
     throw e;
   }
-  if (!res.ok) throw new Error(text || res.statusText);
+  if (!res.ok) {
+    let errMessage = res.statusText || 'Request failed';
+    try {
+      const json = text ? JSON.parse(text) : null;
+      if (json && typeof json.message === 'string') errMessage = json.message;
+      else if (json && Array.isArray(json.message)) errMessage = json.message[0] ?? errMessage;
+    } catch {
+      if (text && text.length < 200) errMessage = text;
+    }
+    throw new Error(errMessage);
+  }
   if (!text || text.trim() === '') return null as T;
   try {
     return JSON.parse(text) as T;
@@ -154,6 +172,7 @@ export const api = {
         primaryColor?: string;
         allowsMedicalDocuments?: boolean;
         medicalDocumentsLimit?: number;
+        showFinanceTab?: boolean;
       }>(q ? `/tenants/config?${q}` : '/tenants/config');
     },
   },
@@ -165,7 +184,7 @@ export const api = {
       }),
     register: (data: { email: string; password: string; name: string }) =>
       request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
-    onboardUser: (data: { email: string; password: string; name: string; role?: 'STAFF' | 'MANAGER' }) =>
+    onboardUser: (data: { email: string; password: string; name: string; role?: 'STAFF' | 'MANAGER' | 'TRAINER' }) =>
       request<{ _id: string; email: string; name: string; role: string }>('/auth/onboard-user', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -190,6 +209,31 @@ export const api = {
       request<{ message: string }>(`/auth/member-users/${encodeURIComponent(userId)}`, {
         method: 'DELETE',
       }),
+    getTrainers: () =>
+      request<Array<{ id: string; email: string; name?: string; createdAt?: string; assignedMemberCount: number }>>('/auth/trainers'),
+    assignMemberToTrainer: (trainerUserId: string, memberUserId: string) =>
+      request<{ success: boolean }>('/auth/assign-member-to-trainer', {
+        method: 'POST',
+        body: JSON.stringify({ trainerUserId, memberUserId }),
+      }),
+    unassignMemberFromTrainer: (memberUserId: string) =>
+      request<{ success: boolean }>(`/auth/trainer-assignments/${encodeURIComponent(memberUserId)}`, {
+        method: 'DELETE',
+      }),
+    deleteTrainer: (trainerUserId: string) =>
+      request<{ success: boolean }>(`/auth/trainers/${encodeURIComponent(trainerUserId)}`, {
+        method: 'DELETE',
+      }),
+    getMemberUserByReg: (regNo: number) =>
+      request<{ id: string; email: string; name?: string; trainerUserId: string | null } | null>(
+        `/auth/member-user-by-reg?regNo=${encodeURIComponent(String(regNo))}`,
+      ),
+    getMemberAssignment: (memberUserId: string) =>
+      request<{ trainerUserId: string | null }>(`/auth/member-assignment/${encodeURIComponent(memberUserId)}`),
+    listTrainerAssignments: () =>
+      request<Array<{ memberUserId: string; trainerUserId: string }>>('/auth/trainer-assignments'),
+    getMyAssignedMembers: () =>
+      request<AiMember[]>('/auth/my-assigned-members'),
   },
   legacy: {
     lookup: (gymId?: string, regNo?: string) => {
@@ -288,6 +332,11 @@ export const api = {
       request(`/platform/tenants/${tenantId}/reset-admin`, {
         method: 'POST',
         body: JSON.stringify({ email, newPassword }),
+      }),
+    createTrainer: (tenantId: string, body: { email: string; password: string; name?: string }) =>
+      request(`/platform/tenants/${encodeURIComponent(tenantId)}/trainers`, {
+        method: 'POST',
+        body: JSON.stringify(body),
       }),
     /** Download pitch PDF for a tenant (SUPER_ADMIN). Fetches blob and triggers browser download. */
     downloadTenantPitchPdf: async (tenantId: string): Promise<void> => {
@@ -410,6 +459,22 @@ export const api = {
         `/calories/member/${encodeURIComponent(memberUserId)}/analysis?${params.toString()}`,
       );
     },
+    chatOnBehalfOfMember: (
+      memberUserId: string,
+      body: { message: string; date?: string; existingItems?: { name: string; quantity?: string; estimatedCalories: number }[] },
+    ) =>
+      request<CalorieChatResult>(`/calories/member/${encodeURIComponent(memberUserId)}/chat`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    setEntryOnBehalfOfMember: (
+      memberUserId: string,
+      body: { date: string; items: { name: string; quantity?: string; estimatedCalories: number }[] },
+    ) =>
+      request<CalorieEntry>(`/calories/member/${encodeURIComponent(memberUserId)}/entry`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
     getReferenceFoods: () => request<ReferenceFood[]>('/calories/reference-foods'),
     getProfile: () =>
       request<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }>('/calories/profile'),
@@ -489,6 +554,20 @@ export const api = {
       }),
     deleteLog: (id: string) =>
       request<{ success: boolean }>(`/workout-plan/logs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    getMemberPlan: (memberUserId: string) =>
+      request<{ name: string; days: { dayOfWeek: number; label: string }[]; updatedAt?: string } | null>(
+        `/workout-plan/member/${encodeURIComponent(memberUserId)}`,
+      ),
+    getMemberLogs: (memberUserId: string, params?: { from?: string; to?: string; limit?: number }) => {
+      const sp = new URLSearchParams();
+      if (params?.from) sp.set('from', params.from);
+      if (params?.to) sp.set('to', params.to);
+      if (params?.limit != null) sp.set('limit', String(params.limit));
+      const q = sp.toString();
+      return request<Array<{ _id: string; date: string; workoutLabel: string; notes?: string; durationMinutes?: number; createdAt: string }>>(
+        q ? `/workout-plan/member/${encodeURIComponent(memberUserId)}/logs?${q}` : `/workout-plan/member/${encodeURIComponent(memberUserId)}/logs`,
+      );
+    },
   },
   notifications: {
     runAbsence: () =>

@@ -1324,44 +1324,6 @@
   color: var(--text-primary);
 }
 
-.dash-quick-stats {
-  display: flex;
-  gap: 12px;
-  flex-shrink: 0;
-  margin-top: 12px;
-}
-
-.dash-quick-stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: border-color 0.15s;
-  font: inherit;
-  text-align: center;
-}
-
-.dash-quick-stat:hover {
-  border-color: var(--primary);
-}
-
-.dash-quick-label {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.dash-quick-value {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
 /* Dashboard sub-view: back + full section content */
 .dash-subview {
   display: flex;
@@ -1616,6 +1578,34 @@
 .btn-pay-fees:hover {
   background: var(--primary-hover);
 }
+
+.btn-edit-member {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 16px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.btn-edit-member:hover {
+  background: var(--hover-bg);
+}
+
+.member-edit-name { font-weight: 600; margin: 0 0 0.25rem 0; }
+.member-edit-reg { margin: 0 0 1rem 0; color: var(--text-secondary); font-size: 0.9rem; }
+.member-edit-loading { margin: 1rem 0; color: var(--text-secondary); }
+.member-edit-section { margin-top: 1rem; }
+.member-edit-section p { margin: 0.25rem 0; }
+.member-edit-label { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; }
+.member-edit-label select { max-width: 280px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-primary); }
+.member-edit-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+.member-edit-actions .btn-primary { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+.member-edit-actions .btn-secondary { background: transparent; color: var(--text-primary); border: 1px solid var(--border); padding: 8px 16px; border-radius: 8px; cursor: pointer; }
 
 .pi-pay-btn {
   padding: 6px 10px;

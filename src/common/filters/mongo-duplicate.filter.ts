@@ -1,4 +1,4 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpStatus, Logger } from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpStatus, Logger, HttpException } from '@nestjs/common';
 import { Response } from 'express';
 import { Request } from 'express';
 
@@ -89,6 +89,22 @@ export class MongoDuplicateKeyExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    throw exception;
+    // Return proper status and message so the client can show the real error (no generic "Internal Server Error" only).
+    if (exception instanceof HttpException) {
+      const status = exception.getStatus();
+      const body = exception.getResponse();
+      const payload = typeof body === 'object' && body !== null ? body as Record<string, unknown> : { message: String(body) };
+      this.logger.warn(`HttpException [${path}] ${status}: ${(payload.message as string) ?? exception.message}`);
+      response.status(status).json(payload);
+      return;
+    }
+    const err = exception as Error;
+    const message = err.message || 'Something went wrong. Check server logs.';
+    this.logger.error(`Unhandled exception [${path}]: ${message}`, err.stack ?? err);
+    response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+      message,
+      error: 'Internal Server Error',
+    });
   }
 }

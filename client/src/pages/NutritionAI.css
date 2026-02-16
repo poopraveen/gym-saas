@@ -3,13 +3,13 @@
   max-width: 560px;
 }
 
-.staff-members-widget .staff-search-row {
+.trainer-members-widget .trainer-search-row {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1rem;
 }
 
-.staff-search-input {
+.trainer-search-input {
   flex: 1;
   min-width: 0;
   padding: 0.5rem 0.75rem;
@@ -20,24 +20,24 @@
   font-size: 1rem;
 }
 
-.staff-empty {
+.trainer-empty {
   color: var(--text-secondary);
   font-size: 0.9rem;
   margin: 0;
 }
 
-.staff-member-list {
+.trainer-member-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.staff-member-item {
+.trainer-member-item {
   margin: 0;
   padding: 0;
 }
 
-.staff-member-btn {
+.trainer-member-btn {
   display: block;
   width: 100%;
   text-align: left;
@@ -51,44 +51,44 @@
   font-size: 0.95rem;
 }
 
-.staff-member-btn:hover {
+.trainer-member-btn:hover {
   background: var(--hover-bg);
   border-color: var(--primary);
 }
 
-.staff-member-btn.selected {
+.trainer-member-btn.selected {
   border-color: var(--primary);
   background: var(--active-bg);
   color: var(--primary);
 }
 
-.staff-member-name {
+.trainer-member-name {
   display: block;
   font-weight: 600;
 }
 
-.staff-member-email,
-.staff-member-reg {
+.trainer-member-email,
+.trainer-member-reg {
   display: block;
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin-top: 0.2rem;
 }
 
-.staff-progress-widget .today-value-block,
-.staff-progress-widget .last7-block,
-.staff-progress-widget .history-block {
+.trainer-progress-widget .today-value-block,
+.trainer-progress-widget .last7-block,
+.trainer-progress-widget .history-block {
   margin-bottom: 1rem;
 }
 
-.staff-progress-widget .last7-list {
+.trainer-progress-widget .last7-list {
   margin: 0.35rem 0 0 0;
   padding-left: 1.25rem;
   font-size: 0.9rem;
   color: var(--text-secondary);
 }
 
-.staff-progress-widget .last7-list li {
+.trainer-progress-widget .last7-list li {
   margin-bottom: 0.2rem;
 }
 
@@ -1275,32 +1275,48 @@
   font-size: 0.85rem;
 }
 
-/* Staff: member's nutrition report (saved in DB) */
-.staff-report-block {
+/* Trainer: add food on behalf */
+.on-behalf-block {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--hover-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.on-behalf-title { font-size: 1rem; margin: 0 0 0.35rem 0; }
+.on-behalf-desc { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 0.75rem 0; }
+.on-behalf-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+.on-behalf-input { flex: 1; min-width: 180px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-primary); }
+.on-behalf-date { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-primary); }
+.on-behalf-btn { flex-shrink: 0; }
+.on-behalf-error { margin: 0.5rem 0 0 0; color: var(--pill-expired, #dc2626); font-size: 0.9rem; }
+
+/* Trainer: member's nutrition report (saved in DB) */
+.trainer-report-block {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--border);
 }
 
-.staff-report-title {
+.trainer-report-title {
   font-size: 1rem;
   margin: 0 0 0.35rem 0;
   color: var(--text-primary);
 }
 
-.staff-report-desc {
+.trainer-report-desc {
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin: 0 0 0.75rem 0;
 }
 
-.staff-report-heading {
+.trainer-report-heading {
   font-size: 1.05rem;
   margin: 0 0 0.75rem 0;
   color: var(--text-primary);
 }
 
-.staff-analysis-result {
+.trainer-analysis-result {
   margin-top: 0.75rem;
   padding: 1rem;
   background: var(--bg);
@@ -1308,7 +1324,7 @@
   border: 1px solid var(--border);
 }
 
-.staff-report-empty {
+.trainer-report-empty {
   font-size: 0.9rem;
   color: var(--text-secondary);
   margin: 0.5rem 0 0 0;

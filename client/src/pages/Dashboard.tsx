@@ -98,6 +98,15 @@ function getAbsentPrefillMessage(m: Member, days: 5 | 7): string {
   return `Hi ${name}, we missed you! You haven't visited in a week. We're here when you're ready to get back. Need help with your routine or schedule? Just reply!`;
 }
 
+function isDueToday(m: Member): boolean {
+  const due = m.dueDate as Date | undefined;
+  if (!due) return false;
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const dueStart = new Date(due).setHours(0, 0, 0, 0);
+  return dueStart === todayStart;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [allMembers, setAllMembers] = useState<Member[]>([]);
@@ -138,6 +147,11 @@ export default function Dashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState<Member | null>(null);
   const [showPayFeesModal, setShowPayFeesModal] = useState<Member | null>(null);
+  const [showMemberEditModal, setShowMemberEditModal] = useState<Member | null>(null);
+  const [memberUserForEdit, setMemberUserForEdit] = useState<{ id: string; email: string; name?: string; trainerUserId: string | null } | null | 'loading'>('loading');
+  const [trainersList, setTrainersList] = useState<Array<{ id: string; email: string; name?: string }>>([]);
+  const [editTrainerId, setEditTrainerId] = useState<string>('');
+  const [editMemberSaving, setEditMemberSaving] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [followUpHistory, setFollowUpHistory] = useState<Array<{ comment: string; nextFollowUpDate?: string; createdAt: string }>>([]);
@@ -291,6 +305,56 @@ export default function Dashboard() {
   useEffect(() => {
     setMembersPage(1);
   }, [filter, statusFilter, sortBy, searchQuery]);
+
+  const canEditMember = storage.getRole() === 'TENANT_ADMIN' || storage.getRole() === 'MANAGER';
+  useEffect(() => {
+    if (!showMemberEditModal) {
+      setMemberUserForEdit('loading');
+      setTrainersList([]);
+      setEditTrainerId('');
+      return;
+    }
+    const regNo = showMemberEditModal['Reg No:'] != null ? Number(showMemberEditModal['Reg No:']) : NaN;
+    if (Number.isNaN(regNo)) {
+      setMemberUserForEdit(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setMemberUserForEdit('loading');
+      try {
+        const [memberUser, trainers] = await Promise.all([
+          api.auth.getMemberUserByReg(regNo),
+          canEditMember ? api.auth.getTrainers() : Promise.resolve([]),
+        ]);
+        if (cancelled) return;
+        setMemberUserForEdit(memberUser ?? null);
+        setTrainersList(trainers);
+        setEditTrainerId(memberUser?.trainerUserId ?? '');
+      } catch {
+        if (!cancelled) setMemberUserForEdit(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showMemberEditModal, canEditMember]);
+
+  const saveMemberEdit = async () => {
+    if (memberUserForEdit === null || memberUserForEdit === 'loading' || !memberUserForEdit.id) return;
+    setEditMemberSaving(true);
+    try {
+      if (editTrainerId) {
+        await api.auth.assignMemberToTrainer(editTrainerId, memberUserForEdit.id);
+      } else {
+        await api.auth.unassignMemberFromTrainer(memberUserForEdit.id);
+      }
+      setShowMemberEditModal(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setEditMemberSaving(false);
+    }
+  };
+
   const regMembersTotal = allMembers.length;
 
   /** Face enroll autocomplete: filter by name or Reg No, show first 15, exact Reg No first when query is digits */
@@ -562,6 +626,50 @@ export default function Dashboard() {
           onSave={handlePayFees}
         />
       )}
+      {showMemberEditModal && (
+        <div className="renewals-modal-overlay" onClick={() => !editMemberSaving && setShowMemberEditModal(null)} role="dialog" aria-modal="true" aria-labelledby="member-edit-modal-title">
+          <div className="renewals-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 id="member-edit-modal-title">Edit member</h2>
+            <p className="member-edit-name">{showMemberEditModal.NAME}</p>
+            <p className="member-edit-reg">Reg No: {String(showMemberEditModal['Reg No:'] ?? '—')}</p>
+            {memberUserForEdit === 'loading' && <p className="member-edit-loading">Loading…</p>}
+            {memberUserForEdit === null && (
+              <div className="member-edit-section">
+                <p>Not enrolled for Nutrition AI. Create member login in Onboarding to assign a trainer.</p>
+              </div>
+            )}
+            {memberUserForEdit && memberUserForEdit !== 'loading' && (
+              <div className="member-edit-section">
+                <p><strong>Enrolled for AI:</strong> Yes</p>
+                <p>{memberUserForEdit.email}{memberUserForEdit.name ? ` (${memberUserForEdit.name})` : ''}</p>
+                {canEditMember && (
+                  <>
+                    <label className="member-edit-label">
+                      <span>Assign trainer</span>
+                      <select
+                        value={editTrainerId}
+                        onChange={(e) => setEditTrainerId(e.target.value)}
+                        disabled={editMemberSaving}
+                      >
+                        <option value="">— No trainer —</option>
+                        {trainersList.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name || t.email}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="member-edit-actions">
+                      <button type="button" className="btn-secondary" onClick={() => setShowMemberEditModal(null)} disabled={editMemberSaving}>Cancel</button>
+                      <button type="button" className="btn-primary" onClick={saveMemberEdit} disabled={editMemberSaving}>
+                        {editMemberSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {showFollowUpModal && (
         <FollowUpModal
           memberId={(showFollowUpModal as Record<string, unknown>).memberId as string}
@@ -643,16 +751,16 @@ export default function Dashboard() {
                   </div>
                 </button>
                 <button type="button" className="dash-summary-card" onClick={() => setDashboardSubView('renewals')}>
-                  <span className="dash-summary-title">Renewals expiring soon</span>
-                  <span className="dash-summary-value">{renewalsDueToday.length + renewalsDueIn3Days.length} members · ₹{(revenueAtRiskDueIn3 || 0).toLocaleString()} at risk</span>
+                  <span className="dash-summary-title">Memberships expiring within 3 days</span>
+                  <span className="dash-summary-value">{renewalsDueIn3Days.length} members · ₹{(revenueAtRiskDueIn3 || 0).toLocaleString()} at risk</span>
                 </button>
                 <button type="button" className="dash-summary-card" onClick={() => setDashboardSubView('absent')}>
-                  <span className="dash-summary-title">Absent today</span>
-                  <span className="dash-summary-value">5d: {absent5DaysList.length} · 7d: {absent7DaysList.length}</span>
+                  <span className="dash-summary-title">Members who haven&apos;t visited</span>
+                  <span className="dash-summary-value">5 days: {absent5DaysList.length} · 7 days: {absent7DaysList.length}</span>
                 </button>
                 <button type="button" className="dash-summary-card" onClick={() => setDashboardSubView('missed')}>
-                  <span className="dash-summary-title">Missed renewals</span>
-                  <span className="dash-summary-value">1–7d: {missedRenewals1_7.length} · 8–30d: {missedRenewals8_30.length} · 31–90d: {missedRenewals31_90.length}</span>
+                  <span className="dash-summary-title">Expired memberships (follow up)</span>
+                  <span className="dash-summary-value">1–7 days: {missedRenewals1_7.length} · 8–30 days: {missedRenewals8_30.length} · 31–90 days: {missedRenewals31_90.length}</span>
                 </button>
                 <div
                   className="dash-summary-card dash-summary-earning dash-card-clickable"
@@ -666,16 +774,6 @@ export default function Dashboard() {
                   <span className="dc-action">Tap to view Finance →</span>
                 </div>
               </div>
-              <div className="dash-quick-stats">
-                <button type="button" className="dash-quick-stat" onClick={() => handleNavChange('main')}>
-                  <span className="dash-quick-label">Members</span>
-                  <span className="dash-quick-value">{(finance?.totalMembers ?? allMembers.length ?? 0).toLocaleString()}</span>
-                </button>
-                <button type="button" className="dash-quick-stat" onClick={() => handleNavChange('checkin')}>
-                  <span className="dash-quick-label">Today check-ins</span>
-                  <span className="dash-quick-value">{todayAttendanceCount} / {(finance?.activeMembers ?? activeMembersOnly.length).toLocaleString()}</span>
-                </button>
-              </div>
             </div>
           ) : (
             /* Sub-view: back + full section content */
@@ -686,9 +784,9 @@ export default function Dashboard() {
                 </button>
                 <h1 className="page-title dash-subview-title">
                   {dashboardSubView === 'actions' && "Today's Actions"}
-                  {dashboardSubView === 'renewals' && 'Renewals expiring soon'}
-                  {dashboardSubView === 'absent' && 'Absent today'}
-                  {dashboardSubView === 'missed' && 'Missed renewals'}
+                  {dashboardSubView === 'renewals' && 'Memberships expiring within 3 days'}
+                  {dashboardSubView === 'absent' && 'Members who haven\'t visited'}
+                  {dashboardSubView === 'missed' && 'Expired memberships (follow up)'}
                 </h1>
               </div>
               <div className="dash-subview-body">
@@ -702,50 +800,30 @@ export default function Dashboard() {
                     </div>
                     <div className="today-action-card">
                       <span className="ta-count">Follow up {todayActionsFollowUp} missed renewals</span>
-                      <span className="ta-desc">Recently expired — best chance to win back</span>
+                      <span className="ta-desc">Follow up (missed renewals)</span>
                     </div>
                     <div className="today-action-card">
                       <span className="ta-count">Call {todayActionsCall} members</span>
-                      <span className="ta-desc">Absent 7+ days and membership expiring soon</span>
+                      <span className="ta-desc">Call (absent 7+ days, expiring soon)</span>
                     </div>
                   </div>
                 </section>
               )}
               {dashboardSubView === 'renewals' && (
                 <section className="dash-section">
+                  <h3>Memberships expiring within 3 days: {renewalsDueIn3Days.length} members</h3>
                   <p className="dash-section-sub">Revenue at risk if they don&apos;t renew: ₹{(revenueAtRiskDueIn3 || 0).toLocaleString()}</p>
-                  <div className="renewals-soon-grid">
-                    <div className="renewals-soon-card">
-                      <h3>Due today: {renewalsDueToday.length} members</h3>
-                      <p className="revenue-risk">Revenue at risk: ₹{revenueAtRiskDueToday.toLocaleString()}</p>
-                      <p className="sort-hint">Order: members absent longer, newer members, and PT first — prioritise these when you contact.</p>
-                      <ul className="member-mini-list">
-                        {renewalsDueToday.slice(0, 5).map((m) => (
-                          <li key={String(m['Reg No:'])}>
-                            <span>{String(m.NAME ?? '—')}</span>
-                            <span className="days-absent">Absent: {getDaysAbsent(m)}d</span>
-                            <WhatsAppButton phone={String(m['Phone Number'] ?? '')} message={getRenewalPrefillMessage(m, 'today')} onClick={() => handleWhatsAppClick(m)} />
-                          </li>
-                        ))}
-                      </ul>
-                      {renewalsDueToday.length > 5 && <p className="more-hint">+{renewalsDueToday.length - 5} more</p>}
-                    </div>
-                    <div className="renewals-soon-card">
-                      <h3>Due in 3 days: {renewalsDueIn3Days.length} members</h3>
-                      <p className="revenue-risk">Revenue at risk: ₹{revenueAtRiskDueIn3.toLocaleString()}</p>
-                      <p className="sort-hint">Order: members absent longer, newer members, and PT first — prioritise these when you contact.</p>
-                      <ul className="member-mini-list">
-                        {renewalsDueIn3Days.slice(0, 5).map((m) => (
-                          <li key={String(m['Reg No:'])}>
-                            <span>{String(m.NAME ?? '—')}</span>
-                            <span className="days-absent">Absent: {getDaysAbsent(m)}d</span>
-                            <WhatsAppButton phone={String(m['Phone Number'] ?? '')} message={getRenewalPrefillMessage(m, '3days')} onClick={() => handleWhatsAppClick(m)} />
-                          </li>
-                        ))}
-                      </ul>
-                      {renewalsDueIn3Days.length > 5 && <p className="more-hint">+{renewalsDueIn3Days.length - 5} more</p>}
-                    </div>
-                  </div>
+                  <p className="sort-hint">Order: members absent longer, newer members, and PT first — prioritise these when you contact.</p>
+                  <ul className="member-mini-list">
+                    {renewalsDueIn3Days.slice(0, 5).map((m) => (
+                      <li key={String(m['Reg No:'])}>
+                        <span>{String(m.NAME ?? '—')}</span>
+                        <span className="days-absent">Absent: {getDaysAbsent(m)} days</span>
+                        <WhatsAppButton phone={String(m['Phone Number'] ?? '')} message={getRenewalPrefillMessage(m, isDueToday(m) ? 'today' : '3days')} onClick={() => handleWhatsAppClick(m)} />
+                      </li>
+                    ))}
+                  </ul>
+                  {renewalsDueIn3Days.length > 5 && <p className="more-hint">+{renewalsDueIn3Days.length - 5} more</p>}
                   <button type="button" className="btn-outline btn-view-renewals" onClick={() => setShowRenewalsDueModal(true)}>View full list &amp; WhatsApp all</button>
                 </section>
               )}
@@ -1393,6 +1471,15 @@ export default function Dashboard() {
                     >
                       Pay fees
                     </button>
+                    {canEditMember && (
+                      <button
+                        type="button"
+                        className="btn-edit-member"
+                        onClick={(e) => { e.stopPropagation(); setShowMemberEditModal(selectedMember); }}
+                      >
+                        Edit member
+                      </button>
+                    )}
                   </div>
                   {followUps[(selectedMember as Record<string, unknown>).memberId as string] && (
                     <div className="md-section">

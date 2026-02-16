@@ -79,7 +79,7 @@ export default function EnquiryDetailModal({
               <dd>{enquiry.interestedPlan || '—'}</dd>
               <dt>Expected Join Date</dt>
               <dd>{enquiry.expectedJoinDate ? format(parseISO(enquiry.expectedJoinDate), 'dd MMM yyyy') : '—'}</dd>
-              <dt>Assigned Staff</dt>
+              <dt>Assigned Trainer</dt>
               <dd>{enquiry.assignedStaff || '—'}</dd>
               <dt>Follow-up Required</dt>
               <dd>{enquiry.followUpRequired ? 'Yes' : 'No'}</dd>

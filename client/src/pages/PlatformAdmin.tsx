@@ -51,6 +51,10 @@ export default function PlatformAdmin() {
   const [telegramEdit, setTelegramEdit] = useState({ telegramBotToken: '', telegramChatId: '', telegramGroupInviteLink: '' });
   const [telegramSaving, setTelegramSaving] = useState(false);
   const [telegramConfigPreview, setTelegramConfigPreview] = useState<{ groupInviteLink?: string; hasBot: boolean } | null>(null);
+  const [platformTab, setPlatformTab] = useState<'tenants' | 'admin'>('tenants');
+  const [trainerForm, setTrainerForm] = useState({ tenantId: '', email: '', password: '', name: '' });
+  const [trainerSubmitting, setTrainerSubmitting] = useState(false);
+  const [trainerMessage, setTrainerMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   useEffect(() => {
     if (storage.getRole() !== 'SUPER_ADMIN') {
@@ -144,6 +148,29 @@ export default function PlatformAdmin() {
     }
   };
 
+  const handleCreateTrainer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTrainerMessage(null);
+    if (!trainerForm.tenantId || !trainerForm.email.trim() || !trainerForm.password || trainerForm.password.length < 6) {
+      setTrainerMessage({ type: 'err', text: 'Select a tenant and enter email and password (min 6 characters).' });
+      return;
+    }
+    setTrainerSubmitting(true);
+    try {
+      await api.platform.createTrainer(trainerForm.tenantId, {
+        email: trainerForm.email.trim(),
+        password: trainerForm.password,
+        name: trainerForm.name.trim() || undefined,
+      });
+      setTrainerMessage({ type: 'ok', text: 'Trainer created. They can log in with the tenant login URL.' });
+      setTrainerForm((f) => ({ ...f, email: '', password: '', name: '' }));
+    } catch (err) {
+      setTrainerMessage({ type: 'err', text: err instanceof Error ? err.message : 'Failed to create trainer' });
+    } finally {
+      setTrainerSubmitting(false);
+    }
+  };
+
   const openResetFromDetail = () => {
     if (!detailModal?.adminUser) return;
     setResetModal({
@@ -191,10 +218,16 @@ export default function PlatformAdmin() {
 
       {error && <div className="platform-error">{error}</div>}
 
+      <div className="platform-tabs">
+        <button type="button" className={`platform-tab ${platformTab === 'tenants' ? 'active' : ''}`} onClick={() => setPlatformTab('tenants')}>Tenants</button>
+        <button type="button" className={`platform-tab ${platformTab === 'admin' ? 'active' : ''}`} onClick={() => setPlatformTab('admin')}>Admin</button>
+      </div>
+
       {showOnboardingGuide && (
         <OnboardingGuideModal onClose={() => setShowOnboardingGuide(false)} />
       )}
 
+      {platformTab === 'tenants' && (
       <section className="platform-section" data-tour="platform-tenants-table">
         <div className="platform-section-header">
           <h2>Tenants</h2>
@@ -246,6 +279,59 @@ export default function PlatformAdmin() {
           </tbody>
         </table>
       </section>
+      )}
+
+      {platformTab === 'admin' && (
+      <section className="platform-section">
+        <h2>Trainer onboarding</h2>
+        <p className="platform-section-desc">Create a trainer user for a tenant. Trainers can access Nutrition AI and onboard members (create member logins for AI) only.</p>
+        <form onSubmit={handleCreateTrainer} className="platform-trainer-form">
+          <label>Tenant</label>
+          <select
+            value={trainerForm.tenantId}
+            onChange={(e) => setTrainerForm((f) => ({ ...f, tenantId: e.target.value }))}
+            required
+          >
+            <option value="">— Select tenant —</option>
+            {tenants.map((t) => (
+              <option key={t._id} value={t._id}>{t.name}</option>
+            ))}
+          </select>
+          <label>Email</label>
+          <input
+            type="email"
+            value={trainerForm.email}
+            onChange={(e) => setTrainerForm((f) => ({ ...f, email: e.target.value }))}
+            required
+            placeholder="trainer@example.com"
+          />
+          <label>Password</label>
+          <input
+            type="password"
+            value={trainerForm.password}
+            onChange={(e) => setTrainerForm((f) => ({ ...f, password: e.target.value }))}
+            required
+            placeholder="••••••••"
+            minLength={6}
+          />
+          <label>Name (optional)</label>
+          <input
+            type="text"
+            value={trainerForm.name}
+            onChange={(e) => setTrainerForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="Display name"
+          />
+          <div className="form-actions">
+            <button type="submit" className="btn-primary" disabled={trainerSubmitting}>
+              {trainerSubmitting ? 'Creating…' : 'Create Trainer'}
+            </button>
+          </div>
+          {trainerMessage && (
+            <div className={trainerMessage.type === 'ok' ? 'message-ok' : 'message-err'}>{trainerMessage.text}</div>
+          )}
+        </form>
+      </section>
+      )}
 
       {createdCredentials && (
         <div className="modal-overlay" onClick={() => setCreatedCredentials(null)}>

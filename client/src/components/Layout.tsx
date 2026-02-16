@@ -10,7 +10,7 @@ import './Layout.css';
 
 type NavItem = { id: NavIconId; label: string };
 
-type TenantConfig = { name: string; logo?: string };
+type TenantConfig = { name: string; logo?: string; showFinanceTab?: boolean };
 
 export default function Layout({
   children,
@@ -56,7 +56,7 @@ export default function Layout({
       return;
     }
     api.tenant.getConfig(undefined, tenantId)
-      .then((c) => setTenantConfig({ name: c.name, logo: c.logo }))
+      .then((c) => setTenantConfig({ name: c.name, logo: c.logo, showFinanceTab: c.showFinanceTab }))
       .catch(() => setTenantConfig(null));
   }, []);
 
@@ -77,7 +77,15 @@ export default function Layout({
   }, []);
 
   const isMember = storage.getRole() === 'MEMBER';
-  const navItems: NavItem[] = isMember
+  const isTrainer = storage.getRole() === 'TRAINER';
+  const showFinanceTab = tenantConfig?.showFinanceTab !== false;
+  const navItems: NavItem[] = isTrainer
+    ? [
+        { id: 'dashboard', label: 'My Members' },
+        { id: 'nutrition-ai', label: 'Nutrition AI' },
+        { id: 'workout-plan', label: 'Workout Plan' },
+      ]
+    : (isMember
     ? [
         { id: 'nutrition-ai', label: 'Nutrition AI' },
         { id: 'medical-history', label: 'Medical History' },
@@ -86,7 +94,6 @@ export default function Layout({
     : [
         { id: 'dashboard', label: 'Dashboard' },
         { id: 'main', label: 'Members' },
-        { id: 'add', label: 'Add Member' },
         { id: 'enquiries', label: 'Enquiry Members' },
         { id: 'checkin', label: 'Attendance' },
         { id: 'finance', label: 'Finance' },
@@ -94,7 +101,8 @@ export default function Layout({
         { id: 'nutrition-ai', label: 'Nutrition AI' },
         { id: 'telegram', label: 'Telegram' },
         { id: 'notifications', label: 'Notifications' },
-      ];
+      ]
+  ).filter((item) => item.id !== 'finance' || showFinanceTab);
 
   const closeDrawer = () => setDrawerOpen(false);
   const toggleDrawer = () => setDrawerOpen((o) => !o);
@@ -202,7 +210,7 @@ export default function Layout({
         <div className="main-content-inner">{children}</div>
       </main>
 
-      {!isMember && (
+      {!isMember && !isTrainer && (
       <nav className="bottom-nav">
         <button className={`bn-item ${activeNav === 'main' ? 'active' : ''}`} onClick={() => handleNav('main')} title="People">
           <span className="bn-icon">{BottomNavIcons.main()}</span>
@@ -210,9 +218,15 @@ export default function Layout({
         <button className={`bn-item ${activeNav === 'dashboard' ? 'active' : ''}`} onClick={() => handleNav('dashboard')} title="Dashboard">
           <span className="bn-icon">{BottomNavIcons.dashboard()}</span>
         </button>
-        <button className={`bn-item ${activeNav === 'finance' ? 'active' : ''}`} onClick={() => handleNav('finance')} title="Finance">
-          <span className="bn-icon">{BottomNavIcons.finance()}</span>
-        </button>
+        {showFinanceTab ? (
+          <button className={`bn-item ${activeNav === 'finance' ? 'active' : ''}`} onClick={() => handleNav('finance')} title="Finance">
+            <span className="bn-icon">{BottomNavIcons.finance()}</span>
+          </button>
+        ) : (
+          <button type="button" className="bn-item bn-item-logout" onClick={onLogout} title="Logout" aria-label="Logout">
+            <span className="bn-icon">{BottomNavIcons.logout()}</span>
+          </button>
+        )}
       </nav>
       )}
 

@@ -7,7 +7,10 @@ import {
   Param,
   UseGuards,
   ForbiddenException,
+  BadRequestException,
+  InternalServerErrorException,
   StreamableFile,
+  Logger,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -21,6 +24,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPER_ADMIN)
 export class PlatformController {
+  private readonly logger = new Logger(PlatformController.name);
+
   constructor(
     private platformService: PlatformService,
     private tenantsService: TenantsService,
@@ -33,15 +38,34 @@ export class PlatformController {
   }
 
   @Get('tenants')
-  listTenants() {
-    return this.tenantsService.findAll();
+  async listTenants() {
+    try {
+      return await this.tenantsService.findAll();
+    } catch (err) {
+      this.logger.error('listTenants failed', err instanceof Error ? err.stack : err);
+      throw new InternalServerErrorException(
+        err instanceof Error ? err.message : 'Failed to load tenants. Check server logs and MongoDB connection.',
+      );
+    }
   }
 
   @Get('tenants/:id')
   async getTenant(@Param('id') id: string) {
-    const details = await this.platformService.getTenantDetails(id);
-    if (!details) throw new ForbiddenException('Tenant not found');
-    return details;
+    try {
+      const details = await this.platformService.getTenantDetails(id);
+      if (!details) throw new ForbiddenException('Tenant not found');
+      const d = details as Record<string, unknown>;
+      if (d._id != null) d._id = String(d._id);
+      if (d.createdAt instanceof Date) d.createdAt = (d.createdAt as Date).toISOString();
+      if (d.updatedAt instanceof Date) d.updatedAt = (d.updatedAt as Date).toISOString();
+      return d;
+    } catch (err) {
+      if (err instanceof ForbiddenException) throw err;
+      this.logger.error('getTenant failed', err instanceof Error ? err.stack : err);
+      throw new InternalServerErrorException(
+        err instanceof Error ? err.message : 'Failed to load tenant details.',
+      );
+    }
   }
 
   /** Preview Telegram config for a tenant (same as gym admin GET /notifications/telegram-config). */
@@ -70,6 +94,22 @@ export class PlatformController {
     );
     if (!ok) throw new ForbiddenException('User not found');
     return { success: true };
+  }
+
+  @Post('tenants/:tenantId/trainers')
+  async createTrainer(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { email: string; password: string; name?: string },
+  ) {
+    if (!body.email?.trim() || !body.password || body.password.length < 6) {
+      throw new BadRequestException('email and password (min 6 characters) required');
+    }
+    return this.platformService.createTrainer(
+      tenantId,
+      body.email.trim(),
+      body.password,
+      body.name?.trim(),
+    );
   }
 
   /** GET /platform/tenants/:id/pitch-pdf — generate application pitch PDF for this tenant (SUPER_ADMIN only). */

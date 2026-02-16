@@ -108,7 +108,7 @@ const APP_GUIDE = [
         title: 'Enquiry Members tab',
         items: [
           '**Enquiry Members** – People who enquired but have not joined yet.',
-          '**Add Enquiry** – Name, phone, email, enquiry date, source (Walk-in / Phone / Website / Referral / Social Media), notes, expected join date, assigned staff.',
+          '**Add Enquiry** – Name, phone, email, enquiry date, source (Walk-in / Phone / Website / Referral / Social Media), notes, expected join date, assigned trainer.',
           'List: Name, contact (phone + **WhatsApp**), enquiry date, expected date, follow-up info, status (New / Follow-up / Converted / Lost). **View**, **Edit**, **F/U**, **Convert**, **Lost**.',
           '**WhatsApp** next to phone opens follow-up modal with type pre-set to WhatsApp.',
           '**Convert** – Opens form prefilled from enquiry; complete membership details and create member. Enquiry status becomes Converted.',

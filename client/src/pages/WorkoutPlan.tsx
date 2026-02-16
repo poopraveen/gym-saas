@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { api, getApiErrorMessage, storage } from '../api/client';
 import { PLAN_TEMPLATES, WORKOUT_GUIDE } from '../data/workoutPlans';
@@ -11,9 +11,14 @@ function toDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+type AiMember = { id: string; email: string; name?: string; linkedRegNo?: number; createdAt?: string };
+
 export default function WorkoutPlan() {
   const navigate = useNavigate();
-  const isMember = storage.getRole() === 'MEMBER';
+  const [searchParams] = useSearchParams();
+  const role = storage.getRole();
+  const isMember = role === 'MEMBER';
+  const isTrainer = role === 'TRAINER';
 
   const [activeNav, setActiveNav] = useState<'nutrition-ai' | 'medical-history' | 'workout-plan'>('workout-plan');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('custom');
@@ -21,6 +26,12 @@ export default function WorkoutPlan() {
   const [planLoading, setPlanLoading] = useState(true);
   const [planSaving, setPlanSaving] = useState(false);
   const [planError, setPlanError] = useState('');
+
+  /** Trainer: assigned members and selected member's plan (read-only) */
+  const [assignedMembers, setAssignedMembers] = useState<AiMember[]>([]);
+  const [trainerSelectedMember, setTrainerSelectedMember] = useState<AiMember | null>(null);
+  const [trainerPlanLoading, setTrainerPlanLoading] = useState(false);
+  const [trainerLogs, setTrainerLogs] = useState<Array<{ _id: string; date: string; workoutLabel: string; notes?: string; durationMinutes?: number; createdAt: string }>>([]);
 
   const [logs, setLogs] = useState<Array<{ _id: string; date: string; workoutLabel: string; notes?: string; durationMinutes?: number; createdAt: string }>>([]);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -52,6 +63,42 @@ export default function WorkoutPlan() {
       .catch(() => setLogs([]))
       .finally(() => setLogsLoading(false));
   }, [isMember]);
+
+  useEffect(() => {
+    if (!isTrainer) return;
+    api.auth.getMyAssignedMembers().then((list) => setAssignedMembers(list || [])).catch(() => setAssignedMembers([]));
+  }, [isTrainer]);
+
+  /** Trainer: preselect member from URL ?memberId= (e.g. from Trainer Dashboard). */
+  useEffect(() => {
+    if (!isTrainer || assignedMembers.length === 0) return;
+    const memberId = searchParams.get('memberId');
+    if (!memberId) return;
+    const member = assignedMembers.find((m) => m.id === memberId);
+    if (member) setTrainerSelectedMember(member);
+  }, [isTrainer, assignedMembers, searchParams]);
+
+  useEffect(() => {
+    if (!isTrainer || !trainerSelectedMember?.id) {
+      setPlan(null);
+      setTrainerLogs([]);
+      return;
+    }
+    setTrainerPlanLoading(true);
+    Promise.all([
+      api.workoutPlan.getMemberPlan(trainerSelectedMember.id),
+      api.workoutPlan.getMemberLogs(trainerSelectedMember.id, { limit: 30 }),
+    ])
+      .then(([p, list]) => {
+        setPlan(p ?? null);
+        setTrainerLogs(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        setPlan(null);
+        setTrainerLogs([]);
+      })
+      .finally(() => setTrainerPlanLoading(false));
+  }, [isTrainer, trainerSelectedMember?.id]);
 
   const loadLogs = () => {
     if (!isMember) return;
@@ -179,6 +226,81 @@ export default function WorkoutPlan() {
       return dateStr;
     }
   };
+
+  if (isTrainer) {
+    const trainerPlanDays = plan?.days ?? [];
+    const trainerDaysWithLabels = DAY_NAMES.map((name, dayOfWeek) => ({
+      dayOfWeek,
+      label: trainerPlanDays.find((d) => d.dayOfWeek === dayOfWeek)?.label ?? 'Rest',
+    }));
+    return (
+      <Layout activeNav="workout-plan" onNavChange={handleNavChange} onLogout={handleLogout}>
+        <div className="workout-plan-page">
+          <h1 className="page-title">Workout Plan</h1>
+          <p className="wp-intro">View training plan and logs of your assigned members (read-only).</p>
+          <div className="wp-card">
+            <h2 className="wp-card-title">My assigned members</h2>
+            {assignedMembers.length === 0 ? (
+              <p className="wp-hint">No members assigned to you yet. Ask an admin to assign members from the Dashboard.</p>
+            ) : (
+              <ul className="wp-trainer-member-list">
+                {assignedMembers.map((m) => (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      className={`wp-trainer-member-btn ${trainerSelectedMember?.id === m.id ? 'selected' : ''}`}
+                      onClick={() => setTrainerSelectedMember(m)}
+                    >
+                      {m.name || m.email}
+                      {m.linkedRegNo != null && <span className="wp-trainer-reg"> #{m.linkedRegNo}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {trainerSelectedMember && (
+            <>
+              <div className="wp-card">
+                <h2 className="wp-card-title">Plan: {trainerSelectedMember.name || trainerSelectedMember.email}</h2>
+                {trainerPlanLoading ? (
+                  <p className="wp-hint">Loading…</p>
+                ) : (
+                  <div className="wp-days wp-days-readonly">
+                    {trainerDaysWithLabels.map((d) => (
+                      <div key={d.dayOfWeek} className="wp-day-row">
+                        <span className="wp-day-name">{DAY_NAMES[d.dayOfWeek]}</span>
+                        <span className="wp-day-input">{d.label || 'Rest'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="wp-card">
+                <h2 className="wp-card-title">Workout logs</h2>
+                {trainerPlanLoading ? (
+                  <p className="wp-hint">Loading…</p>
+                ) : trainerLogs.length === 0 ? (
+                  <p className="wp-hint">No logs yet.</p>
+                ) : (
+                  <ul className="wp-log-list">
+                    {trainerLogs.map((log) => (
+                      <li key={log._id} className="wp-log-item">
+                        <span className="wp-log-date">{log.date}</span>
+                        <strong>{log.workoutLabel}</strong>
+                        {log.durationMinutes != null && <span>{log.durationMinutes} min</span>}
+                        {log.notes && <span className="wp-log-notes">{log.notes}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </Layout>
+    );
+  }
 
   if (!isMember) {
     return (

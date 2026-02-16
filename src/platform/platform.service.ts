@@ -83,6 +83,19 @@ export class PlatformService {
     return this.authService.resetUserPassword(tenantId, email, newPassword);
   }
 
+  /** Create a trainer user for a tenant (SUPER_ADMIN only). Trainer can use Nutrition AI and onboard members. */
+  async createTrainer(tenantId: string, email: string, password: string, name?: string) {
+    const tenant = await this.tenantsService.findById(tenantId);
+    if (!tenant) throw new ForbiddenException('Tenant not found');
+    return this.authService.register(
+      email,
+      password,
+      tenantId,
+      name || email,
+      Role.TRAINER,
+    );
+  }
+
   /** Update tenant and re-register Telegram webhook when tenant has a bot token (so "Save Telegram" fixes webhook if PUBLIC_API_URL was set later). */
   async updateTenant(tenantId: string, dto: UpdateTenantDto) {
     const updated = await this.tenantsService.updateTenant(tenantId, dto);
@@ -105,12 +118,16 @@ export class PlatformService {
     if (!tenant) return null;
     const adminUser = await this.authService.getAdminUserByTenantId(tenantId);
     const t = tenant as Record<string, unknown>;
-    const { telegramBotToken, ...rest } = t;
-    return {
+    const { telegramBotToken, _id, createdAt, updatedAt, ...rest } = t;
+    const out: Record<string, unknown> = {
       ...rest,
+      _id: _id != null ? String(_id) : _id,
+      createdAt: createdAt instanceof Date ? (createdAt as Date).toISOString() : createdAt,
+      updatedAt: updatedAt instanceof Date ? (updatedAt as Date).toISOString() : updatedAt,
       telegramBotToken: telegramBotToken ? '••••••••' : undefined,
       adminUser: adminUser ? { email: adminUser.email, name: adminUser.name, role: adminUser.role } : null,
     };
+    return out;
   }
 
   /**

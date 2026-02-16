@@ -74,6 +74,83 @@
   margin-bottom: 16px;
 }
 
+.platform-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.platform-tab {
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.platform-tab:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.platform-tab.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.platform-section-desc {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0 0 16px 0;
+  padding: 0 20px;
+}
+
+.platform-trainer-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+}
+
+.platform-trainer-form label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.platform-trainer-form input,
+.platform-trainer-form select {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+.platform-trainer-form .form-actions {
+  margin-top: 8px;
+}
+
+.platform-trainer-form .message-ok {
+  color: var(--success, #22c55e);
+  font-size: 0.9rem;
+}
+
+.platform-trainer-form .message-err {
+  color: var(--error);
+  font-size: 0.9rem;
+}
+
+.platform-section > h2:first-child {
+  padding: 16px 20px 0;
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
 .platform-section {
   background: var(--card-bg);
   border-radius: 12px;

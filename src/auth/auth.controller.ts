@@ -12,6 +12,10 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+  Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Role } from '../common/constants/roles';
@@ -21,6 +25,8 @@ import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
@@ -31,13 +37,19 @@ export class AuthController {
     @Headers('host') host: string,
     @Headers('x-forwarded-host') forwardedHost: string,
   ) {
-    const resolvedHost = forwardedHost || host;
-    return this.authService.login(
-      body.email,
-      body.password,
-      tenantId || undefined,
-      resolvedHost,
-    );
+    try {
+      const resolvedHost = forwardedHost || host;
+      return await this.authService.login(
+        body?.email ?? '',
+        body?.password ?? '',
+        tenantId || undefined,
+        resolvedHost,
+      );
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
+      this.logger.error('login failed', err instanceof Error ? err.stack : err);
+      throw new InternalServerErrorException('Login failed. Check server logs.');
+    }
   }
 
   @Post('register')
@@ -76,19 +88,30 @@ export class AuthController {
       email: string;
       password: string;
       name: string;
-      role?: Role.STAFF | Role.MANAGER;
+      role?: Role.STAFF | Role.MANAGER | Role.TRAINER;
     },
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) throw new BadRequestException('Unauthorized');
-    const role = body.role === Role.MANAGER ? Role.MANAGER : Role.STAFF;
-    return this.authService.register(
-      body.email,
-      body.password,
-      tenantId,
-      body.name || body.email,
-      role,
-    );
+    if (!body.email?.trim() || !body.password) {
+      throw new BadRequestException('Email and password are required.');
+    }
+    const role = body.role === Role.MANAGER ? Role.MANAGER : body.role === Role.TRAINER ? Role.TRAINER : Role.STAFF;
+    try {
+      return await this.authService.register(
+        body.email.trim(),
+        body.password,
+        tenantId,
+        (body.name || body.email || '').trim() || body.email.trim(),
+        role,
+      );
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof ConflictException) throw err;
+      this.logger.error('onboard-user failed', err instanceof Error ? err.stack : err);
+      throw new InternalServerErrorException(
+        err instanceof Error ? err.message : 'Failed to create user. Check server logs.',
+      );
+    }
   }
 
   /**
@@ -97,7 +120,7 @@ export class AuthController {
    */
   @Post('onboard-member')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.TRAINER)
   @HttpCode(HttpStatus.CREATED)
   async onboardMember(
     @Req() req: { user: { tenantId: string } },
@@ -126,19 +149,24 @@ export class AuthController {
   }
 
   /**
-   * List members onboarded for AI (Nutrition) in this tenant. Staff/Admin only.
+   * List members onboarded for AI (Nutrition) in this tenant. Trainer/Admin only.
    * Used on /nutrition-ai to search and view member progress one by one.
    */
   @Get('ai-members')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF, Role.TRAINER)
   async listAiMembers(
     @Req() req: { user: { tenantId: string } },
     @Query('search') search: string | undefined,
   ) {
     const tenantId = req.user?.tenantId;
     if (!tenantId) throw new BadRequestException('Unauthorized');
-    return this.authService.listMemberUsers(tenantId, search);
+    try {
+      return await this.authService.listMemberUsers(tenantId, search);
+    } catch (err) {
+      this.logger.error('ai-members failed', err instanceof Error ? err.stack : err);
+      return [];
+    }
   }
 
   /**
@@ -147,7 +175,7 @@ export class AuthController {
    */
   @Post('reset-member-password')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.TRAINER)
   @HttpCode(HttpStatus.OK)
   async resetMemberPassword(
     @Req() req: { user: { tenantId: string } },
@@ -175,5 +203,136 @@ export class AuthController {
     const tenantId = req.user?.tenantId;
     if (!tenantId) throw new BadRequestException('Unauthorized');
     return this.authService.deactivateMemberUser(tenantId, userId);
+  }
+
+  /**
+   * List trainers in the tenant (for admin to assign members to trainer).
+   * TENANT_ADMIN or MANAGER only.
+   */
+  @Get('trainers')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  async listTrainers(@Req() req: { user: { tenantId: string } }) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    try {
+      return await this.authService.listTrainers(tenantId);
+    } catch (err) {
+      this.logger.error('trainers failed', err instanceof Error ? err.stack : err);
+      return [];
+    }
+  }
+
+  /**
+   * Assign a member user to a trainer. TENANT_ADMIN or MANAGER only.
+   */
+  @Post('assign-member-to-trainer')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  async assignMemberToTrainer(
+    @Req() req: { user: { tenantId: string } },
+    @Body() body: { trainerUserId: string; memberUserId: string },
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    if (!body.trainerUserId || !body.memberUserId) throw new BadRequestException('trainerUserId and memberUserId required');
+    await this.authService.assignMemberToTrainer(tenantId, body.trainerUserId, body.memberUserId);
+    return { success: true };
+  }
+
+  /**
+   * Unassign a member from their trainer. TENANT_ADMIN or MANAGER only.
+   */
+  @Delete('trainer-assignments/:memberUserId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  async unassignMemberFromTrainer(
+    @Req() req: { user: { tenantId: string } },
+    @Param('memberUserId') memberUserId: string,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    await this.authService.unassignMemberFromTrainer(tenantId, memberUserId);
+    return { success: true };
+  }
+
+  /**
+   * Get auth member user (enrolled for AI) by gym reg no. For admin edit screen to show/assign trainer.
+   */
+  @Get('member-user-by-reg')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  async getMemberUserByReg(
+    @Req() req: { user: { tenantId: string } },
+    @Query('regNo') regNo: string,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    const reg = regNo != null ? parseInt(String(regNo), 10) : NaN;
+    if (Number.isNaN(reg)) throw new BadRequestException('regNo is required');
+    return this.authService.getMemberUserByRegNo(tenantId, reg);
+  }
+
+  /**
+   * Get current trainer assigned to a member (for admin UI). TENANT_ADMIN or MANAGER only.
+   */
+  @Get('member-assignment/:memberUserId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  async getMemberAssignment(
+    @Req() req: { user: { tenantId: string } },
+    @Param('memberUserId') memberUserId: string,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    const trainerUserId = await this.authService.getTrainerForMember(tenantId, memberUserId);
+    return { trainerUserId };
+  }
+
+  /**
+   * List all trainer assignments in the tenant (for admin UI). TENANT_ADMIN or MANAGER only.
+   */
+  @Get('trainer-assignments')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  async listTrainerAssignments(@Req() req: { user: { tenantId: string } }) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    try {
+      return await this.authService.listAssignmentsForTenant(tenantId);
+    } catch (err) {
+      this.logger.error('trainer-assignments failed', err instanceof Error ? err.stack : err);
+      return [];
+    }
+  }
+
+  /**
+   * List member users assigned to the current trainer. TRAINER only.
+   */
+  @Get('my-assigned-members')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TRAINER)
+  async getMyAssignedMembers(@Req() req: { user: { tenantId: string; userId: string } }) {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.userId;
+    if (!tenantId || !userId) throw new BadRequestException('Unauthorized');
+    return this.authService.getAssignedMembersForTrainer(tenantId, userId);
+  }
+
+  /**
+   * Deactivate a trainer (they can no longer log in). Unassigns all their members. TENANT_ADMIN or MANAGER only.
+   */
+  @Delete('trainers/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  async deleteTrainer(
+    @Req() req: { user: { tenantId: string } },
+    @Param('userId') trainerUserId: string,
+  ) {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) throw new BadRequestException('Unauthorized');
+    await this.authService.deactivateTrainer(tenantId, trainerUserId);
+    return { success: true };
   }
 }

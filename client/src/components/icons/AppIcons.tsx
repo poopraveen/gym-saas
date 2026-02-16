@@ -81,6 +81,7 @@ export const BottomNavIcons = {
   main: () => <IconWrap icon={Users} size={ICON_SIZE_BN} className="bn-icon-svg" />,
   dashboard: () => <IconWrap icon={LayoutDashboard} size={ICON_SIZE_BN} className="bn-icon-svg" />,
   finance: () => <IconWrap icon={Wallet} size={ICON_SIZE_BN} className="bn-icon-svg" />,
+  logout: () => <IconWrap icon={LogOut} size={ICON_SIZE_BN} className="bn-icon-svg" />,
 } as const;
 
 export type NavIconId = keyof typeof AppIcons;

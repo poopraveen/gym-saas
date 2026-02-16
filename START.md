@@ -18,10 +18,12 @@ Open **Terminal 1**:
 
 ```bash
 cd gym-saas
-npm start
+npm run start:dev
 ```
 
 Wait until you see: `Application is running on: http://localhost:3000/api`
+
+If you see **ERR_CONNECTION_REFUSED** in the browser, the backend is not running — start it with the command above and keep that terminal open.
 
 ## Step 4: Start the Frontend UI
 Open **Terminal 2** (new terminal):
@@ -33,6 +35,8 @@ npm run dev
 ```
 
 Wait until you see: `Local: http://localhost:5173/`
+
+**Tip:** In `client/.env`, leave `VITE_API_URL` commented out so the app uses the Vite proxy (requests to `/api` are forwarded to the backend). Then open the app at **http://localhost:5173** (not by opening the backend URL).
 
 ## Step 5: Open the App
 In your browser, go to: **http://localhost:5173**

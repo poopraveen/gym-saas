@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schemas/user.schema';
+import { TrainerAssignment, TrainerAssignmentSchema } from './schemas/trainer-assignment.schema';
 import { TenantsModule } from '../tenants/tenants.module';
 import { MembersModule } from '../members/members.module';
 import { AuthService } from './auth.service';
@@ -14,7 +15,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   imports: [
     TenantsModule,
     MembersModule,
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: TrainerAssignment.name, schema: TrainerAssignmentSchema },
+    ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

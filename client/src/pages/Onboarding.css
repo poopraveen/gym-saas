@@ -162,6 +162,47 @@
   margin-top: 1rem;
 }
 
+/* Trainers table below onboard user */
+.trainers-table-wrap {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.trainers-table-title {
+  font-size: 1.05rem;
+  margin: 0 0 0.35rem 0;
+}
+.trainers-table-wrap .section-desc {
+  margin: 0 0 0.75rem 0;
+}
+.trainers-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.trainers-table-scroll {
+  overflow-x: auto;
+}
+.trainers-table {
+  width: 100%;
+  min-width: 400px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.trainers-table th,
+.trainers-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.trainers-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.trainers-table tbody tr:hover {
+  background: var(--hover-bg);
+}
+
 .message-ok {
   margin-top: 0.75rem;
   color: var(--pill-valid);
@@ -229,6 +270,50 @@
 
 .btn-delete:hover {
   background: var(--error-bg);
+}
+
+.trainer-cell {
+  min-width: 200px;
+}
+
+.trainer-name {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.trainer-none {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.trainer-assign-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.trainer-select {
+  min-width: 120px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.trainer-assign-busy {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.trainer-current-label {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
 /* Modals (confirmations) - scoped to onboarding screen */

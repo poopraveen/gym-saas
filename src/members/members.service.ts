@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Member } from './schemas/member.schema';
@@ -104,8 +104,16 @@ export class MembersService {
       return mapToLegacy(updated as unknown as Member);
     }
 
-    const created = await this.memberModel.create(data);
-    return mapToLegacy(created.toObject());
+    try {
+      const created = await this.memberModel.create(data);
+      return mapToLegacy(created.toObject());
+    } catch (err: unknown) {
+      const code = (err as { code?: number })?.code;
+      if (code === 11000) {
+        throw new ConflictException('A member with this Reg No already exists in this tenant.');
+      }
+      throw err;
+    }
   }
 
   async list(tenantId: string): Promise<Record<string, unknown>[]> {

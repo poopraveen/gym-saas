@@ -13,7 +13,7 @@ export class AttendanceService {
     private readonly configService: ConfigService,
   ) {}
 
-  /** Check-in updates member and returns check-in list. checkedInBy = staff name or "QR" for self check-in. Rejects expired membership. */
+  /** Check-in updates member and returns check-in list. checkedInBy = trainer name or "QR" for self check-in. Rejects expired membership. */
   async checkIn(tenantId: string, regNo: number, checkedInBy?: string): Promise<Member | null> {
     const list = await this.membersService.list(tenantId);
     const member = list.find((m) => Number(m['Reg No:']) === regNo) as unknown as Member;
