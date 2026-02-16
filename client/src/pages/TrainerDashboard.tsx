@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, storage, getApiErrorMessage } from '../api/client';
 import type { AiMember } from '../api/client';
+import { useI18n } from '../context/I18nContext';
 import Layout from '../components/Layout';
 import { AppIcons } from '../components/icons/AppIcons';
 import './TrainerDashboard.css';
@@ -24,6 +25,7 @@ const emptyRow = (): AttentionRow => ({
 
 export default function TrainerDashboard() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [members, setMembers] = useState<AiMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [attentionRows, setAttentionRows] = useState<AttentionRow[]>([emptyRow()]);
@@ -104,7 +106,7 @@ export default function TrainerDashboard() {
   const runNeedsAttention = async () => {
     const valid = attentionRows.filter((r) => r.memberName.trim());
     if (!valid.length) {
-      setAttentionError('Add at least one member with a name.');
+      setAttentionError(t('trainer.addOneMemberError'));
       return;
     }
     setAttentionError(null);
@@ -147,33 +149,33 @@ export default function TrainerDashboard() {
   return (
     <Layout activeNav="dashboard" onNavChange={handleNavChange} onLogout={handleLogout}>
       <div className="trainer-dashboard">
-        <h1 className="trainer-dashboard-title">My assigned members</h1>
+        <h1 className="trainer-dashboard-title">{t('trainer.myAssignedMembers')}</h1>
         <p className="trainer-dashboard-desc">
-          View Nutrition AI and Workout info for each member assigned to you.
+          {t('trainer.viewNutritionWorkout')}
         </p>
 
         {/* Assigned Members – Tap to view summary */}
         <section className="trainer-assigned-summary-card">
           <div className="trainer-assigned-summary-header">
-            <span className="trainer-assigned-summary-label">Assigned Members</span>
+            <span className="trainer-assigned-summary-label">{t('trainer.assignedMembers')}</span>
             <button
               type="button"
               className="btn-primary trainer-tap-view-btn"
               onClick={fetchAssignedSummary}
               disabled={summaryLoading}
             >
-              {summaryLoading ? 'Loading…' : 'Tap to view'}
+              {summaryLoading ? t('common.loading') : t('trainer.tapToView')}
             </button>
           </div>
           {summaryModalOpen && (
             <div className="trainer-summary-modal-overlay" onClick={() => setSummaryModalOpen(false)} role="presentation">
               <div className="trainer-summary-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="trainer-summary-modal-header">
-                  <h3>Assigned Members Summary</h3>
-                  <button type="button" className="trainer-summary-modal-close" onClick={() => setSummaryModalOpen(false)} aria-label="Close">×</button>
+                  <h3>{t('trainer.assignedMembersSummary')}</h3>
+                  <button type="button" className="trainer-summary-modal-close" onClick={() => setSummaryModalOpen(false)} aria-label={t('common.close')}>×</button>
                 </div>
                 <div className="trainer-summary-modal-body">
-                  {summaryLoading && <div className="trainer-summary-loading">Loading…</div>}
+                  {summaryLoading && <div className="trainer-summary-loading">{t('common.loading')}</div>}
                   {summaryError && <div className="trainer-summary-err">{summaryError}</div>}
                   {!summaryLoading && summaryResult != null && summaryResult !== '' && (
                     <pre className="trainer-summary-pre">{summaryResult}</pre>
@@ -186,26 +188,25 @@ export default function TrainerDashboard() {
 
         {/* Needs Attention Today */}
         <section className="trainer-needs-attention">
-          <h2 className="trainer-needs-attention-title">Needs Attention Today</h2>
+          <h2 className="trainer-needs-attention-title">{t('trainer.needsAttentionToday')}</h2>
           <p className="trainer-needs-attention-desc">
-            You are an AI Trainer Assistant. Analyze today&apos;s member activity and identify who needs attention.
-            For each member: identify the main problem, assign risk level (Low / Medium / High), and suggest ONE clear action.
+            {t('trainer.needsAttentionDesc')}
           </p>
           <div className="trainer-needs-attention-inputs">
             {members.length > 0 && (
               <button type="button" className="btn-secondary trainer-load-members-btn" onClick={loadAssignedIntoAttention}>
-                Load my assigned members
+                {t('trainer.loadMyAssignedMembers')}
               </button>
             )}
             <div className="trainer-attention-table-wrap">
               <table className="trainer-attention-table">
                 <thead>
                   <tr>
-                    <th>Member name</th>
-                    <th>Days workout missed</th>
-                    <th>Meal followed yesterday</th>
-                    <th>Last activity date</th>
-                    <th>Upcoming renewal date</th>
+                    <th>{t('trainer.memberName')}</th>
+                    <th>{t('trainer.daysWorkoutMissed')}</th>
+                    <th>{t('trainer.mealFollowedYesterday')}</th>
+                    <th>{t('trainer.lastActivityDate')}</th>
+                    <th>{t('trainer.upcomingRenewalDate')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -217,7 +218,7 @@ export default function TrainerDashboard() {
                           type="text"
                           value={row.memberName}
                           onChange={(e) => updateAttentionRow(idx, 'memberName', e.target.value)}
-                          placeholder="Name"
+                          placeholder={t('trainer.placeholderName')}
                           className="trainer-attention-input"
                         />
                       </td>
@@ -257,8 +258,8 @@ export default function TrainerDashboard() {
                         />
                       </td>
                       <td>
-                        <button type="button" className="btn-sm btn-reset trainer-remove-row" onClick={() => removeAttentionRow(idx)} disabled={attentionRows.length <= 1} title="Remove row">
-                          Remove
+                        <button type="button" className="btn-sm btn-reset trainer-remove-row" onClick={() => removeAttentionRow(idx)} disabled={attentionRows.length <= 1} title={t('trainer.remove')}>
+                          {t('trainer.remove')}
                         </button>
                       </td>
                     </tr>
@@ -267,24 +268,24 @@ export default function TrainerDashboard() {
               </table>
             </div>
             <button type="button" className="btn-secondary trainer-add-row-btn" onClick={addAttentionRow}>
-              Add row
+              {t('trainer.addRow')}
             </button>
             <button type="button" className="btn-primary trainer-analyze-btn" onClick={runNeedsAttention} disabled={attentionLoading}>
-              {attentionLoading ? 'Analyzing…' : 'Analyze'}
+              {attentionLoading ? t('trainer.analyzing') : t('trainer.analyze')}
             </button>
             {attentionError && <div className="trainer-attention-err">{attentionError}</div>}
             {attentionResult != null && attentionResult !== '' && (
               <div className="trainer-attention-result">
-                <h3 className="trainer-attention-result-title">Result: Name | Issue | Risk Level | Suggested Trainer Action</h3>
+                <h3 className="trainer-attention-result-title">{t('trainer.resultTableTitle')}</h3>
                 {tableRows.length > 0 ? (
                   <div className="trainer-attention-result-table-wrap">
                     <table className="trainer-attention-result-table">
                       <thead>
                         <tr>
-                          <th>Name</th>
-                          <th>Issue</th>
-                          <th>Risk Level</th>
-                          <th>Suggested Trainer Action</th>
+                          <th>{t('trainer.resultName')}</th>
+                          <th>{t('trainer.resultIssue')}</th>
+                          <th>{t('trainer.resultRiskLevel')}</th>
+                          <th>{t('trainer.resultSuggestedAction')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -308,12 +309,12 @@ export default function TrainerDashboard() {
         </section>
 
         {loading ? (
-          <div className="trainer-dashboard-loading">Loading…</div>
+          <div className="trainer-dashboard-loading">{t('common.loading')}</div>
         ) : members.length === 0 ? (
           <div className="trainer-dashboard-empty">
-            <p>No members assigned to you yet.</p>
+            <p>{t('trainer.noMembersAssigned')}</p>
             <p className="trainer-dashboard-empty-hint">
-              Your admin can assign members from Onboarding → Members enrolled for AI.
+              {t('trainer.hintOnboarding')}
             </p>
           </div>
         ) : (
@@ -324,7 +325,7 @@ export default function TrainerDashboard() {
                   <span className="trainer-dashboard-card-name">{m.name || m.email}</span>
                   {m.name && <span className="trainer-dashboard-card-email">{m.email}</span>}
                   {m.linkedRegNo != null && (
-                    <span className="trainer-dashboard-card-reg">Reg No: {m.linkedRegNo}</span>
+                    <span className="trainer-dashboard-card-reg">{t('trainer.regNo')}: {m.linkedRegNo}</span>
                   )}
                 </div>
                 <div className="trainer-dashboard-card-actions">
@@ -334,7 +335,7 @@ export default function TrainerDashboard() {
                     onClick={() => navigate(`/nutrition-ai?memberId=${encodeURIComponent(m.id)}`)}
                   >
                     <span className="trainer-dashboard-btn-icon">{AppIcons['nutrition-ai']?.() ?? null}</span>
-                    Nutrition AI
+                    {t('trainer.nutritionAI')}
                   </button>
                   <button
                     type="button"
@@ -342,7 +343,7 @@ export default function TrainerDashboard() {
                     onClick={() => navigate(`/workout-plan?memberId=${encodeURIComponent(m.id)}`)}
                   >
                     <span className="trainer-dashboard-btn-icon">{AppIcons['workout-plan']?.() ?? null}</span>
-                    Workout Plan
+                    {t('trainer.workoutPlan')}
                   </button>
                 </div>
               </div>

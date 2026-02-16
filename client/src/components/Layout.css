@@ -130,6 +130,35 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.topbar-lang-switcher {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.topbar-lang-btn {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.topbar-lang-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.topbar-lang-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
 /* Logo */

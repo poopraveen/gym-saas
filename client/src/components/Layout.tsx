@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../context/I18nContext';
 import { storage, api } from '../api/client';
 import { runDashboardTour, runEnquiriesTour } from '../utils/guidedTour';
 import Logo from './Logo';
@@ -26,6 +27,7 @@ export default function Layout({
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const { t, locale, setLocale } = useI18n();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isSuperAdmin = storage.getRole() === 'SUPER_ADMIN';
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -81,9 +83,9 @@ export default function Layout({
   const showFinanceTab = tenantConfig?.showFinanceTab !== false;
   const navItems: NavItem[] = isTrainer
     ? [
-        { id: 'dashboard', label: 'My Members' },
-        { id: 'nutrition-ai', label: 'Nutrition AI' },
-        { id: 'workout-plan', label: 'Workout Plan' },
+        { id: 'dashboard', label: t('trainer.nav.myMembers') },
+        { id: 'nutrition-ai', label: t('trainer.nav.nutritionAI') },
+        { id: 'workout-plan', label: t('trainer.nav.workoutPlan') },
       ]
     : (isMember
     ? [
@@ -129,6 +131,22 @@ export default function Layout({
           <span className={`hamburger ${drawerOpen ? 'open' : ''}`} />
         </button>
         <span className="topbar-user-name">{userName}</span>
+        {isTrainer && (
+          <div className="topbar-lang-switcher">
+            {(['en', 'ta', 'hi'] as const).map((loc) => (
+              <button
+                key={loc}
+                type="button"
+                className={`topbar-lang-btn ${locale === loc ? 'active' : ''}`}
+                onClick={() => setLocale(loc)}
+                aria-pressed={locale === loc}
+                title={loc === 'en' ? 'English' : loc === 'ta' ? 'Tamil' : 'Hindi'}
+              >
+                {loc === 'en' ? 'EN' : loc === 'ta' ? 'தமிழ்' : 'हिंदी'}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       <div className={`drawer-overlay ${drawerOpen ? 'visible' : ''}`} onClick={closeDrawer} aria-hidden />

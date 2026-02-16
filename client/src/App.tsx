@@ -63,6 +63,7 @@ export default function App() {
       <PWAInstallPrompt />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/login/trainer" element={<Login />} />
         <Route path="/checkin" element={<CheckIn />} />
         <Route
           path="/platform"

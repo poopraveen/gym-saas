@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider } from './context/ThemeContext';
+import { I18nProvider } from './context/I18nContext';
 import App from './App';
 import './index.css';
 
@@ -17,8 +18,10 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <I18nProvider>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </I18nProvider>
   </React.StrictMode>
 );
