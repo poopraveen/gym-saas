@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { format, isValid } from 'date-fns';
 import { api, getApiErrorMessage } from '../api/client';
 import FaceCaptureModal from '../components/FaceCaptureModal';
+import SuccessPopup from '../components/SuccessPopup';
 import './CheckIn.css';
 
 type QRMember = { regNo: number; name: string };
@@ -29,6 +30,7 @@ export default function CheckIn() {
     checkInTime?: string;
   } | null>(null);
   const [showFaceModal, setShowFaceModal] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -217,6 +219,7 @@ export default function CheckIn() {
                         checkInTime: res.checkInTime,
                       });
                     }
+                    setShowSuccessPopup(true);
                   } catch (err) {
                     setMessage({ type: 'error', text: getApiErrorMessage(err) });
                   } finally {
@@ -271,6 +274,12 @@ export default function CheckIn() {
               Check in again
             </button>
           </>
+        )}
+        {showSuccessPopup && (
+          <SuccessPopup
+            message="Check-in recorded! Successfully added."
+            onClose={() => setShowSuccessPopup(false)}
+          />
         )}
       </div>
     </div>

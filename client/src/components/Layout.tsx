@@ -32,6 +32,14 @@ export default function Layout({
   const mainRef = useRef<HTMLDivElement>(null);
   const [tenantConfig, setTenantConfig] = useState<TenantConfig | null>(null);
   const [userName, setUserNameState] = useState(() => storage.getUserName() || 'User');
+  const [isPwa, setIsPwa] = useState(false);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as { standalone?: boolean }).standalone === true;
+    setIsPwa(standalone);
+  }, []);
 
   useEffect(() => {
     const el = mainRef.current;
@@ -105,7 +113,7 @@ export default function Layout({
   };
 
   return (
-    <div className="layout">
+    <div className={`layout ${isPwa ? 'layout--pwa' : ''}`}>
       <header className="topbar">
         <button className="menu-btn" onClick={toggleDrawer} aria-label="Toggle menu">
           <span className={`hamburger ${drawerOpen ? 'open' : ''}`} />

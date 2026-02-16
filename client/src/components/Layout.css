@@ -21,33 +21,55 @@
   z-index: 100;
 }
 
-/* Mobile: ensure hamburger and username stay below device status bar (time/network/battery) */
+/* Mobile: ensure hamburger and username stay below device status bar */
 @media (max-width: 768px) {
   .topbar {
-    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 52px);
+    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 56px);
     min-height: 56px;
   }
-  .topbar .menu-btn,
-  .topbar .topbar-user-name {
-    margin-top: 0;
-  }
   .drawer {
-    padding-top: max(env(safe-area-inset-top, 0px), 52px);
+    padding-top: max(env(safe-area-inset-top, 0px), 56px);
   }
 }
 
-/* PWA standalone: extra top padding so content never overlaps system status bar */
+/* PWA / Add to Home Screen: many devices report safe-area 0, so use a large fixed inset */
 @media (display-mode: standalone) {
   .topbar {
-    padding-top: max(calc(16px + env(safe-area-inset-top, 0px)), 64px);
+    padding-top: max(calc(16px + env(safe-area-inset-top, 0px)), 80px);
     min-height: 56px;
   }
   .drawer {
-    padding-top: max(env(safe-area-inset-top, 0px), 64px);
+    padding-top: max(env(safe-area-inset-top, 0px), 80px);
   }
   .main-content {
-    padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 120px);
+    padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 136px);
   }
+}
+
+/* Also apply when launched from home screen (standalone or fullscreen) */
+@media (display-mode: fullscreen) {
+  .topbar {
+    padding-top: max(calc(16px + env(safe-area-inset-top, 0px)), 80px);
+    min-height: 56px;
+  }
+  .drawer {
+    padding-top: max(env(safe-area-inset-top, 0px), 80px);
+  }
+  .main-content {
+    padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 136px);
+  }
+}
+
+/* Fallback when JS detects PWA (e.g. display-mode not reported on some devices) */
+.layout--pwa .topbar {
+  padding-top: max(calc(16px + env(safe-area-inset-top, 0px)), 80px);
+  min-height: 56px;
+}
+.layout--pwa .drawer {
+  padding-top: max(env(safe-area-inset-top, 0px), 80px);
+}
+.layout--pwa .main-content {
+  padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 136px);
 }
 
 .menu-btn {
@@ -507,4 +529,9 @@
   .main-content-inner {
     padding-bottom: 20px;
   }
+}
+
+/* Hide bottom nav when face capture modal is open so Capture button is visible */
+body.face-capture-open .bottom-nav {
+  display: none !important;
 }

@@ -76,6 +76,11 @@ export default function FaceCaptureModal({
     return () => clearTimeout(t);
   }, [showSuccess, onCapture, onClose]);
 
+  useEffect(() => {
+    document.body.classList.add('face-capture-open');
+    return () => document.body.classList.remove('face-capture-open');
+  }, []);
+
   const handleCapture = async () => {
     const video = videoRef.current;
     if (!video || video.readyState < 2) {
@@ -122,10 +127,19 @@ export default function FaceCaptureModal({
       <div className="face-capture-video-wrap face-capture-video-wrap--fullscreen">
         {loading && <p className="face-capture-loading">Loading camera and face model…</p>}
         {!loading && !error && (
-          <p className="face-capture-look-hint">
-            <span className="face-capture-look-hint-icon">👁</span>
-            <span className="face-capture-look-hint-text">Look at the camera</span>
-          </p>
+          <div className="face-detect-animation" aria-hidden>
+            <div className="face-detect-frame">
+              <div className="face-detect-scan" />
+              <div className="face-detect-corner face-detect-corner--tl" />
+              <div className="face-detect-corner face-detect-corner--tr" />
+              <div className="face-detect-corner face-detect-corner--bl" />
+              <div className="face-detect-corner face-detect-corner--br" />
+            </div>
+            <p className="face-detect-text">
+              <span className="face-detect-text-line face-detect-text-line-1">Position your face in the frame</span>
+              <span className="face-detect-text-line face-detect-text-line-2">Then tap Capture</span>
+            </p>
+          </div>
         )}
       </div>
       {error && <p className="face-capture-error face-capture-error--overlay">{error}</p>}

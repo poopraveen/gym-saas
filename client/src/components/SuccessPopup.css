@@ -1,0 +1,62 @@
+.success-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.65);
+  animation: success-popup-fade-in 0.25s ease-out;
+}
+
+.success-popup-card {
+  background: var(--card-bg, #25262b);
+  border: 1px solid var(--border, #3f3f46);
+  border-radius: 16px;
+  padding: 28px 32px;
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  animation: success-popup-scale-in 0.35s ease-out;
+}
+
+.success-popup-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  background: #22c55e;
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.success-popup-message {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #e4e4e7);
+  line-height: 1.4;
+}
+
+@keyframes success-popup-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes success-popup-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

@@ -22,6 +22,7 @@ import WhatsAppButton from '../components/WhatsAppButton';
 import { CardSkeleton, ListSkeleton, ChartSkeleton } from '../components/LoadingSkeleton';
 import { QRCodeSVG } from 'qrcode.react';
 import FaceCaptureModal from '../components/FaceCaptureModal';
+import SuccessPopup from '../components/SuccessPopup';
 import { AppIcons } from '../components/icons/AppIcons';
 import './Dashboard.css';
 
@@ -121,7 +122,12 @@ export default function Dashboard() {
   const checkinDropdownRef = useRef<HTMLDivElement>(null);
   const [showFaceEnrollModal, setShowFaceEnrollModal] = useState(false);
   const [faceEnrollRegNo, setFaceEnrollRegNo] = useState<number | null>(null);
+  const [faceEnrollQuery, setFaceEnrollQuery] = useState('');
+  const [faceEnrollDropdownOpen, setFaceEnrollDropdownOpen] = useState(false);
+  const faceEnrollDropdownRef = useRef<HTMLDivElement>(null);
+  const faceEnrollInputRef = useRef<HTMLInputElement>(null);
   const [faceEnrollMessage, setFaceEnrollMessage] = useState<string | null>(null);
+  const [showEnrollSuccessPopup, setShowEnrollSuccessPopup] = useState(false);
   const [activeNav, setActiveNav] = useState<'dashboard' | 'main' | 'add' | 'checkin' | 'finance'>('main');
   const [filter, setFilter] = useState<'all' | 'men' | 'women'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
@@ -285,6 +291,27 @@ export default function Dashboard() {
   }, [filter, statusFilter, sortBy, searchQuery]);
   const regMembersTotal = allMembers.length;
 
+  /** Face enroll autocomplete: filter by name or Reg No, show first 15, exact Reg No first when query is digits */
+  const faceEnrollMatches = (() => {
+    const q = faceEnrollQuery.trim().toLowerCase();
+    if (!q) return allMembers.slice(0, 15);
+    const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
+    const filtered = allMembers.filter(
+      (m) =>
+        String(m.NAME ?? '').toLowerCase().includes(q) ||
+        String(m['Reg No:'] ?? '').includes(q),
+    );
+    const sorted =
+      !isNaN(qNum) && !Number.isNaN(qNum)
+        ? [...filtered].sort((a, b) => {
+            const aExact = Number(a['Reg No:']) === qNum ? 1 : 0;
+            const bExact = Number(b['Reg No:']) === qNum ? 1 : 0;
+            return bExact - aExact;
+          })
+        : filtered;
+    return sorted.slice(0, 15);
+  })();
+
   const loadFinance = async () => {
     if (activeNav === 'dashboard') setDashboardLoading(true);
     try {
@@ -380,6 +407,21 @@ export default function Dashboard() {
   useEffect(() => {
     if (membersPage > totalPages && totalPages >= 1) setMembersPage(totalPages);
   }, [totalPages, membersPage]);
+
+  useEffect(() => {
+    if (!faceEnrollDropdownOpen) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        faceEnrollInputRef.current?.contains(target) ||
+        faceEnrollDropdownRef.current?.contains(target)
+      )
+        return;
+      setFaceEnrollDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [faceEnrollDropdownOpen]);
 
   useEffect(() => {
     if (activeNav !== 'checkin' || !checkinDropdownOpen) return;
@@ -972,23 +1014,69 @@ export default function Dashboard() {
                 Enroll a member&apos;s face here. After enrollment, they can check in by face on the QR check-in page.
               </p>
               <div className="checkin-face-enroll-row">
-                <select
-                  className="checkin-face-enroll-select"
-                  value={faceEnrollRegNo ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setFaceEnrollRegNo(v ? Number(v) : null);
-                    setFaceEnrollMessage(null);
-                  }}
-                  aria-label="Select member to enroll face"
-                >
-                  <option value="">Select member to enroll face</option>
-                  {allMembers.map((m) => (
-                    <option key={String(m['Reg No:'])} value={String(m['Reg No:'])}>
-                      {String(m.NAME)} #{m['Reg No:']}
-                    </option>
-                  ))}
-                </select>
+                <div className="checkin-face-enroll-autocomplete">
+                  <input
+                    ref={faceEnrollInputRef}
+                    type="text"
+                    inputMode="text"
+                    placeholder="Search by name or Reg. No. — autocomplete will suggest"
+                    value={faceEnrollQuery}
+                    onChange={(e) => {
+                      setFaceEnrollQuery(e.target.value);
+                      setFaceEnrollDropdownOpen(true);
+                      if (!e.target.value.trim()) setFaceEnrollRegNo(null);
+                      setFaceEnrollMessage(null);
+                    }}
+                    onFocus={() => setFaceEnrollDropdownOpen(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && faceEnrollMatches.length === 1) {
+                        const m = faceEnrollMatches[0];
+                        setFaceEnrollRegNo(Number(m['Reg No:']));
+                        setFaceEnrollQuery(`${String(m.NAME)} #${m['Reg No:']}`);
+                        setFaceEnrollDropdownOpen(false);
+                      }
+                      if (e.key === 'Escape') setFaceEnrollDropdownOpen(false);
+                    }}
+                    className="checkin-face-enroll-input"
+                    aria-label="Select member to enroll face"
+                    aria-autocomplete="list"
+                    aria-expanded={faceEnrollDropdownOpen}
+                  />
+                  {faceEnrollDropdownOpen && (
+                    <div
+                      ref={faceEnrollDropdownRef}
+                      className="checkin-face-enroll-dropdown"
+                      role="listbox"
+                    >
+                      {faceEnrollMatches.length === 0 ? (
+                        <div className="checkin-face-enroll-dropdown-empty">
+                          No match — type name or Reg. No.
+                        </div>
+                      ) : (
+                        faceEnrollMatches.map((m) => {
+                          const regNo = Number(m['Reg No:']);
+                          const selected = faceEnrollRegNo === regNo;
+                          return (
+                            <button
+                              key={String(m['Reg No:'])}
+                              type="button"
+                              role="option"
+                              className={`checkin-face-enroll-dropdown-item ${selected ? 'selected' : ''}`}
+                              onClick={() => {
+                                setFaceEnrollRegNo(regNo);
+                                setFaceEnrollQuery(`${String(m.NAME)} #${m['Reg No:']}`);
+                                setFaceEnrollDropdownOpen(false);
+                                setFaceEnrollMessage(null);
+                              }}
+                            >
+                              {String(m.NAME)} #{m['Reg No:']}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="btn-primary"
@@ -1014,6 +1102,7 @@ export default function Dashboard() {
                     setFaceEnrollMessage('Saved. Member can now check in by face.');
                     setShowFaceEnrollModal(false);
                     loadList();
+                    setShowEnrollSuccessPopup(true);
                   } catch (err) {
                     setFaceEnrollMessage(err instanceof Error ? err.message : 'Enroll failed');
                   }
@@ -1351,6 +1440,15 @@ export default function Dashboard() {
           </>
           )}
         </div>
+      )}
+      {showEnrollSuccessPopup && (
+        <SuccessPopup
+          message="Successfully added! Member can check in by face."
+          onClose={() => {
+            setShowEnrollSuccessPopup(false);
+            handleNavChange('checkin');
+          }}
+        />
       )}
     </Layout>
   );
