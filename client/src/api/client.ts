@@ -242,6 +242,21 @@ export const api = {
       }),
     removeTodayCheckIn: (regNo: number) =>
       request<unknown>('/attendance/remove-today', { method: 'POST', body: JSON.stringify({ regNo }) }),
+    faceEnroll: (regNo: number, descriptor: number[]) =>
+      request<{ ok: boolean }>('/attendance/face-enroll', {
+        method: 'POST',
+        body: JSON.stringify({ regNo, descriptor }),
+      }),
+    checkInByFace: (token: string, descriptor: number[]) =>
+      requestPublic<{
+        success: boolean;
+        name?: string;
+        memberSummary?: { name: string; dueDate?: string; phoneNumber?: string; typeofPack?: string };
+        checkInTime?: string;
+      }>('/attendance/checkin-face', {
+        method: 'POST',
+        body: JSON.stringify({ token, descriptor }),
+      }),
   },
   platform: {
     listTenants: () => request<unknown[]>('/platform/tenants'),

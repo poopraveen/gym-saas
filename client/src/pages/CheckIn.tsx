@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, isValid } from 'date-fns';
 import { api, getApiErrorMessage } from '../api/client';
+import FaceCaptureModal from '../components/FaceCaptureModal';
 import './CheckIn.css';
 
 type QRMember = { regNo: number; name: string };
@@ -27,6 +28,7 @@ export default function CheckIn() {
     memberSummary: MemberSummary;
     checkInTime?: string;
   } | null>(null);
+  const [showFaceModal, setShowFaceModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -119,7 +121,17 @@ export default function CheckIn() {
         <h1>Gym Check-in</h1>
         {showForm ? (
           <>
-            <p className="checkin-hint">Type your name or Reg. No. — autocomplete will suggest you. Select yourself and tap Check In.</p>
+            <p className="checkin-hint">Use face recognition (if enrolled) or type your name/Reg. No. and tap Check In.</p>
+            <div className="checkin-face-row">
+              <button
+                type="button"
+                className="checkin-btn checkin-face-btn"
+                onClick={() => setShowFaceModal(true)}
+                disabled={submitting}
+              >
+                Check in with face
+              </button>
+            </div>
             <form onSubmit={handleSubmit}>
               <div className="checkin-autocomplete-wrap">
                 <input
@@ -182,6 +194,36 @@ export default function CheckIn() {
             </form>
             {message && message.type === 'error' && (
               <p className="checkin-error">{message.text}</p>
+            )}
+            {showFaceModal && (
+              <FaceCaptureModal
+                title="Look at the camera — then tap Capture to check in"
+                captureButtonLabel="Capture & check in"
+                onCapture={async (descriptor) => {
+                  setSubmitting(true);
+                  setMessage(null);
+                  setLastCheckInInfo(null);
+                  try {
+                    const res = await api.attendance.checkInByFace(token, descriptor);
+                    setShowFaceModal(false);
+                    setMessage({
+                      type: 'success',
+                      text: res.name ? `Welcome, ${res.name}! Check-in recorded.` : 'Check-in recorded.',
+                    });
+                    if (res.memberSummary) {
+                      setLastCheckInInfo({
+                        memberSummary: res.memberSummary,
+                        checkInTime: res.checkInTime,
+                      });
+                    }
+                  } catch (err) {
+                    setMessage({ type: 'error', text: getApiErrorMessage(err) });
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                onClose={() => setShowFaceModal(false)}
+              />
             )}
           </>
         ) : (

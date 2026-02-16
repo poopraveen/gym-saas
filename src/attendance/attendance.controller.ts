@@ -75,6 +75,36 @@ export class AttendanceController {
     return { members };
   }
 
+  /** Admin: enroll face for a member (128-d descriptor from face-api.js). */
+  @Post('face-enroll')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  async faceEnroll(
+    @TenantId() tenantId: string,
+    @Body() body: { regNo: number; descriptor: number[] },
+  ) {
+    if (body.regNo == null || !Array.isArray(body.descriptor) || body.descriptor.length !== 128) {
+      throw new BadRequestException('regNo and descriptor (128 numbers) required');
+    }
+    const ok = await this.attendanceService.faceEnroll(tenantId, Number(body.regNo), body.descriptor);
+    if (!ok) throw new BadRequestException('Member not found');
+    return { ok: true };
+  }
+
+  /** Public: check-in by face (QR token + 128-d descriptor). */
+  @Post('checkin-face')
+  async checkInByFace(@Body() body: { token: string; descriptor: number[] }) {
+    const { token, descriptor } = body || {};
+    if (!token || !Array.isArray(descriptor) || descriptor.length !== 128) {
+      throw new BadRequestException('token and descriptor (128 numbers) required');
+    }
+    const result = await this.attendanceService.checkInByFace(token, descriptor);
+    if (!result) {
+      throw new BadRequestException('Face not recognized. Enroll your face at the gym or check in with name/Reg. No.');
+    }
+    return result;
+  }
+
   /** Public: check-in by QR token (member scans QR, selects by name or enters Reg No). No auth. */
   @Post('checkin-qr')
   async checkInByQR(@Body() body: { token: string; regNo: number }) {

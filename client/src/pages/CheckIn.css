@@ -112,6 +112,21 @@
   cursor: not-allowed;
 }
 
+.checkin-face-row {
+  margin-bottom: 12px;
+}
+
+.checkin-face-btn {
+  width: 100%;
+  background: var(--hover-bg, #2d2d32);
+  border: 2px solid var(--primary, #3b82f6);
+  color: var(--primary, #3b82f6);
+}
+
+.checkin-face-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.15);
+}
+
 .checkin-again-btn {
   margin-top: 16px;
   background: transparent;

@@ -21,6 +21,7 @@ import PayFeesModal from '../components/PayFeesModal';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { CardSkeleton, ListSkeleton, ChartSkeleton } from '../components/LoadingSkeleton';
 import { QRCodeSVG } from 'qrcode.react';
+import FaceCaptureModal from '../components/FaceCaptureModal';
 import './Dashboard.css';
 
 type Member = Record<string, unknown>;
@@ -117,6 +118,9 @@ export default function Dashboard() {
   const [checkinDropdownOpen, setCheckinDropdownOpen] = useState(false);
   const checkinInputRef = useRef<HTMLInputElement>(null);
   const checkinDropdownRef = useRef<HTMLDivElement>(null);
+  const [showFaceEnrollModal, setShowFaceEnrollModal] = useState(false);
+  const [faceEnrollRegNo, setFaceEnrollRegNo] = useState<number | null>(null);
+  const [faceEnrollMessage, setFaceEnrollMessage] = useState<string | null>(null);
   const [activeNav, setActiveNav] = useState<'dashboard' | 'main' | 'add' | 'checkin' | 'finance'>('main');
   const [filter, setFilter] = useState<'all' | 'men' | 'women'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
@@ -961,6 +965,61 @@ export default function Dashboard() {
                 })
               )}
             </div>
+            <div className="checkin-face-enroll-section">
+              <h3 className="checkin-face-enroll-title">Face recognition (check-in by face)</h3>
+              <p className="checkin-face-enroll-hint">
+                Enroll a member&apos;s face here. After enrollment, they can check in by face on the QR check-in page.
+              </p>
+              <div className="checkin-face-enroll-row">
+                <select
+                  className="checkin-face-enroll-select"
+                  value={faceEnrollRegNo ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFaceEnrollRegNo(v ? Number(v) : null);
+                    setFaceEnrollMessage(null);
+                  }}
+                  aria-label="Select member to enroll face"
+                >
+                  <option value="">Select member to enroll face</option>
+                  {allMembers.map((m) => (
+                    <option key={String(m['Reg No:'])} value={String(m['Reg No:'])}>
+                      {String(m.NAME)} #{m['Reg No:']}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!faceEnrollRegNo}
+                  onClick={() => setShowFaceEnrollModal(true)}
+                >
+                  Enroll face
+                </button>
+              </div>
+              {faceEnrollMessage && (
+                <p className={`checkin-face-enroll-msg ${faceEnrollMessage.startsWith('Saved') ? 'success' : 'error'}`}>
+                  {faceEnrollMessage}
+                </p>
+              )}
+            </div>
+            {showFaceEnrollModal && faceEnrollRegNo != null && (
+              <FaceCaptureModal
+                title="Position face in frame — then tap Capture"
+                captureButtonLabel="Capture & save"
+                onCapture={async (descriptor) => {
+                  try {
+                    await api.attendance.faceEnroll(faceEnrollRegNo, descriptor);
+                    setFaceEnrollMessage('Saved. Member can now check in by face.');
+                    setShowFaceEnrollModal(false);
+                    loadList();
+                  } catch (err) {
+                    setFaceEnrollMessage(err instanceof Error ? err.message : 'Enroll failed');
+                  }
+                }}
+                onClose={() => setShowFaceEnrollModal(false)}
+              />
+            )}
           </div>
         </div>
       )}

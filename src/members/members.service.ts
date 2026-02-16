@@ -78,6 +78,7 @@ function mapToLegacy(m: Member): Record<string, unknown> {
     comments: m.comments,
     lastUpdateDateTime: m.lastUpdateDateTime,
     telegramChatId: m.telegramChatId,
+    faceDescriptor: m.faceDescriptor,
     ...m.legacyFields,
   };
   return legacy;
@@ -316,6 +317,42 @@ export class MembersService {
       { tenantId, regNo },
       { $set: { telegramChatId } },
     );
+  }
+
+  /**
+   * Save face descriptor (128-d) for a member. Used for face recognition check-in.
+   */
+  async updateFaceDescriptor(tenantId: string, regNo: number, descriptor: number[]): Promise<boolean> {
+    if (!Array.isArray(descriptor) || descriptor.length !== 128) return false;
+    const result = await this.memberModel.updateOne(
+      { tenantId, regNo },
+      { $set: { faceDescriptor: descriptor } },
+    );
+    return result.matchedCount === 1;
+  }
+
+  /**
+   * Get members that have a face descriptor (for matching). Returns regNo, name, faceDescriptor.
+   */
+  async getMembersWithFaceDescriptors(tenantId: string): Promise<{ regNo: number; name: string; faceDescriptor: number[] }[]> {
+    const docs = await this.memberModel
+      .find({ tenantId, faceDescriptor: { $exists: true, $ne: null } })
+      .select('regNo name faceDescriptor')
+      .lean();
+    return docs
+      .filter((m) => {
+        const fd = (m as Record<string, unknown>).faceDescriptor;
+        return Array.isArray(fd) && fd.length === 128;
+      })
+      .map((m) => {
+        const r = m as Record<string, unknown>;
+        return {
+          regNo: Number(r.regNo) || 0,
+          name: String(r.name ?? ''),
+          faceDescriptor: r.faceDescriptor as number[],
+        };
+      })
+      .filter((x) => x.regNo && x.name);
   }
 
   /**

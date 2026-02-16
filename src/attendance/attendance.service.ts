@@ -128,4 +128,61 @@ export class AttendanceService {
       name: String(m.NAME ?? m.name ?? ''),
     })).filter((m) => m.regNo && m.name.trim());
   }
+
+  /** Euclidean distance between two 128-d descriptors. */
+  private static descriptorDistance(a: number[], b: number[]): number {
+    if (a.length !== 128 || b.length !== 128) return Infinity;
+    let sum = 0;
+    for (let i = 0; i < 128; i++) {
+      const d = a[i] - b[i];
+      sum += d * d;
+    }
+    return Math.sqrt(sum);
+  }
+
+  /** Save face descriptor for a member (admin enrollment). */
+  async faceEnroll(tenantId: string, regNo: number, descriptor: number[]): Promise<boolean> {
+    return this.membersService.updateFaceDescriptor(tenantId, regNo, descriptor);
+  }
+
+  /** Find best-matching member by face descriptor. Returns regNo if distance below threshold. */
+  async findMemberByFace(tenantId: string, descriptor: number[]): Promise<{ regNo: number; name: string } | null> {
+    if (!Array.isArray(descriptor) || descriptor.length !== 128) return null;
+    const members = await this.membersService.getMembersWithFaceDescriptors(tenantId);
+    if (members.length === 0) return null;
+    const THRESHOLD = 0.65;
+    let best: { regNo: number; name: string; distance: number } | null = null;
+    for (const m of members) {
+      const dist = AttendanceService.descriptorDistance(descriptor, m.faceDescriptor);
+      if (dist < THRESHOLD && (!best || dist < best.distance)) {
+        best = { regNo: m.regNo, name: m.name, distance: dist };
+      }
+    }
+    return best ? { regNo: best.regNo, name: best.name } : null;
+  }
+
+  /** Public: check-in by face (token from QR + face descriptor). */
+  async checkInByFace(token: string, descriptor: number[]): Promise<{ success: boolean; name?: string; memberSummary?: Record<string, unknown>; checkInTime?: string } | null> {
+    const tenantId = this.verifyQRToken(token);
+    if (!tenantId) return null;
+    const match = await this.findMemberByFace(tenantId, descriptor);
+    if (!match) return null;
+    const member = await this.checkIn(tenantId, match.regNo, 'Face');
+    if (!member) return null;
+    const m = member as unknown as Record<string, unknown>;
+    const name = (m.name ?? m.NAME) as string;
+    const dueRaw = m['DUE DATE'] ?? m.dueDate;
+    const dueDate =
+      dueRaw != null && !isNaN(new Date(dueRaw as string | number).getTime())
+        ? new Date(dueRaw as string | number).toISOString()
+        : undefined;
+    const checkInTime = new Date().toISOString();
+    const memberSummary = {
+      name,
+      dueDate,
+      phoneNumber: (m['Phone Number'] ?? m.phoneNumber) as string | undefined,
+      typeofPack: (m['Typeof pack'] ?? m.typeofPack) as string | undefined,
+    };
+    return { success: true, name, memberSummary, checkInTime };
+  }
 }

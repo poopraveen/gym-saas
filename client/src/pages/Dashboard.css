@@ -845,6 +845,55 @@
   color: var(--text-primary);
 }
 
+.checkin-face-enroll-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.checkin-face-enroll-title {
+  margin: 0 0 6px 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.checkin-face-enroll-hint {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.checkin-face-enroll-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.checkin-face-enroll-select {
+  flex: 1;
+  min-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.checkin-face-enroll-msg {
+  margin: 10px 0 0 0;
+  font-size: 0.9rem;
+}
+
+.checkin-face-enroll-msg.success {
+  color: var(--success, #22c55e);
+}
+
+.checkin-face-enroll-msg.error {
+  color: var(--error, #ef4444);
+}
+
 .chip-validity .chip-text {
   display: flex;
   flex-wrap: wrap;

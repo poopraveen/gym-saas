@@ -69,6 +69,10 @@ export class Member extends Document {
   @Prop()
   telegramChatId?: string;
 
+  /** Face recognition: 128-d descriptor from face-api.js for check-in by face. */
+  @Prop({ type: [Number] })
+  faceDescriptor?: number[];
+
   @Prop({ type: Object })
   legacyFields?: Record<string, unknown>;
 }
