@@ -21,28 +21,32 @@
   z-index: 100;
 }
 
-/* Mobile: ensure hamburger stays below status bar (many PWAs report safe-area 0) */
+/* Mobile: ensure hamburger and username stay below device status bar (time/network/battery) */
 @media (max-width: 768px) {
   .topbar {
-    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 50px);
+    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 52px);
     min-height: 56px;
   }
+  .topbar .menu-btn,
+  .topbar .topbar-user-name {
+    margin-top: 0;
+  }
   .drawer {
-    padding-top: max(env(safe-area-inset-top, 0px), 50px);
+    padding-top: max(env(safe-area-inset-top, 0px), 52px);
   }
 }
 
-/* PWA standalone: always clear status bar; use larger inset when safe-area is 0 */
+/* PWA standalone: extra top padding so content never overlaps system status bar */
 @media (display-mode: standalone) {
   .topbar {
-    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 58px);
+    padding-top: max(calc(16px + env(safe-area-inset-top, 0px)), 64px);
     min-height: 56px;
   }
   .drawer {
-    padding-top: max(env(safe-area-inset-top, 0px), 58px);
+    padding-top: max(env(safe-area-inset-top, 0px), 64px);
   }
   .main-content {
-    padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 114px);
+    padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 120px);
   }
 }
 

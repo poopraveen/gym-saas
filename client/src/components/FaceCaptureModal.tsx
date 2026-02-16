@@ -7,14 +7,26 @@ type Props = {
   onClose: () => void;
   title?: string;
   captureButtonLabel?: string;
+  /** Shown in watermark after successful recognition (e.g. "Recognized" or "Welcome!") */
+  successWatermarkText?: string;
 };
 
-export default function FaceCaptureModal({ onCapture, onClose, title = 'Position your face in the frame', captureButtonLabel = 'Capture face' }: Props) {
+const SUCCESS_DISPLAY_MS = 1800;
+
+export default function FaceCaptureModal({
+  onCapture,
+  onClose,
+  title = 'Position your face in the frame',
+  captureButtonLabel = 'Capture face',
+  successWatermarkText = 'Recognized',
+}: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const pendingDescriptorRef = useRef<number[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +35,13 @@ export default function FaceCaptureModal({ onCapture, onClose, title = 'Position
       try {
         await loadFaceModels();
         if (cancelled) return;
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -47,6 +65,17 @@ export default function FaceCaptureModal({ onCapture, onClose, title = 'Position
     };
   }, []);
 
+  useEffect(() => {
+    if (!showSuccess || !pendingDescriptorRef.current) return;
+    const t = setTimeout(() => {
+      const desc = pendingDescriptorRef.current;
+      pendingDescriptorRef.current = null;
+      if (desc) onCapture(desc);
+      onClose();
+    }, SUCCESS_DISPLAY_MS);
+    return () => clearTimeout(t);
+  }, [showSuccess, onCapture, onClose]);
+
   const handleCapture = async () => {
     const video = videoRef.current;
     if (!video || video.readyState < 2) {
@@ -58,8 +87,8 @@ export default function FaceCaptureModal({ onCapture, onClose, title = 'Position
     try {
       const descriptor = await getDescriptorFromVideo(video);
       if (descriptor) {
-        onCapture(descriptor);
-        onClose();
+        pendingDescriptorRef.current = descriptor;
+        setShowSuccess(true);
       } else {
         setError('No face detected. Look at the camera and try again.');
       }
@@ -70,24 +99,33 @@ export default function FaceCaptureModal({ onCapture, onClose, title = 'Position
     }
   };
 
+  if (showSuccess) {
+    return (
+      <div className="face-capture-overlay face-capture-overlay--fullscreen" role="dialog" aria-modal="true" aria-label="Face recognized">
+        <div className="face-capture-success-watermark">
+          <span className="face-capture-success-check">✓</span>
+          <span className="face-capture-success-text">{successWatermarkText}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="face-capture-overlay" role="dialog" aria-modal="true" aria-label="Face capture">
-      <div className="face-capture-modal">
-        <div className="face-capture-header">
-          <h3>{title}</h3>
-          <button type="button" className="face-capture-close" onClick={onClose} aria-label="Close">&times;</button>
-        </div>
-        <div className="face-capture-video-wrap">
-          {loading && <p className="face-capture-loading">Loading camera and face model…</p>}
-          <video ref={videoRef} className="face-capture-video" playsInline muted width={640} height={480} />
-        </div>
-        {error && <p className="face-capture-error">{error}</p>}
-        <div className="face-capture-actions">
-          <button type="button" className="face-capture-btn face-capture-btn-capture" onClick={handleCapture} disabled={loading || capturing}>
-            {capturing ? 'Detecting…' : captureButtonLabel}
-          </button>
-          <button type="button" className="face-capture-btn face-capture-btn-cancel" onClick={onClose}>Cancel</button>
-        </div>
+    <div className="face-capture-overlay face-capture-overlay--fullscreen" role="dialog" aria-modal="true" aria-label="Face capture">
+      <video ref={videoRef} className="face-capture-video face-capture-video--fullscreen" playsInline muted />
+      <div className="face-capture-header face-capture-header--overlay">
+        <h3>{title}</h3>
+        <button type="button" className="face-capture-close" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <div className="face-capture-video-wrap face-capture-video-wrap--fullscreen">
+        {loading && <p className="face-capture-loading">Loading camera and face model…</p>}
+      </div>
+      {error && <p className="face-capture-error face-capture-error--overlay">{error}</p>}
+      <div className="face-capture-actions face-capture-actions--overlay">
+        <button type="button" className="face-capture-btn face-capture-btn-capture" onClick={handleCapture} disabled={loading || capturing}>
+          {capturing ? 'Detecting…' : captureButtonLabel}
+        </button>
+        <button type="button" className="face-capture-btn face-capture-btn-cancel" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );

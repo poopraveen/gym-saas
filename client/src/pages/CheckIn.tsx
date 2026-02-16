@@ -199,6 +199,7 @@ export default function CheckIn() {
               <FaceCaptureModal
                 title="Look at the camera — then tap Capture to check in"
                 captureButtonLabel="Capture & check in"
+                successWatermarkText="Welcome!"
                 onCapture={async (descriptor) => {
                   setSubmitting(true);
                   setMessage(null);
