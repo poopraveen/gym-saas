@@ -1242,6 +1242,173 @@
   margin-top: auto;
 }
 
+/* Dashboard Home: summary-first, one screen */
+.dash-home {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+
+.dash-home .page-title {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+.dash-summary-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.dash-summary-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.dash-summary-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.dash-summary-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dash-summary-value {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.dash-summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dash-summary-stat {
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--primary);
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.dash-summary-actions .dash-summary-value {
+  display: none;
+}
+
+.dash-summary-earning .dash-summary-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.dash-quick-stats {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-top: 12px;
+}
+
+.dash-quick-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  font: inherit;
+  text-align: center;
+}
+
+.dash-quick-stat:hover {
+  border-color: var(--primary);
+}
+
+.dash-quick-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.dash-quick-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Dashboard sub-view: back + full section content */
+.dash-subview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dash-subview-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
+.dash-subview-back {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  color: var(--primary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dash-subview-back:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.dash-subview-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.dash-subview-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.dash-subview-body .dash-section {
+  margin-bottom: 24px;
+}
+
 /* Renewals due in 3 days – popup with table + WhatsApp follow-up */
 .renewals-modal-overlay {
   position: fixed;
