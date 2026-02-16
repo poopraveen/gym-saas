@@ -6,6 +6,7 @@ import { CaloriesController } from './calories.controller';
 import { CaloriesService } from './calories.service';
 import { AuthModule } from '../auth/auth.module';
 import { MembersModule } from '../members/members.module';
+import { WorkoutPlanModule } from '../workout-plan/workout-plan.module';
 
 /**
  * Member-facing calorie tracking + full nutrition analysis (one AI call).
@@ -19,6 +20,7 @@ import { MembersModule } from '../members/members.module';
     ]),
     AuthModule,
     MembersModule,
+    WorkoutPlanModule,
   ],
   controllers: [CaloriesController],
   providers: [CaloriesService],

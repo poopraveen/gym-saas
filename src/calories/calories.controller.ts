@@ -312,6 +312,47 @@ export class CaloriesController {
   }
 
   /**
+   * POST /calories/trainer/needs-attention
+   * Trainer: submit member activity data and get AI analysis (who needs attention today).
+   */
+  @Post('trainer/needs-attention')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TRAINER)
+  async trainerNeedsAttention(
+    @Req() req: any,
+    @Body()
+    body: {
+      members: Array<{
+        memberName: string;
+        daysWorkoutMissed: number;
+        mealFollowedYesterday: boolean;
+        lastActivityDate: string;
+        upcomingRenewalDate: string;
+      }>;
+    },
+  ): Promise<{ result: string }> {
+    const tenantId = this.tenantId(req);
+    if (!tenantId) throw new Error('Unauthorized');
+    const result = await this.caloriesService.needsAttentionAnalysis(body.members ?? []);
+    return { result };
+  }
+
+  /**
+   * GET /calories/trainer/assigned-summary
+   * Trainer: compact AI summary of assigned members for mobile dashboard (tap to view).
+   */
+  @Get('trainer/assigned-summary')
+  @UseGuards(RolesGuard)
+  @Roles(Role.TRAINER)
+  async trainerAssignedSummary(@Req() req: any): Promise<{ result: string }> {
+    const tenantId = this.tenantId(req);
+    const trainerUserId = this.userId(req);
+    if (!tenantId || !trainerUserId) throw new Error('Unauthorized');
+    const result = await this.caloriesService.assignedMembersSummary(tenantId, trainerUserId);
+    return { result };
+  }
+
+  /**
    * GET /calories/reference-foods
    * List reference foods for food input (tenant-agnostic, shared).
    */

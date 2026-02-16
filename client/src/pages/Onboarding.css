@@ -232,6 +232,7 @@
   padding: 0.5rem 0.75rem;
   text-align: left;
   border-bottom: 1px solid var(--border);
+  vertical-align: top;
 }
 
 .user-mgmt-table th {
@@ -241,6 +242,24 @@
 
 .user-mgmt-table tbody tr:hover {
   background: var(--hover-bg);
+}
+
+/* Actions column: flex layout so buttons align and wrap on all viewports */
+.user-mgmt-table td.actions-cell {
+  min-width: 0;
+  white-space: normal;
+}
+
+.user-mgmt-table .actions-cell-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-mgmt-table .actions-cell .btn-sm {
+  margin-right: 0;
+  flex-shrink: 0;
 }
 
 .btn-sm {
@@ -314,6 +333,38 @@
   margin-top: 0.25rem;
   font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+/* Members enrolled for AI – responsive: aligned actions, wrap on mobile */
+@media (max-width: 640px) {
+  .user-mgmt-table-wrap {
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .user-mgmt-table {
+    font-size: 0.85rem;
+  }
+
+  .user-mgmt-table th,
+  .user-mgmt-table td {
+    padding: 0.45rem 0.5rem;
+  }
+
+  .user-mgmt-table .actions-cell-inner {
+    gap: 0.4rem;
+  }
+
+  .user-mgmt-table .actions-cell .btn-sm {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .user-mgmt-table .trainer-select {
+    min-width: 100px;
+    font-size: 0.75rem;
+  }
 }
 
 /* Modals (confirmations) - scoped to onboarding screen */

@@ -93,3 +93,274 @@
   width: 100%;
   height: 100%;
 }
+
+/* Assigned Members – Tap to view summary */
+.trainer-assigned-summary-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.trainer-assigned-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.trainer-assigned-summary-label {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.trainer-tap-view-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+}
+
+.trainer-summary-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.trainer-summary-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.trainer-summary-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.trainer-summary-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.trainer-summary-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0.25rem;
+}
+
+.trainer-summary-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.trainer-summary-modal-body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.trainer-summary-loading,
+.trainer-summary-err {
+  padding: 0.5rem 0;
+}
+
+.trainer-summary-err {
+  color: var(--error);
+  font-size: 0.9rem;
+}
+
+.trainer-summary-pre {
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 0;
+  font-family: inherit;
+  line-height: 1.45;
+}
+
+/* Needs Attention Today */
+.trainer-needs-attention {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.trainer-needs-attention-title {
+  font-size: 1.15rem;
+  margin: 0 0 0.35rem 0;
+}
+
+.trainer-needs-attention-desc {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0 0 1rem 0;
+  line-height: 1.4;
+}
+
+.trainer-needs-attention-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.trainer-load-members-btn {
+  align-self: flex-start;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.trainer-attention-table-wrap {
+  overflow-x: auto;
+}
+
+.trainer-attention-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.trainer-attention-table th,
+.trainer-attention-table td {
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.trainer-attention-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.trainer-attention-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.trainer-attention-num {
+  width: 4rem;
+}
+
+.trainer-attention-select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  min-width: 4.5rem;
+}
+
+.trainer-remove-row {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.trainer-add-row-btn {
+  align-self: flex-start;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.9rem;
+}
+
+.trainer-analyze-btn {
+  align-self: flex-start;
+  padding: 0.5rem 1rem;
+}
+
+.trainer-attention-err {
+  color: var(--error);
+  font-size: 0.9rem;
+}
+
+.trainer-attention-result {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.trainer-attention-result-title {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.trainer-attention-result-table-wrap {
+  overflow-x: auto;
+}
+
+.trainer-attention-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.trainer-attention-result-table th,
+.trainer-attention-result-table td {
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  border: 1px solid var(--border);
+}
+
+.trainer-attention-result-table th {
+  font-weight: 600;
+  background: var(--hover-bg);
+}
+
+.trainer-attention-result-table tbody tr:nth-child(even) {
+  background: var(--card-bg);
+}
+
+.trainer-attention-result-raw {
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 0.75rem;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .trainer-attention-table th,
+  .trainer-attention-table td {
+    padding: 0.35rem 0.4rem;
+    font-size: 0.8rem;
+  }
+
+  .trainer-attention-input,
+  .trainer-attention-select {
+    font-size: 0.8rem;
+  }
+
+  .trainer-attention-table {
+    min-width: 480px;
+  }
+}

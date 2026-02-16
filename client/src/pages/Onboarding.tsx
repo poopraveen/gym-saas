@@ -459,15 +459,17 @@ const selectedId = selectedTrainerForMember[u.id] ?? currentTrainerId ?? '';
                                               )}
                                             </td>
                                           )}
-                          <td>
-                            <button type="button" className="btn-sm btn-reset" onClick={() => handleOpenResetPassword(u)}>
-                              Reset password
-                            </button>
-                            {canOnboardUser && (
-                              <button type="button" className="btn-sm btn-delete" onClick={() => setDeleteConfirmUser(u)}>
-                                Delete
+                          <td className="actions-cell">
+                            <div className="actions-cell-inner">
+                              <button type="button" className="btn-sm btn-reset" onClick={() => handleOpenResetPassword(u)}>
+                                Reset password
                               </button>
-                            )}
+                              {canOnboardUser && (
+                                <button type="button" className="btn-sm btn-delete" onClick={() => setDeleteConfirmUser(u)}>
+                                  Delete
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

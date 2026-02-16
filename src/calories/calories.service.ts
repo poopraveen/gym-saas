@@ -5,6 +5,7 @@ import { Model } from 'mongoose';
 import OpenAI from 'openai';
 import { AuthService } from '../auth/auth.service';
 import { MembersService } from '../members/members.service';
+import { WorkoutPlanService } from '../workout-plan/workout-plan.service';
 import { CalorieEntry } from './schemas/calorie-entry.schema';
 import {
   NutritionAnalysis,
@@ -125,6 +126,7 @@ export class CaloriesService {
     private config: ConfigService,
     private authService: AuthService,
     private membersService: MembersService,
+    private workoutPlanService: WorkoutPlanService,
   ) {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (apiKey) this.openai = new OpenAI({ apiKey });
@@ -530,5 +532,208 @@ Return the single JSON object with perFood, dailyTotal, rdiPercentage, deficienc
     const d = new Date(date);
     if (Number.isNaN(d.getTime())) return this.todayDate();
     return this.toDateStr(d);
+  }
+
+  /**
+   * Trainer: analyze member activity and return who needs attention (OpenAI).
+   * Input: array of { memberName, daysWorkoutMissed, mealFollowedYesterday, lastActivityDate, upcomingRenewalDate }.
+   * Output: plain text table "Name | Issue | Risk Level | Suggested Trainer Action" (one line per member).
+   */
+  async needsAttentionAnalysis(
+    members: Array<{
+      memberName: string;
+      daysWorkoutMissed: number;
+      mealFollowedYesterday: boolean;
+      lastActivityDate: string;
+      upcomingRenewalDate: string;
+    }>,
+  ): Promise<string> {
+    if (!this.openai) {
+      throw new BadRequestException('Needs Attention analysis is not configured (missing OPENAI_API_KEY)');
+    }
+    if (!members?.length) {
+      throw new BadRequestException('At least one member is required');
+    }
+
+    const NEEDS_ATTENTION_PROMPT = `You are an AI Trainer Assistant.
+Analyze today's member activity and identify who needs attention.
+
+For each member:
+- Identify the main problem
+- Assign risk level (Low / Medium / High)
+- Suggest ONE clear action for the trainer
+
+Strict output format — one line per member, pipe-separated:
+Name | Issue | Risk Level | Suggested Trainer Action
+
+Do not add a header line. Do not use markdown. Only output the data lines.`;
+
+    const memberLines = members.map(
+      (m) =>
+        `- ${m.memberName}: Days workout missed: ${m.daysWorkoutMissed}, Meal followed yesterday: ${m.mealFollowedYesterday ? 'Yes' : 'No'}, Last activity date: ${m.lastActivityDate || 'N/A'}, Upcoming renewal date: ${m.upcomingRenewalDate || 'N/A'}`,
+    );
+    const userContent = `Members to analyze:\n${memberLines.join('\n')}`;
+
+    const completion = await this.openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: NEEDS_ATTENTION_PROMPT },
+        { role: 'user', content: userContent },
+      ],
+      temperature: 0.3,
+      max_tokens: 800,
+    });
+
+    const content = completion.choices[0]?.message?.content?.trim() || '';
+    return content || 'No analysis returned.';
+  }
+
+  /**
+   * Trainer: gather assigned members' data and return AI summary for mobile dashboard.
+   * Uses: assigned count, last activity, plan assigned, due dates; outputs strict compact format.
+   */
+  async assignedMembersSummary(tenantId: string, trainerUserId: string): Promise<string> {
+    if (!this.openai) {
+      throw new BadRequestException('Assigned summary is not configured (missing OPENAI_API_KEY)');
+    }
+
+    const assigned = await this.authService.getAssignedMembersForTrainer(tenantId, trainerUserId);
+    const total = assigned.length;
+    if (total === 0) {
+      return `Assigned Members:\n• Total: 0\n• On track: 0\n• Needs attention: 0\n   - Inactive 3–6 days: 0\n   - Inactive 7+ days: 0\n   - No plan assigned: 0\n• Renewal risk (7 days): 0\n\nTop Actions Today:\n1. No assigned members yet.`;
+    }
+
+    const today = this.toDateStr(new Date());
+    const sevenDaysAgo = this.toDateStr(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+    const gymMembers = await this.membersService.list(tenantId);
+    const byRegNo = new Map<number, Record<string, unknown>>();
+    for (const m of gymMembers) {
+      const reg = Number((m as Record<string, unknown>)['Reg No:']);
+      if (!Number.isNaN(reg)) byRegNo.set(reg, m as Record<string, unknown>);
+    }
+
+    let onTrack = 0;
+    let inactive3to6 = 0;
+    let inactive7Plus = 0;
+    let noPlanAssigned = 0;
+    let renewalRisk7 = 0;
+    const needsAttentionIds = new Set<string>();
+    const lastActivityDates: string[] = [];
+    const planStatuses: string[] = [];
+    const renewalStatuses: string[] = [];
+
+    for (const m of assigned) {
+      const memberId = m.id;
+      const regNo = m.linkedRegNo;
+      const gym = regNo != null ? byRegNo.get(regNo) : undefined;
+      const dueRaw = gym?.['DUE DATE'] ?? gym?.dueDate;
+      const dueDate = dueRaw != null ? new Date(dueRaw as string | number) : null;
+      const lastCheckInStr = (gym?.lastCheckInTime as string) || '';
+      const lastCheckInDate = lastCheckInStr ? this.toDateStr(new Date(lastCheckInStr)) : null;
+
+      const plan = await this.workoutPlanService.getPlanForUser(tenantId, memberId);
+      const hasPlan = !!plan?.days?.length;
+      if (!hasPlan) {
+        noPlanAssigned++;
+        needsAttentionIds.add(memberId);
+      }
+
+      const logs = await this.workoutPlanService.getLogsForUser(tenantId, memberId, {
+        from: sevenDaysAgo,
+        to: today,
+        limit: 30,
+      });
+      const lastLogDate = logs.length > 0 ? logs[0].date : null;
+
+      const calorieDocs = await this.calorieModel
+        .find({ tenantId, userId: memberId, date: { $gte: sevenDaysAgo, $lte: today } })
+        .select('date')
+        .lean();
+      const lastCalorieDate =
+        calorieDocs.length > 0
+          ? (calorieDocs as { date: string }[]).sort((a, b) => b.date.localeCompare(a.date))[0].date
+          : null;
+
+      const lastActivity = [lastLogDate, lastCalorieDate, lastCheckInDate].filter(Boolean).sort().reverse()[0] ?? null;
+      if (lastActivity) lastActivityDates.push(`${m.name || m.email}: ${lastActivity}`);
+
+      const daysSinceActive = lastActivity
+        ? Math.floor((new Date().getTime() - new Date(lastActivity).getTime()) / (24 * 60 * 60 * 1000))
+        : 999;
+      if (daysSinceActive <= 2) onTrack++;
+      else if (daysSinceActive >= 3 && daysSinceActive <= 6) {
+        inactive3to6++;
+        needsAttentionIds.add(memberId);
+      } else if (daysSinceActive >= 7) {
+        inactive7Plus++;
+        needsAttentionIds.add(memberId);
+      }
+
+      if (dueDate && !isNaN(dueDate.getTime())) {
+        const daysToDue = Math.floor((dueDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+        if (daysToDue >= 0 && daysToDue <= 7) renewalRisk7++;
+        renewalStatuses.push(`${m.name || m.email}: ${dueDate.toISOString().slice(0, 10)} (${daysToDue}d)`);
+      }
+
+      planStatuses.push(`${m.name || m.email}: ${hasPlan ? 'Yes' : 'No'}`);
+    }
+
+    const needsAttention = needsAttentionIds.size;
+
+    const ASSIGNED_SUMMARY_PROMPT = `You are an AI Trainer Assistant.
+Summarize the trainer's assigned members in the most compact way possible for a mobile dashboard.
+
+Rules:
+- No long explanations
+- No full member list
+- Focus only on action
+- Use numbers, not paragraphs
+- Clear, minimal, trainer-friendly tone.
+
+Output format (STRICT):
+
+Assigned Members:
+• Total: X
+• On track: X
+• Needs attention: X
+   - Inactive 3–6 days: X
+   - Inactive 7+ days: X
+   - No plan assigned: X
+• Renewal risk (7 days): X
+
+Top Actions Today:
+1. [Action in 1 short line]
+2. [Action in 1 short line]
+3. [Optional]
+
+Output only the above. No other text.`;
+
+    const userContent = `Input data (use these numbers and derive actions):
+- Assigned members count: ${total}
+- On track (active in last 2 days): ${onTrack}
+- Needs attention total: ${needsAttention}
+  - Inactive 3–6 days: ${inactive3to6}
+  - Inactive 7+ days: ${inactive7Plus}
+  - No plan assigned: ${noPlanAssigned}
+- Renewal risk (due in next 7 days): ${renewalRisk7}
+
+Last activity dates (sample): ${lastActivityDates.slice(0, 10).join('; ') || 'N/A'}
+Plan assigned (sample): ${planStatuses.slice(0, 10).join('; ') || 'N/A'}
+Upcoming renewals (sample): ${renewalStatuses.slice(0, 10).join('; ') || 'N/A'}
+
+Generate the strict format output with these numbers and 1–3 concrete top actions.`;
+
+    const completion = await this.openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: ASSIGNED_SUMMARY_PROMPT },
+        { role: 'user', content: userContent },
+      ],
+      temperature: 0.2,
+      max_tokens: 500,
+    });
+
+    const content = completion.choices[0]?.message?.content?.trim() || '';
+    return content || 'No summary returned.';
   }
 }

@@ -476,6 +476,12 @@ export const api = {
         body: JSON.stringify(body),
       }),
     getReferenceFoods: () => request<ReferenceFood[]>('/calories/reference-foods'),
+    trainerNeedsAttention: (members: Array<{ memberName: string; daysWorkoutMissed: number; mealFollowedYesterday: boolean; lastActivityDate: string; upcomingRenewalDate: string }>) =>
+      request<{ result: string }>('/calories/trainer/needs-attention', {
+        method: 'POST',
+        body: JSON.stringify({ members }),
+      }),
+    trainerAssignedSummary: () => request<{ result: string }>('/calories/trainer/assigned-summary'),
     getProfile: () =>
       request<{ age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }>('/calories/profile'),
     saveProfile: (profile: { age?: number; gender?: string; heightCm?: number; weightKg?: number; goal?: string }) =>
