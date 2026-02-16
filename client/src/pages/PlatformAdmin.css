@@ -46,6 +46,26 @@
   background: var(--hover-bg);
 }
 
+.platform-btn-icon .btn-icon-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.platform-btn-icon .btn-icon-inline svg {
+  color: inherit;
+}
+
+.status-icon-ok,
+.status-icon-miss {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.status-icon-ok svg { color: var(--success, #22c55e); }
+.status-icon-miss svg { color: var(--text-secondary); }
+
 .platform-error {
   padding: 12px;
   background: var(--error-bg);

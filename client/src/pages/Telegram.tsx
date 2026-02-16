@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import Layout from '../components/Layout';
 import { api, storage } from '../api/client';
+import { AppIcons } from '../components/icons/AppIcons';
 import './Telegram.css';
 
 type Attempt = {
@@ -225,7 +226,7 @@ export default function Telegram() {
               <p className="telegram-hint">When members message your gym&apos;s bot with their phone number (in the group or in private chat), they show up here. Once enrolled, they can send <strong>attendance</strong> or <strong>present</strong> to mark their visit for the day—it appears in the <strong>Attendance</strong> tab with date and time. You can see who has registered for 3/7/14‑day absence reminders.</p>
               {config?.hasBot && (
                 <div className="telegram-tip-box">
-                  <span className="telegram-tip-icon" aria-hidden>💬</span>
+                  <span className="telegram-tip-icon" aria-hidden>{AppIcons.messageCircle()}</span>
                   <span>In groups, ask members to send <strong>/start</strong> to the bot. In private chat they can send &quot;Hi&quot; or their phone number.</span>
                 </div>
               )}
@@ -271,7 +272,7 @@ export default function Telegram() {
               )}
               {attempts.length === 0 ? (
                 <div className="telegram-empty-state">
-                  <span className="telegram-empty-icon" aria-hidden>📋</span>
+                  <span className="telegram-empty-icon" aria-hidden>{AppIcons.clipboard()}</span>
                   <p className="telegram-empty">No sign-ups yet. When members message your bot, they&apos;ll appear here. Click <strong>Refresh list</strong> to check.</p>
                 </div>
               ) : (

@@ -22,6 +22,7 @@ import WhatsAppButton from '../components/WhatsAppButton';
 import { CardSkeleton, ListSkeleton, ChartSkeleton } from '../components/LoadingSkeleton';
 import { QRCodeSVG } from 'qrcode.react';
 import FaceCaptureModal from '../components/FaceCaptureModal';
+import { AppIcons } from '../components/icons/AppIcons';
 import './Dashboard.css';
 
 type Member = Record<string, unknown>;
@@ -768,7 +769,7 @@ export default function Dashboard() {
                   }
                   type="button"
                 >
-                  📥 Download PDF
+                  <><span className="btn-icon-inline">{AppIcons.download()}</span> Download PDF</>
                 </button>
               )}
             </div>
@@ -936,7 +937,7 @@ export default function Dashboard() {
                         )}
                         {(phone || pack) && (
                           <span className="chip-details">
-                            {phone && <span className="chip-phone">{phone}</span>}
+                            {phone && <span className="chip-phone">{AppIcons.phone()}{phone}</span>}
                             {pack && <span className="chip-pack">{pack}</span>}
                           </span>
                         )}

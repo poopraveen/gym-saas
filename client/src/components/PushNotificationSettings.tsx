@@ -20,7 +20,9 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output;
 }
 
-export default function PushNotificationSettings() {
+type PushVariant = 'full' | 'drawer';
+
+export default function PushNotificationSettings({ variant = 'full' }: { variant?: PushVariant }) {
   const [supported, setSupported] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [loading, setLoading] = useState(false);
@@ -97,8 +99,39 @@ export default function PushNotificationSettings() {
   if (!supported) return null;
 
   return (
-    <div className="push-settings">
-      <h3 className="push-settings-title">Push notifications</h3>
+    <PushNotificationSettingsInner
+      permission={permission}
+      loading={loading}
+      message={message}
+      vapidConfigured={vapidConfigured}
+      onEnable={enable}
+      onDisable={disable}
+      variant={variant}
+    />
+  );
+}
+
+function PushNotificationSettingsInner({
+  permission,
+  loading,
+  message,
+  vapidConfigured,
+  onEnable,
+  onDisable,
+  variant = 'full',
+}: {
+  permission: NotificationPermission;
+  loading: boolean;
+  message: string | null;
+  vapidConfigured: boolean;
+  onEnable: () => void;
+  onDisable: () => void;
+  variant?: 'full' | 'drawer';
+}) {
+  const title = variant === 'drawer' ? 'Notifications' : 'Push notifications';
+  return (
+    <div className={`push-settings push-settings--${variant}`}>
+      <h3 className="push-settings-title">{title}</h3>
       {!vapidConfigured && (
         <p className="push-settings-hint">Server has not configured push (VAPID keys). Notifications are unavailable.</p>
       )}
@@ -109,11 +142,11 @@ export default function PushNotificationSettings() {
           </p>
           <div className="push-settings-actions">
             {permission === 'granted' ? (
-              <button type="button" className="push-settings-btn push-settings-btn-off" onClick={disable} disabled={loading}>
+              <button type="button" className="push-settings-btn push-settings-btn-off" onClick={onDisable} disabled={loading}>
                 {loading ? '…' : 'Disable notifications'}
               </button>
             ) : (
-              <button type="button" className="push-settings-btn push-settings-btn-on" onClick={enable} disabled={loading}>
+              <button type="button" className="push-settings-btn push-settings-btn-on" onClick={onEnable} disabled={loading}>
                 {loading ? '…' : 'Enable notifications'}
               </button>
             )}

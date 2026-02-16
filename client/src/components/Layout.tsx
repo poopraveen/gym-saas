@@ -5,9 +5,10 @@ import { storage, api } from '../api/client';
 import { runDashboardTour, runEnquiriesTour } from '../utils/guidedTour';
 import Logo from './Logo';
 import PushNotificationSettings from './PushNotificationSettings';
+import { AppIcons, BottomNavIcons, type NavIconId } from './icons/AppIcons';
 import './Layout.css';
 
-type NavItem = { id: string; label: string; icon: string };
+type NavItem = { id: NavIconId; label: string };
 
 type TenantConfig = { name: string; logo?: string };
 
@@ -70,21 +71,21 @@ export default function Layout({
   const isMember = storage.getRole() === 'MEMBER';
   const navItems: NavItem[] = isMember
     ? [
-        { id: 'nutrition-ai', label: 'Nutrition AI', icon: '🥗' },
-        { id: 'medical-history', label: 'Medical History', icon: '🩺' },
-        { id: 'workout-plan', label: 'Workout Plan', icon: '💪' },
+        { id: 'nutrition-ai', label: 'Nutrition AI' },
+        { id: 'medical-history', label: 'Medical History' },
+        { id: 'workout-plan', label: 'Workout Plan' },
       ]
     : [
-        { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-        { id: 'main', label: 'Members', icon: '👥' },
-        { id: 'add', label: 'Add Member', icon: '➕' },
-        { id: 'enquiries', label: 'Enquiry Members', icon: '📋' },
-        { id: 'checkin', label: 'Attendance', icon: '✓' },
-        { id: 'finance', label: 'Finance', icon: '💰' },
-        { id: 'onboarding', label: 'Onboarding', icon: '👋' },
-        { id: 'nutrition-ai', label: 'Nutrition AI', icon: '🥗' },
-        { id: 'telegram', label: 'Telegram', icon: '✈️' },
-        { id: 'notifications', label: 'Notifications', icon: '🔔' },
+        { id: 'dashboard', label: 'Dashboard' },
+        { id: 'main', label: 'Members' },
+        { id: 'add', label: 'Add Member' },
+        { id: 'enquiries', label: 'Enquiry Members' },
+        { id: 'checkin', label: 'Attendance' },
+        { id: 'finance', label: 'Finance' },
+        { id: 'onboarding', label: 'Onboarding' },
+        { id: 'nutrition-ai', label: 'Nutrition AI' },
+        { id: 'telegram', label: 'Telegram' },
+        { id: 'notifications', label: 'Notifications' },
       ];
 
   const closeDrawer = () => setDrawerOpen(false);
@@ -128,7 +129,7 @@ export default function Layout({
               onClick={() => handleNav(item.id)}
               data-tour={`nav-${item.id}`}
             >
-              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-icon">{AppIcons[item.id]?.() ?? null}</span>
               <span className="nav-label">{item.label}</span>
             </button>
           ))}
@@ -136,7 +137,7 @@ export default function Layout({
         <div className="drawer-footer">
           {!isMember && isSuperAdmin && (
             <button className="nav-item" onClick={() => { closeDrawer(); navigate('/platform'); }}>
-              <span className="nav-icon">⚙️</span>
+              <span className="nav-icon">{AppIcons.settings()}</span>
               <span className="nav-label">Platform Admin</span>
             </button>
           )}
@@ -155,21 +156,21 @@ export default function Layout({
               }}
               data-tour="tour-trigger"
             >
-              <span className="nav-icon">📖</span>
+              <span className="nav-icon">{AppIcons.guide()}</span>
               <span className="nav-label">Guide</span>
             </button>
           )}
           <div className="drawer-push-settings">
-            <PushNotificationSettings />
+            <PushNotificationSettings variant="drawer" />
           </div>
           {!isMember && (
             <button type="button" className="nav-item" onClick={toggleTheme} data-tour="theme-toggle">
-            <span className="nav-icon">{theme === 'light' ? '🌙' : '☀️'}</span>
+            <span className="nav-icon">{theme === 'light' ? AppIcons.moon() : AppIcons.sun()}</span>
             <span className="nav-label">{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
           </button>
           )}
           <button className="nav-item logout" onClick={onLogout}>
-            <span className="nav-icon">🚪</span>
+            <span className="nav-icon">{AppIcons.logout()}</span>
             <span className="nav-label">Logout</span>
           </button>
           <div className="drawer-footer-brand">
@@ -196,13 +197,13 @@ export default function Layout({
       {!isMember && (
       <nav className="bottom-nav">
         <button className={`bn-item ${activeNav === 'main' ? 'active' : ''}`} onClick={() => handleNav('main')} title="People">
-          <span className="bn-icon">👥</span>
+          <span className="bn-icon">{BottomNavIcons.main()}</span>
         </button>
         <button className={`bn-item ${activeNav === 'dashboard' ? 'active' : ''}`} onClick={() => handleNav('dashboard')} title="Dashboard">
-          <span className="bn-icon">📊</span>
+          <span className="bn-icon">{BottomNavIcons.dashboard()}</span>
         </button>
         <button className={`bn-item ${activeNav === 'finance' ? 'active' : ''}`} onClick={() => handleNav('finance')} title="Finance">
-          <span className="bn-icon">💰</span>
+          <span className="bn-icon">{BottomNavIcons.finance()}</span>
         </button>
       </nav>
       )}
@@ -214,7 +215,7 @@ export default function Layout({
           title="Scroll to top"
           aria-label="Scroll to top"
         >
-          <span className="fab-scroll-top-arrow">↑</span>
+          <span className="fab-scroll-top-arrow">{AppIcons.chevronUp()}</span>
         </button>
       )}
     </div>

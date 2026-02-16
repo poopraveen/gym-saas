@@ -524,9 +524,15 @@
 }
 
 .chat-result-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   color: var(--pill-valid);
   margin-bottom: 0.25rem;
+}
+.chat-result-header .chat-result-icon svg {
+  color: inherit;
 }
 
 .chat-result-total {
@@ -1165,7 +1171,22 @@
 .deficiency-label {
   font-weight: 600;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
+.deficiency-label::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.deficiency-label--deficient::before { background: #ef4444; }
+.deficiency-label--slightly_low::before { background: #eab308; }
+.deficiency-label--optimal::before { background: #22c55e; }
+.deficiency-label--excess::before { background: var(--text-secondary); }
 
 .deficiency-nutrient {
   font-weight: 500;

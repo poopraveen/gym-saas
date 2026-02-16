@@ -828,7 +828,27 @@
   margin-left: 4px;
 }
 
-.chip-phone::before { content: '📞 '; }
+.btn-icon-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.btn-icon-inline svg {
+  color: inherit;
+}
+
+.chip-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chip-phone svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
 .chip-pack::before { content: 'Pack: '; font-weight: 600; }
 
 .checkin-validity-note {

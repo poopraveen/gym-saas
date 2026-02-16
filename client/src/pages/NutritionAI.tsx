@@ -25,6 +25,7 @@ import type {
   ImprovementRecommendation,
 } from '../api/client';
 import Layout from '../components/Layout';
+import { AppIcons } from '../components/icons/AppIcons';
 import './NutritionAI.css';
 
 function safeDateStr(s: string | undefined): string {
@@ -605,9 +606,9 @@ export default function NutritionAI() {
   };
   const nutrientStatusLabel = (status: NutrientStatus['status']) => {
     switch (status) {
-      case 'deficient': return '🔴 Deficient';
-      case 'slightly_low': return '🟡 Slightly low';
-      case 'optimal': return '🟢 Optimal';
+      case 'deficient': return 'Deficient';
+      case 'slightly_low': return 'Slightly low';
+      case 'optimal': return 'Optimal';
       case 'excess': return 'Excess';
       default: return status;
     }
@@ -864,7 +865,7 @@ export default function NutritionAI() {
                               <ul className="deficiencies-list">
                                 {memberAnalysisResult.deficiencies.map((d, i) => (
                                   <li key={i} className={`deficiency-item ${nutrientStatusClass(d.status)}`}>
-                                    <span className="deficiency-label">{nutrientStatusLabel(d.status)}</span>
+                                    <span className={`deficiency-label deficiency-label--${d.status}`}>{nutrientStatusLabel(d.status)}</span>
                                     <span className="deficiency-nutrient">{d.nutrient}</span>
                                     {d.message && <span className="deficiency-msg">{d.message}</span>}
                                     {d.current != null && d.recommended != null && (
@@ -1272,7 +1273,7 @@ export default function NutritionAI() {
                 <ul className="deficiencies-list">
                   {analysisResult.deficiencies.map((d, i) => (
                     <li key={i} className={`deficiency-item ${nutrientStatusClass(d.status)}`}>
-                      <span className="deficiency-label">{nutrientStatusLabel(d.status)}</span>
+                      <span className={`deficiency-label deficiency-label--${d.status}`}>{nutrientStatusLabel(d.status)}</span>
                       <span className="deficiency-nutrient">{d.nutrient}</span>
                       {d.message && <span className="deficiency-msg">{d.message}</span>}
                       {d.current != null && d.recommended != null && (
@@ -1497,7 +1498,7 @@ export default function NutritionAI() {
           {chatError && <div className="chat-error">{chatError}</div>}
           {lastResult && (
             <div className="chat-result">
-              <div className="chat-result-header">✓ Added for {safeDateStr(lastResult.date)}</div>
+              <div className="chat-result-header"><span className="chat-result-icon">{AppIcons.check()}</span> Added for {safeDateStr(lastResult.date)}</div>
               <div className="chat-result-total">
                 {lastResult.totalCalories} kcal total
               </div>

@@ -9,7 +9,9 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px)) 12px calc(20px + env(safe-area-inset-left, 0px));
+  min-height: 56px;
+  padding: 12px calc(20px + env(safe-area-inset-right, 0px)) 12px calc(20px + env(safe-area-inset-left, 0px));
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
   background: var(--card-bg);
   border-bottom: 1px solid var(--border);
   position: fixed;
@@ -19,23 +21,28 @@
   z-index: 100;
 }
 
-/* Mobile / portrait: keep hamburger and menu below status bar (time, network) - safe-area can be 0 in browser */
-@media (max-width: 768px), (orientation: portrait) and (max-height: 900px) {
+/* Mobile: ensure hamburger stays below status bar (many PWAs report safe-area 0) */
+@media (max-width: 768px) {
   .topbar {
-    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 48px);
+    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 50px);
+    min-height: 56px;
   }
   .drawer {
-    padding-top: max(env(safe-area-inset-top, 0px), 48px);
+    padding-top: max(env(safe-area-inset-top, 0px), 50px);
   }
 }
 
-/* PWA standalone: ensure header and drawer clear status bar when safe-area is 0 or missing */
+/* PWA standalone: always clear status bar; use larger inset when safe-area is 0 */
 @media (display-mode: standalone) {
   .topbar {
-    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 52px);
+    padding-top: max(calc(12px + env(safe-area-inset-top, 0px)), 58px);
+    min-height: 56px;
   }
   .drawer {
-    padding-top: max(env(safe-area-inset-top, 0px), 52px);
+    padding-top: max(env(safe-area-inset-top, 0px), 58px);
+  }
+  .main-content {
+    padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 114px);
   }
 }
 
@@ -184,16 +191,54 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.drawer-nav .nav-item {
+  border-bottom: 1px solid var(--border);
+}
+.drawer-nav .nav-item:last-child {
+  border-bottom: none;
+}
+
 .drawer-footer {
   flex-shrink: 0;
   padding: 12px 0;
   border-top: 1px solid var(--border);
 }
 
+/* Notifications block: compact, clearly not a nav item */
 .drawer-push-settings {
-  padding: 0 16px 12px;
+  padding: 10px 20px 14px;
+  margin: 0 0 4px 0;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  background: var(--hover-bg, rgba(255, 255, 255, 0.04));
+  border-radius: 0;
+}
+
+.drawer-push-settings .push-settings-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.drawer-push-settings .push-settings-desc,
+.drawer-push-settings .push-settings-hint {
+  display: none;
+}
+
+.drawer-push-settings .push-settings-actions {
+  margin: 0;
+}
+
+.drawer-push-settings .push-settings-btn {
+  padding: 8px 14px;
+  font-size: 0.8125rem;
+}
+
+.drawer-push-settings .push-settings-msg {
+  margin-top: 6px;
+  font-size: 0.75rem;
 }
 
 .drawer-footer-brand {
@@ -237,9 +282,15 @@
 }
 
 .nav-icon {
-  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 24px;
-  text-align: center;
+  flex-shrink: 0;
+}
+
+.nav-icon svg {
+  color: inherit;
 }
 
 .nav-label {
@@ -263,12 +314,6 @@
   position: relative;
 }
 
-/* PWA standalone: match main padding to taller topbar so content isn't under header/status bar */
-@media (display-mode: standalone) {
-  .main-content {
-    padding-top: max(calc(56px + env(safe-area-inset-top, 0px)), 104px);
-  }
-}
 
 .motivation-bg {
   position: absolute;
@@ -399,7 +444,13 @@
 }
 
 .bn-icon {
-  font-size: 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bn-icon svg {
+  color: inherit;
 }
 
 /* Floating scroll-to-top button - above bottom nav and home indicator in PWA */
@@ -429,9 +480,13 @@
 }
 
 .fab-scroll-top-arrow {
-  font-size: 1.35rem;
-  font-weight: 700;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fab-scroll-top-arrow svg {
+  color: inherit;
 }
 
 @media (min-width: 769px) {

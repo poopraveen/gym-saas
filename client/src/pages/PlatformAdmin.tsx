@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, storage } from '../api/client';
 import OnboardingGuideModal from '../components/OnboardingGuideModal';
 import { runPlatformTour } from '../utils/guidedTour';
+import { AppIcons } from '../components/icons/AppIcons';
 import './PlatformAdmin.css';
 
 type Tenant = { _id: string; name: string; slug?: string; subdomain?: string; isActive?: boolean };
@@ -177,11 +178,11 @@ export default function PlatformAdmin() {
       <header className="platform-header">
         <h1>Platform Admin</h1>
         <div className="platform-actions">
-          <button type="button" className="btn-outline" onClick={() => runPlatformTour()}>
-            📖 Take a tour
+          <button type="button" className="btn-outline platform-btn-icon" onClick={() => runPlatformTour()}>
+            <span className="btn-icon-inline">{AppIcons.guide()}</span> Take a tour
           </button>
-          <button type="button" className="btn-outline" onClick={() => setShowOnboardingGuide(true)} data-tour="platform-onboarding-guide">
-            📄 Onboarding guide
+          <button type="button" className="btn-outline platform-btn-icon" onClick={() => setShowOnboardingGuide(true)} data-tour="platform-onboarding-guide">
+            <span className="btn-icon-inline">{AppIcons.fileText()}</span> Onboarding guide
           </button>
           <button type="button" onClick={() => navigate('/')} data-tour="platform-go-dashboard">Go to Dashboard</button>
           <button type="button" onClick={handleLogout}>Logout</button>
@@ -374,14 +375,14 @@ export default function PlatformAdmin() {
               <div className="telegram-status-row">
                 <span className="telegram-status-label">QR in gym Telegram tab:</span>
                 <span className={detailModal.telegramGroupInviteLink ? 'telegram-status-ok' : 'telegram-status-missing'}>
-                  {detailModal.telegramGroupInviteLink ? '✓ Will show (link saved)' : '✗ Won’t show — add Group Invite Link below and Save'}
+                  {detailModal.telegramGroupInviteLink ? <><span className="status-icon-ok">{AppIcons.check()}</span> Will show (link saved)</> : <><span className="status-icon-miss">{AppIcons.x()}</span> Won’t show — add Group Invite Link below and Save</>}
                 </span>
               </div>
               {telegramConfigPreview != null && (
                 <div className="telegram-status-row telegram-preview-row">
                   <span className="telegram-status-label">API preview (what gym admin sees):</span>
                   <span className={telegramConfigPreview.groupInviteLink ? 'telegram-status-ok' : 'telegram-status-missing'}>
-                    {telegramConfigPreview.groupInviteLink ? '✓ QR will show' : '✗ QR won’t show'}
+                    {telegramConfigPreview.groupInviteLink ? <><span className="status-icon-ok">{AppIcons.check()}</span> QR will show</> : <><span className="status-icon-miss">{AppIcons.x()}</span> QR won’t show</>}
                   </span>
                 </div>
               )}
