@@ -24,8 +24,11 @@ import type {
   NutrientStatus,
   ImprovementRecommendation,
 } from '../api/client';
+import { Mic } from 'lucide-react';
 import Layout from '../components/Layout';
 import { AppIcons } from '../components/icons/AppIcons';
+import { useI18n } from '../context/I18nContext';
+import { useSpeechRecognition, localeToSpeechLang } from '../hooks/useSpeechRecognition';
 import './NutritionAI.css';
 
 function safeDateStr(s: string | undefined): string {
@@ -152,6 +155,11 @@ export default function NutritionAI() {
   const [onBehalfError, setOnBehalfError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const historyRefreshInProgressRef = useRef(false);
+  const { t, locale } = useI18n();
+  const speechLang = localeToSpeechLang(locale);
+  const voiceInput = useSpeechRecognition({ lang: speechLang, continuous: true });
+  const voiceLangName = locale === 'en' ? t('voice.langNameEn') : locale === 'ta' ? t('voice.langNameTa') : t('voice.langNameHi');
+  const voiceHint = t('voice.speakForBest').replace('{lang}', voiceLangName);
 
   /** Nutrition Analysis (one-shot AI): reference foods from API + user-added custom foods, meal list, result */
   const [referenceFoods, setReferenceFoods] = useState<ReferenceFood[]>([]);
@@ -731,14 +739,40 @@ export default function NutritionAI() {
                       <h3 className="on-behalf-title">Add food on behalf</h3>
                       <p className="on-behalf-desc">Describe what they ate (e.g. &quot;2 roti, dal, rice&quot;). Entry will be added for the date below.</p>
                       <div className="on-behalf-row">
-                        <input
-                          type="text"
-                          className="on-behalf-input"
-                          placeholder="e.g. 2 eggs, toast, banana"
-                          value={onBehalfMessage}
-                          onChange={(e) => setOnBehalfMessage(e.target.value)}
-                          disabled={onBehalfSubmitting}
-                        />
+                        <div className="on-behalf-input-wrap">
+                          <input
+                            type="text"
+                            className="on-behalf-input"
+                            placeholder="e.g. 2 eggs, toast, banana"
+                            value={onBehalfMessage}
+                            onChange={(e) => { setOnBehalfMessage(e.target.value); voiceInput.setError?.(null); }}
+                            disabled={onBehalfSubmitting}
+                          />
+                          {voiceInput.supported && (
+                            voiceInput.isListening ? (
+                              <button
+                                type="button"
+                                className="on-behalf-mic-btn on-behalf-stop-btn listening"
+                                onClick={() => voiceInput.stopListening()}
+                                title={t('voice.stop')}
+                                aria-label={t('voice.stop')}
+                              >
+                                {t('voice.stop')}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="on-behalf-mic-btn"
+                                onClick={() => voiceInput.startListening((text) => setOnBehalfMessage((prev) => (prev ? prev + ' ' + text : text)))}
+                                disabled={onBehalfSubmitting}
+                                title={t('voice.input')}
+                                aria-label={t('voice.input')}
+                              >
+                                <Mic size={18} aria-hidden />
+                              </button>
+                            )
+                          )}
+                        </div>
                         <input
                           type="date"
                           className="on-behalf-date"
@@ -750,7 +784,10 @@ export default function NutritionAI() {
                           {onBehalfSubmitting ? 'Adding…' : 'Add'}
                         </button>
                       </div>
+                      {voiceInput.isListening && <p className="on-behalf-voice-status">{t('voice.speakMeal')}</p>}
+                      {voiceInput.supported && !voiceInput.isListening && <p className="on-behalf-voice-hint">{voiceHint}</p>}
                       {onBehalfError && <p className="on-behalf-error">{onBehalfError}</p>}
+                      {voiceInput.error && <p className="on-behalf-error on-behalf-voice-error">{voiceInput.error}</p>}
                     </div>
                     <div className="last7-block">
                       <strong>Last 7 days</strong>
@@ -1544,18 +1581,47 @@ export default function NutritionAI() {
             <p className="chat-desc">E.g. &quot;2 idlis, sambar, 1 cup coffee&quot;</p>
           )}
           <form onSubmit={handleChatSubmit} className="chat-form">
-            <input
-              type="text"
-              className="chat-input"
-              placeholder={addForDateMode ? 'Describe what you ate on that day...' : 'Describe your meal...'}
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              disabled={chatSubmitting}
-            />
+            <div className="chat-input-wrap">
+              <input
+                type="text"
+                className="chat-input"
+                placeholder={addForDateMode ? 'Describe what you ate on that day...' : 'Describe your meal...'}
+                value={chatInput}
+                onChange={(e) => { setChatInput(e.target.value); voiceInput.setError?.(null); }}
+                disabled={chatSubmitting}
+              />
+              {voiceInput.supported && (
+                voiceInput.isListening ? (
+                  <button
+                    type="button"
+                    className="chat-mic-btn chat-stop-btn listening"
+                    onClick={() => voiceInput.stopListening()}
+                    title={t('voice.stop')}
+                    aria-label={t('voice.stop')}
+                  >
+                    {t('voice.stop')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="chat-mic-btn"
+                    onClick={() => voiceInput.startListening((text) => setChatInput((prev) => (prev ? prev + ' ' + text : text)))}
+                    disabled={chatSubmitting}
+                    title={t('voice.input')}
+                    aria-label={t('voice.input')}
+                  >
+                    <Mic size={20} aria-hidden />
+                  </button>
+                )
+              )}
+            </div>
+            {voiceInput.isListening && <p className="chat-voice-status">{t('voice.speakMeal')}</p>}
+            {voiceInput.supported && !voiceInput.isListening && <p className="chat-voice-hint">{voiceHint}</p>}
             <button type="submit" className="btn-primary" disabled={chatSubmitting || !chatInput.trim()}>
               {chatSubmitting ? 'Adding…' : 'Add'}
             </button>
           </form>
+          {voiceInput.error && <p className="chat-voice-error">{voiceInput.error}</p>}
           {!addForDateMode && (
             <button
               type="button"

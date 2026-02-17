@@ -491,12 +491,22 @@
 
 .chat-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
 
+.chat-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
 .chat-input {
   flex: 1;
+  min-width: 0;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -507,6 +517,66 @@
 
 .chat-input::placeholder {
   color: var(--text-secondary);
+}
+
+.chat-mic-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.chat-mic-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.chat-mic-btn.listening,
+.chat-mic-btn.chat-stop-btn {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.chat-mic-btn.chat-stop-btn {
+  min-width: 3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  animation: chat-mic-pulse 1s ease-in-out infinite;
+}
+
+@keyframes chat-mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.chat-voice-status {
+  width: 100%;
+  margin: 0 0 0.25rem 0;
+  font-size: 0.85rem;
+  color: var(--primary);
+}
+
+.chat-voice-hint {
+  width: 100%;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.chat-voice-error {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: var(--error);
 }
 
 .chat-error {
@@ -1289,6 +1359,16 @@
 .on-behalf-input { flex: 1; min-width: 180px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-primary); }
 .on-behalf-date { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-primary); }
 .on-behalf-btn { flex-shrink: 0; }
+.on-behalf-mic-btn.on-behalf-stop-btn {
+  min-width: 2.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.on-behalf-voice-status { margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--primary); }
+.on-behalf-voice-hint { margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-secondary); }
 .on-behalf-error { margin: 0.5rem 0 0 0; color: var(--pill-expired, #dc2626); font-size: 0.9rem; }
 
 /* Trainer: member's nutrition report (saved in DB) */

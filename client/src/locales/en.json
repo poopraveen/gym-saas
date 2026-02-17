@@ -45,5 +45,13 @@
   "trainer.nutritionAI": "Nutrition AI",
   "trainer.workoutPlan": "Workout Plan",
   "trainer.regNo": "Reg No",
-  "trainer.addOneMemberError": "Add at least one member with a name."
+  "trainer.addOneMemberError": "Add at least one member with a name.",
+  "voice.input": "Voice input",
+  "voice.listening": "Listening…",
+  "voice.speakMeal": "Speak your meal (e.g. 2 idlis, sambar, coffee)",
+  "voice.speakForBest": "Speak in {lang} for best accuracy",
+  "voice.langNameEn": "English",
+  "voice.langNameHi": "Hindi",
+  "voice.langNameTa": "Tamil",
+  "voice.stop": "Stop"
 }

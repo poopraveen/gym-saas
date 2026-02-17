@@ -27,6 +27,9 @@ const SYSTEM_PROMPT = `You are a nutrition assistant specialized in Indian diets
 Convert food descriptions into estimated calorie counts.
 Use common Indian portions (e.g. 1 katori, 2 idlis, 1 medium chapati).
 Use average Indian calorie references (ICMR-style); avoid extreme fitness assumptions.
+
+IMPORTANT: The user message may contain extra text (e.g. voice input picked up UI text or instructions). Extract ONLY the part that describes food or meals. Ignore phrases like "please describe what you ate", "describe your meal", "what did you eat", "coming need to refine", or any instructions/meta text. Analyze only the actual food items mentioned (e.g. "chicken rice, one egg, 2 idli" → analyze chicken rice, one egg, 2 idli).
+
 Respond ONLY with a valid JSON object, no other text. No markdown, no code block.
 Format:
 {
@@ -36,14 +39,15 @@ Format:
   ],
   "totalCalories": number
 }
-If the user message does not describe food, return: { "error": "Please describe what you ate." }
+If after extracting there is no food description, return: { "error": "Please describe what you ate." }
 Use today's date in YYYY-MM-DD for "date" unless the user specifies another date.`;
 
 const EXTEND_PROMPT = `Same rules as above, but the user is ADDING MORE food to an existing day.
 You will receive "Existing items for this day: [...]" and "User is adding: ...".
+Extract ONLY the food/meal part from the user message; ignore any instructions or off-topic text.
 Return JSON with ONLY the NEW items and totalCalories for those new items (not the full day total).
 Format: { "date": "YYYY-MM-DD", "items": [ new items only ], "totalCalories": sum of new items only }
-If the message does not describe new food, return: { "error": "Please describe what you ate." }`;
+If after extracting there is no new food, return: { "error": "Please describe what you ate." }`;
 
 export interface ChatCalorieResult {
   date: string;
@@ -147,7 +151,8 @@ export class CaloriesService {
     if (!this.openai) {
       throw new BadRequestException('Calorie chat is not configured (missing OPENAI_API_KEY)');
     }
-    const trimmed = message?.trim();
+    let trimmed = message?.trim() || '';
+    trimmed = this.stripVoiceInputNoise(trimmed);
     if (!trimmed) {
       throw new BadRequestException('Message is required');
     }
@@ -518,6 +523,32 @@ Return the single JSON object with perFood, dailyTotal, rdiPercentage, deficienc
       suggestions: d.suggestions || [],
       improvements: d.improvements || [],
     };
+  }
+
+  /**
+   * Strip common UI/instruction phrases that voice input may pick up.
+   * Keeps only the food/meal-relevant part of the message.
+   */
+  private stripVoiceInputNoise(message: string): string {
+    const lower = message.toLowerCase();
+    const phrases = [
+      'please describe what you ate',
+      'describe what you ate',
+      'please describe your meal',
+      'describe your meal',
+      'what did you eat',
+      'describe your meal.',
+      'coming need to refine',
+      'coming need to refine the',
+      'the chat api',
+      'its correct input',
+    ];
+    let out = message;
+    for (const p of phrases) {
+      const re = new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      out = out.replace(re, ' ');
+    }
+    return out.replace(/\s+/g, ' ').replace(/^[\s,.]*|[\s,.]*$/g, '').trim();
   }
 
   private todayDate(): string {

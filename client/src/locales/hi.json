@@ -45,5 +45,13 @@
   "trainer.nutritionAI": "न्यूट्रिशन AI",
   "trainer.workoutPlan": "वर्कआउट प्लान",
   "trainer.regNo": "रज. नं.",
-  "trainer.addOneMemberError": "कम से कम एक मेंबर का नाम डालें।"
+  "trainer.addOneMemberError": "कम से कम एक मेंबर का नाम डालें।",
+  "voice.input": "वॉयस इनपुट",
+  "voice.listening": "सुन रहा है…",
+  "voice.speakMeal": "अपना भोजन बोलें (जैसे 2 रोटी, दाल, चावल)",
+  "voice.speakForBest": "बेहतर रिज़ल्ट के लिए {lang} में बोलें",
+  "voice.langNameEn": "English",
+  "voice.langNameHi": "हिंदी",
+  "voice.langNameTa": "तमिल",
+  "voice.stop": "रोकें"
 }
