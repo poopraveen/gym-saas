@@ -28,6 +28,13 @@ export class AttendanceService {
       }
     }
 
+    if (checkedInBy === 'QR') {
+      const hasFace = await this.membersService.hasFaceDescriptor(tenantId, regNo);
+      if (hasFace) {
+        throw new BadRequestException('This member is enrolled for face check-in. Please use the face scan option to check in.');
+      }
+    }
+
     const now = new Date();
     const monthKey = String(now.getMonth());
     const monthlyAttendance = (member.monthlyAttendance || {}) as Record<string, number>;
@@ -150,25 +157,33 @@ export class AttendanceService {
     return Math.sqrt(sum);
   }
 
-  /** Save face descriptor for a member (admin enrollment). */
+  /** Save face descriptor for a member (admin enrollment). Fails if member is already enrolled. */
   async faceEnroll(tenantId: string, regNo: number, descriptor: number[]): Promise<boolean> {
+    const alreadyEnrolled = await this.membersService.hasFaceDescriptor(tenantId, regNo);
+    if (alreadyEnrolled) {
+      throw new BadRequestException('This member is already enrolled for face recognition. To re-enroll, clear the existing face first (or contact support).');
+    }
     return this.membersService.updateFaceDescriptor(tenantId, regNo, descriptor);
   }
 
-  /** Find best-matching member by face descriptor. Returns regNo if distance below threshold. */
+  /** Find best-matching member by face descriptor. Uses stricter threshold and margin to avoid wrong-person match. */
   async findMemberByFace(tenantId: string, descriptor: number[]): Promise<{ regNo: number; name: string } | null> {
     if (!Array.isArray(descriptor) || descriptor.length !== 128) return null;
     const members = await this.membersService.getMembersWithFaceDescriptors(tenantId);
     if (members.length === 0) return null;
-    const THRESHOLD = 0.65;
-    let best: { regNo: number; name: string; distance: number } | null = null;
+    const THRESHOLD = 0.5;
+    const MARGIN = 0.08;
+    const distances: { regNo: number; name: string; distance: number }[] = [];
     for (const m of members) {
       const dist = AttendanceService.descriptorDistance(descriptor, m.faceDescriptor);
-      if (dist < THRESHOLD && (!best || dist < best.distance)) {
-        best = { regNo: m.regNo, name: m.name, distance: dist };
-      }
+      if (dist < THRESHOLD) distances.push({ regNo: m.regNo, name: m.name, distance: dist });
     }
-    return best ? { regNo: best.regNo, name: best.name } : null;
+    distances.sort((a, b) => a.distance - b.distance);
+    const best = distances[0];
+    if (!best) return null;
+    const secondBest = distances[1];
+    if (secondBest != null && secondBest.distance - best.distance < MARGIN) return null;
+    return { regNo: best.regNo, name: best.name };
   }
 
   /** Public: check-in by face (token from QR + face descriptor). */

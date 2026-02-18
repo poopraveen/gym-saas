@@ -165,6 +165,13 @@ export class AttendanceController {
           pushUrl: '/',
           telegramText: `⚠️ <b>Expired membership check-in</b>\nReg. No. <b>${regNo}</b> tried to check in but membership is expired.`,
         });
+      } else if (msg.includes('enrolled for face check-in')) {
+        await this.notificationsService.notifyGymOwner(tenantId, {
+          pushTitle: 'Face check-in required',
+          pushBody: `Someone tried to check in by name/Reg. No. for a member who must use face check-in (Reg. No. ${regNo}).`,
+          pushUrl: '/',
+          telegramText: `⚠️ <b>Face check-in required</b>\nSomeone tried to check in by name/Reg. No. for a member who must use face check-in (Reg. No. <b>${regNo}</b>).`,
+        });
       }
       throw err;
     }

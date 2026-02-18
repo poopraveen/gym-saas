@@ -328,6 +328,18 @@ export class MembersService {
   }
 
   /**
+   * Check if a member already has a face descriptor (already enrolled for face recognition).
+   */
+  async hasFaceDescriptor(tenantId: string, regNo: number): Promise<boolean> {
+    const doc = await this.memberModel
+      .findOne({ tenantId, regNo })
+      .select('faceDescriptor')
+      .lean();
+    const fd = (doc as Record<string, unknown> | null)?.faceDescriptor;
+    return Array.isArray(fd) && fd.length === 128;
+  }
+
+  /**
    * Save face descriptor (128-d) for a member. Used for face recognition check-in.
    */
   async updateFaceDescriptor(tenantId: string, regNo: number, descriptor: number[]): Promise<boolean> {

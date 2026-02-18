@@ -4,6 +4,7 @@
   "description": "Multi-tenant Gym Management SaaS - NestJS + RBAC",
   "scripts": {
     "build": "nest build",
+    "generate-vapid-keys": "node -e \"const w=require('web-push'); const k=w.generateVAPIDKeys(); console.log('VAPID_PUBLIC_KEY='+k.publicKey); console.log('VAPID_PRIVATE_KEY='+k.privateKey);\"",
     "tunnel": "ngrok http 3000",
     "free-port": "npx --yes kill-port 3000",
     "dev:telegram": "node scripts/telegram-tunnel.mjs",

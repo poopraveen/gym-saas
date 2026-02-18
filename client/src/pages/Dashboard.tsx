@@ -12,7 +12,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
-import { api, storage } from '../api/client';
+import { api, storage, getApiErrorMessage } from '../api/client';
 import { downloadMonthlyReportPDF } from '../utils/downloadMonthlyReport';
 import Layout from '../components/Layout';
 import AddMemberModal from '../components/AddMemberModal';
@@ -1371,7 +1371,8 @@ export default function Dashboard() {
                     setShowEnrollSuccessPopup(true);
                     return { success: true as const };
                   } catch (err) {
-                    setFaceEnrollMessage(err instanceof Error ? err.message : 'Enroll failed');
+                    const msg = getApiErrorMessage(err);
+                    setFaceEnrollMessage(msg || 'Enrollment failed. Please try again.');
                     return { success: false as const };
                   }
                 }}

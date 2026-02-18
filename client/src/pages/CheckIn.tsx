@@ -124,6 +124,7 @@ export default function CheckIn() {
         {showForm ? (
           <>
             <p className="checkin-hint">Use face recognition (if enrolled) or type your name/Reg. No. and tap Check In.</p>
+            <p className="checkin-hint checkin-hint-face">Members who have enrolled their face must use the <strong>face scan</strong> option to check in.</p>
             <div className="checkin-face-row">
               <button
                 type="button"
