@@ -156,6 +156,16 @@ export class AuthService {
     return { email: u.email, name: u.name, role: u.role };
   }
 
+  /** Get tenant admin user id (for push notifications to gym owner). Returns first TENANT_ADMIN userId or null. */
+  async getTenantAdminUserId(tenantId: string): Promise<string | null> {
+    const user = await this.userModel
+      .findOne({ tenantId, role: Role.TENANT_ADMIN, isActive: true })
+      .select('_id')
+      .lean();
+    if (!user || !(user as { _id?: unknown })._id) return null;
+    return String((user as { _id: unknown })._id);
+  }
+
   /** Super admin: reset user password by tenant + email */
   async resetUserPassword(tenantId: string, email: string, newPassword: string) {
     const hash = await bcrypt.hash(newPassword, 10);

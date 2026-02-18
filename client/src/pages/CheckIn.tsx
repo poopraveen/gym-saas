@@ -202,6 +202,7 @@ export default function CheckIn() {
                 title="Look at the camera — then tap Capture to check in"
                 captureButtonLabel="Capture & check in"
                 successWatermarkText="Welcome!"
+                failureMessage="Face not recognized. Gym owner has been notified. Use name/Reg. No. or try again."
                 onCapture={async (descriptor) => {
                   setSubmitting(true);
                   setMessage(null);
@@ -220,8 +221,10 @@ export default function CheckIn() {
                       });
                     }
                     setShowSuccessPopup(true);
+                    return { success: true as const };
                   } catch (err) {
                     setMessage({ type: 'error', text: getApiErrorMessage(err) });
+                    return { success: false as const };
                   } finally {
                     setSubmitting(false);
                   }

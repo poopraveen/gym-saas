@@ -175,8 +175,13 @@ export default function TrainerDashboard() {
                   <button type="button" className="trainer-summary-modal-close" onClick={() => setSummaryModalOpen(false)} aria-label={t('common.close')}>×</button>
                 </div>
                 <div className="trainer-summary-modal-body">
-                  {summaryLoading && <div className="trainer-summary-loading">{t('common.loading')}</div>}
-                  {summaryError && <div className="trainer-summary-err">{summaryError}</div>}
+                  {summaryLoading && (
+                    <div className="trainer-summary-loading-block">
+                      <div className="trainer-summary-spinner" aria-hidden />
+                      <p className="trainer-summary-loading-text">{t('trainer.summaryLoadingMessage')}</p>
+                    </div>
+                  )}
+                  {!summaryLoading && summaryError && <div className="trainer-summary-err">{summaryError}</div>}
                   {!summaryLoading && summaryResult != null && summaryResult !== '' && (
                     <pre className="trainer-summary-pre">{summaryResult}</pre>
                   )}

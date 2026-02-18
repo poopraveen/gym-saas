@@ -586,10 +586,13 @@ Return the single JSON object with perFood, dailyTotal, rdiPercentage, deficienc
       throw new BadRequestException('At least one member is required');
     }
 
-    const NEEDS_ATTENTION_PROMPT = `You are an AI Trainer Assistant.
-Analyze today's member activity and identify who needs attention.
+    const NEEDS_ATTENTION_PROMPT = `You are the Trainer Attention Intelligence Agent.
 
-For each member:
+Your job: Help the trainer quickly identify which assigned members need attention today.
+
+You ONLY analyze members assigned to this trainer. Never access other trainers' members.
+
+For each member provided:
 - Identify the main problem
 - Assign risk level (Low / Medium / High)
 - Suggest ONE clear action for the trainer

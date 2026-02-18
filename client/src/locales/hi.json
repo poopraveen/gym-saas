@@ -22,6 +22,7 @@
   "trainer.assignedMembers": "असाइन्ड मेंबर्स",
   "trainer.tapToView": "देखने के लिए टैप करें",
   "trainer.assignedMembersSummary": "असाइन्ड मेंबर्स सारांश",
+  "trainer.summaryLoadingMessage": "आपके असाइन्ड मेंबर्स का सारांश लोड हो रहा है…",
   "trainer.needsAttentionToday": "आज ध्यान चाहिए",
   "trainer.needsAttentionDesc": "आप एक AI ट्रेनर असिस्टेंट हैं। आज के मेंबर एक्टिविटी का विश्लेषण करें और पहचानें किसे ध्यान चाहिए। हर मेंबर के लिए: मुख्य समस्या पहचानें, रिस्क लेवल (Low / Medium / High) दें, और एक स्पष्ट एक्शन सुझाएं।",
   "trainer.loadMyAssignedMembers": "मेरे असाइन्ड मेंबर्स लोड करें",

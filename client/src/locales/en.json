@@ -22,6 +22,7 @@
   "trainer.assignedMembers": "Assigned Members",
   "trainer.tapToView": "Tap to view",
   "trainer.assignedMembersSummary": "Assigned Members Summary",
+  "trainer.summaryLoadingMessage": "Getting your assigned members summary…",
   "trainer.needsAttentionToday": "Needs Attention Today",
   "trainer.needsAttentionDesc": "You are an AI Trainer Assistant. Analyze today's member activity and identify who needs attention. For each member: identify the main problem, assign risk level (Low / Medium / High), and suggest ONE clear action.",
   "trainer.loadMyAssignedMembers": "Load my assigned members",

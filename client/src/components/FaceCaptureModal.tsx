@@ -2,13 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { loadFaceModels, getDescriptorFromVideo } from '../utils/faceRecognition';
 import './FaceCaptureModal.css';
 
+export type FaceCaptureResult = { success: true } | { success: false };
+
 type Props = {
-  onCapture: (descriptor: number[]) => void;
+  /** Called with descriptor; return { success: true } to show green and close, { success: false } to show red and stay. */
+  onCapture: (descriptor: number[]) => Promise<FaceCaptureResult>;
   onClose: () => void;
   title?: string;
   captureButtonLabel?: string;
   /** Shown in watermark after successful recognition (e.g. "Recognized" or "Welcome!") */
   successWatermarkText?: string;
+  /** Message when recognition failed (red state). */
+  failureMessage?: string;
 };
 
 const SUCCESS_DISPLAY_MS = 1800;
@@ -19,6 +24,7 @@ export default function FaceCaptureModal({
   title = 'Position your face in the frame',
   captureButtonLabel = 'Capture face',
   successWatermarkText = 'Recognized',
+  failureMessage = 'Face not recognized. Gym owner has been notified.',
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -26,7 +32,7 @@ export default function FaceCaptureModal({
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const pendingDescriptorRef = useRef<number[] | null>(null);
+  const [recognitionFailed, setRecognitionFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,15 +72,10 @@ export default function FaceCaptureModal({
   }, []);
 
   useEffect(() => {
-    if (!showSuccess || !pendingDescriptorRef.current) return;
-    const t = setTimeout(() => {
-      const desc = pendingDescriptorRef.current;
-      pendingDescriptorRef.current = null;
-      if (desc) onCapture(desc);
-      onClose();
-    }, SUCCESS_DISPLAY_MS);
+    if (!showSuccess) return;
+    const t = setTimeout(() => onClose(), SUCCESS_DISPLAY_MS);
     return () => clearTimeout(t);
-  }, [showSuccess, onCapture, onClose]);
+  }, [showSuccess, onClose]);
 
   useEffect(() => {
     document.body.classList.add('face-capture-open');
@@ -89,19 +90,30 @@ export default function FaceCaptureModal({
     }
     setCapturing(true);
     setError(null);
+    setRecognitionFailed(false);
     try {
       const descriptor = await getDescriptorFromVideo(video);
-      if (descriptor) {
-        pendingDescriptorRef.current = descriptor;
+      if (!descriptor) {
+        setError('No face detected. Look at the camera and try again.');
+        setCapturing(false);
+        return;
+      }
+      const result = await onCapture(descriptor);
+      if (result.success) {
         setShowSuccess(true);
       } else {
-        setError('No face detected. Look at the camera and try again.');
+        setRecognitionFailed(true);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Face detection failed');
     } finally {
       setCapturing(false);
     }
+  };
+
+  const handleTryAgain = () => {
+    setRecognitionFailed(false);
+    setError(null);
   };
 
   if (showSuccess) {
@@ -128,26 +140,43 @@ export default function FaceCaptureModal({
         {loading && <p className="face-capture-loading">Loading camera and face model…</p>}
         {!loading && !error && (
           <div className="face-detect-animation" aria-hidden>
-            <div className="face-detect-frame">
-              <div className="face-detect-scan" />
-              <div className="face-detect-corner face-detect-corner--tl" />
-              <div className="face-detect-corner face-detect-corner--tr" />
-              <div className="face-detect-corner face-detect-corner--bl" />
-              <div className="face-detect-corner face-detect-corner--br" />
+            <div className={`face-detect-frame ${recognitionFailed ? 'face-detect-frame--failure' : ''}`}>
+              <div className={`face-detect-scan ${recognitionFailed ? 'face-detect-scan--failure' : ''}`} />
+              <div className={`face-detect-corner face-detect-corner--tl ${recognitionFailed ? 'face-detect-corner--failure' : ''}`} />
+              <div className={`face-detect-corner face-detect-corner--tr ${recognitionFailed ? 'face-detect-corner--failure' : ''}`} />
+              <div className={`face-detect-corner face-detect-corner--bl ${recognitionFailed ? 'face-detect-corner--failure' : ''}`} />
+              <div className={`face-detect-corner face-detect-corner--br ${recognitionFailed ? 'face-detect-corner--failure' : ''}`} />
             </div>
             <p className="face-detect-text">
-              <span className="face-detect-text-line face-detect-text-line-1">Position your face in the frame</span>
-              <span className="face-detect-text-line face-detect-text-line-2">Then tap Capture</span>
+              {recognitionFailed ? (
+                <span className="face-detect-text-line face-detect-text-line-1 face-detect-text-line--failure">{failureMessage}</span>
+              ) : (
+                <>
+                  <span className="face-detect-text-line face-detect-text-line-1">Position your face in the frame</span>
+                  <span className="face-detect-text-line face-detect-text-line-2">Then tap Capture</span>
+                </>
+              )}
             </p>
           </div>
         )}
       </div>
       {error && <p className="face-capture-error face-capture-error--overlay">{error}</p>}
       <div className="face-capture-actions face-capture-actions--overlay">
-        <button type="button" className="face-capture-btn face-capture-btn-capture" onClick={handleCapture} disabled={loading || capturing}>
-          {capturing ? 'Detecting…' : captureButtonLabel}
-        </button>
-        <button type="button" className="face-capture-btn face-capture-btn-cancel" onClick={onClose}>Cancel</button>
+        {recognitionFailed ? (
+          <>
+            <button type="button" className="face-capture-btn face-capture-btn-capture" onClick={handleTryAgain}>
+              Try again
+            </button>
+            <button type="button" className="face-capture-btn face-capture-btn-cancel" onClick={onClose}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="face-capture-btn face-capture-btn-capture" onClick={handleCapture} disabled={loading || capturing}>
+              {capturing ? 'Detecting…' : captureButtonLabel}
+            </button>
+            <button type="button" className="face-capture-btn face-capture-btn-cancel" onClick={onClose}>Cancel</button>
+          </>
+        )}
       </div>
     </div>
   );

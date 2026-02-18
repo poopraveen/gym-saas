@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Query, UseGuards } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { TenantId } from '../common/decorators/tenant-id.decorator';
 import { Role } from '../common/constants/roles';
 
 @Controller('tenants')
@@ -31,5 +32,28 @@ export class TenantsController {
   @Roles(Role.SUPER_ADMIN)
   findAll() {
     return this.tenantsService.findAll();
+  }
+
+  /** Gym admin: get my tenant settings (e.g. notify on face failure). */
+  @Get('my/settings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  getMySettings(@TenantId() tenantId: string) {
+    return this.tenantsService.getMySettings(tenantId);
+  }
+
+  /** Gym admin: update my tenant settings. */
+  @Patch('my/settings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER)
+  async updateMySettings(
+    @TenantId() tenantId: string,
+    @Body() body: {
+      notifyOwnerOnFaceFailure?: boolean;
+      enrollKey?: string;
+      newFaceAlertEnrollKey?: string;
+    },
+  ) {
+    return this.tenantsService.updateMySettings(tenantId, body);
   }
 }

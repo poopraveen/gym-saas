@@ -865,6 +865,98 @@
   color: var(--text-primary);
 }
 
+.checkin-face-alerts-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.checkin-face-alerts-title {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.checkin-face-alerts-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+}
+
+.checkin-face-alerts-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.checkin-face-alerts-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  max-width: 420px;
+}
+
+.checkin-face-alerts-key-hint {
+  margin: 0 0 6px 0;
+  font-size: 0.85rem;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.checkin-face-alerts-set-key {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.checkin-face-alerts-set-key-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.checkin-enroll-key-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.checkin-enroll-key-modal {
+  background: var(--card-bg, #25262b);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.checkin-enroll-key-modal .checkin-face-enroll-input {
+  width: 100%;
+  margin: 12px 0;
+  box-sizing: border-box;
+}
+
+.checkin-enroll-key-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.checkin-enroll-key-actions .btn-primary {
+  flex: 1;
+}
+
 .checkin-face-enroll-section {
   margin-top: 24px;
   padding-top: 20px;

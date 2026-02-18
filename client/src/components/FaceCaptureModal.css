@@ -202,6 +202,30 @@
   border-radius: 0 0 6px 0;
 }
 
+/* Red state when face not recognized (gym owner notified) */
+.face-detect-frame--failure {
+  outline: 3px solid rgba(239, 68, 68, 0.95);
+  outline-offset: 4px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.6), 0 0 24px rgba(239, 68, 68, 0.35);
+}
+
+.face-detect-frame--failure .face-detect-corner,
+.face-detect-corner--failure {
+  border-color: rgba(239, 68, 68, 0.95) !important;
+}
+
+.face-detect-scan--failure {
+  background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.9), transparent) !important;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6) !important;
+}
+
+.face-detect-text-line--failure {
+  color: rgba(254, 202, 202, 0.98) !important;
+  font-size: 0.95rem;
+  max-width: 280px;
+}
+
 .face-detect-text {
   margin: 0;
   display: flex;

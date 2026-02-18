@@ -175,6 +175,17 @@ export const api = {
         showFinanceTab?: boolean;
       }>(q ? `/tenants/config?${q}` : '/tenants/config');
     },
+    getMySettings: () =>
+      request<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean }>('/tenants/my/settings'),
+    updateMySettings: (body: {
+      notifyOwnerOnFaceFailure?: boolean;
+      enrollKey?: string;
+      newFaceAlertEnrollKey?: string;
+    }) =>
+      request<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean }>('/tenants/my/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
   },
   auth: {
     login: (email: string, password: string) =>

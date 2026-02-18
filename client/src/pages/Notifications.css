@@ -3,6 +3,164 @@
   padding: 20px;
 }
 
+.notifications-face-alerts {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--hover-bg, rgba(59, 130, 246, 0.06));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.notifications-face-alerts-title {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notifications-face-alerts-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.notifications-face-alerts-label input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.notifications-face-alerts-hint {
+  margin: 10px 0 0 28px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.notifications-face-alerts-key-hint {
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.notifications-face-alerts-set-key {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.notifications-face-alerts-set-key-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.notifications-set-key-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.notifications-set-key-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.notifications-set-key-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.notifications-btn-primary {
+  padding: 10px 18px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.notifications-btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.notifications-btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.notifications-btn-cancel {
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.notifications-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.notifications-enroll-key-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.notifications-enroll-key-modal {
+  background: var(--card-bg, #25262b);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.notifications-enroll-key-modal .notifications-set-key-input {
+  width: 100%;
+  margin: 12px 0;
+  box-sizing: border-box;
+}
+
+.notifications-enroll-key-error {
+  margin: 8px 0 0 0;
+  font-size: 0.9rem;
+  color: var(--error, #ef4444);
+}
+
+.notifications-enroll-key-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.notifications-enroll-key-actions .notifications-btn-primary {
+  flex: 1;
+}
+
 .notifications-intro {
   color: var(--text-secondary);
   margin: 0 0 24px 0;

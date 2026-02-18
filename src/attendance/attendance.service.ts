@@ -44,9 +44,19 @@ export class AttendanceService {
     return member;
   }
 
-  /** List of members with today's check-ins. */
+  /** List of members eligible for check-in (due date >= today only). Used for attendance screen and today's check-ins. */
   async checkInList(tenantId: string) {
-    return this.membersService.list(tenantId);
+    const list = await this.membersService.list(tenantId);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return list.filter((row) => {
+      const r = row as unknown as Record<string, unknown>;
+      const dueRaw = r['DUE DATE'] ?? r.dueDate;
+      if (dueRaw == null) return true;
+      const due = new Date(dueRaw as number | string);
+      if (isNaN(due.getTime())) return true;
+      return due >= todayStart;
+    });
   }
 
   /** Remove today's check-in for a member so they can check in again. Clears lastCheckInTime and decrements monthly count. */

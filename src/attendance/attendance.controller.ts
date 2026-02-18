@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AttendanceService } from './attendance.service';
+import { TenantsService } from '../tenants/tenants.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { TenantId } from '../common/decorators/tenant-id.decorator';
@@ -20,6 +22,8 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
     private readonly configService: ConfigService,
+    private readonly tenantsService: TenantsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Get('checkinlist')
@@ -32,7 +36,7 @@ export class AttendanceController {
   @Post('checkin')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
-  checkIn(
+  async checkIn(
     @TenantId() tenantId: string,
     @Body() body: { newUserData?: { 'Reg No:': number }; regNo?: number; checkedInBy?: string },
   ) {
@@ -40,7 +44,20 @@ export class AttendanceController {
       body.newUserData?.['Reg No:'] ??
       body.regNo;
     if (regNo == null) throw new BadRequestException('regNo required');
-    return this.attendanceService.checkIn(tenantId, Number(regNo), body.checkedInBy);
+    try {
+      return await this.attendanceService.checkIn(tenantId, Number(regNo), body.checkedInBy);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('Membership expired')) {
+        await this.notificationsService.notifyGymOwner(tenantId, {
+          pushTitle: 'Expired membership check-in attempt',
+          pushBody: `Someone tried to check in with Reg. No. ${regNo} but membership is expired.`,
+          pushUrl: '/',
+          telegramText: `⚠️ <b>Expired membership check-in</b>\nReg. No. <b>${regNo}</b> tried to check in but membership is expired.`,
+        });
+      }
+      throw err;
+    }
   }
 
   /** Remove today's check-in for a member so they can re-enter. */
@@ -100,6 +117,15 @@ export class AttendanceController {
     }
     const result = await this.attendanceService.checkInByFace(token, descriptor);
     if (!result) {
+      const tenantId = this.attendanceService.verifyQRToken(token);
+      if (tenantId) {
+        await this.notificationsService.notifyGymOwner(tenantId, {
+          pushTitle: 'Face recognition failed',
+          pushBody: 'Someone tried to check in by face but was not recognized. They can use name/Reg. No. instead.',
+          pushUrl: '/',
+          telegramText: '⚠️ <b>Face recognition failed</b>\nSomeone tried to check in by face but was not recognized. They can use name/Reg. No. instead.',
+        });
+      }
       throw new BadRequestException('Face not recognized. Enroll your face at the gym or check in with name/Reg. No.');
     }
     return result;
@@ -112,22 +138,35 @@ export class AttendanceController {
     if (!token || regNo == null) throw new BadRequestException('token and regNo required');
     const tenantId = this.attendanceService.verifyQRToken(token);
     if (!tenantId) throw new BadRequestException('Invalid or expired QR code. Please scan the latest QR at the gym.');
-    const member = await this.attendanceService.checkIn(tenantId, Number(regNo), 'QR');
-    if (!member) throw new BadRequestException('Registration number not found.');
-    const m = member as unknown as Record<string, unknown>;
-    const name = (m.name ?? m.NAME) as string;
-    const dueRaw = m['DUE DATE'] ?? m.dueDate;
-    const dueDate =
-      dueRaw != null && !isNaN(new Date(dueRaw as string | number).getTime())
-        ? new Date(dueRaw as string | number).toISOString()
-        : undefined;
-    const checkInTime = new Date().toISOString();
-    const memberSummary = {
-      name,
-      dueDate,
-      phoneNumber: (m['Phone Number'] ?? m.phoneNumber) as string | undefined,
-      typeofPack: (m['Typeof pack'] ?? m.typeofPack) as string | undefined,
-    };
-    return { success: true, name, memberSummary, checkInTime };
+    try {
+      const member = await this.attendanceService.checkIn(tenantId, Number(regNo), 'QR');
+      if (!member) throw new BadRequestException('Registration number not found.');
+      const m = member as unknown as Record<string, unknown>;
+      const name = (m.name ?? m.NAME) as string;
+      const dueRaw = m['DUE DATE'] ?? m.dueDate;
+      const dueDate =
+        dueRaw != null && !isNaN(new Date(dueRaw as string | number).getTime())
+          ? new Date(dueRaw as string | number).toISOString()
+          : undefined;
+      const checkInTime = new Date().toISOString();
+      const memberSummary = {
+        name,
+        dueDate,
+        phoneNumber: (m['Phone Number'] ?? m.phoneNumber) as string | undefined,
+        typeofPack: (m['Typeof pack'] ?? m.typeofPack) as string | undefined,
+      };
+      return { success: true, name, memberSummary, checkInTime };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('Membership expired')) {
+        await this.notificationsService.notifyGymOwner(tenantId, {
+          pushTitle: 'Expired membership check-in attempt',
+          pushBody: `Someone tried to check in with Reg. No. ${regNo} but membership is expired.`,
+          pushUrl: '/',
+          telegramText: `⚠️ <b>Expired membership check-in</b>\nReg. No. <b>${regNo}</b> tried to check in but membership is expired.`,
+        });
+      }
+      throw err;
+    }
   }
 }

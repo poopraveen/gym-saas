@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Tenant, TenantBranding, ThemeType } from './schemas/tenant.schema';
@@ -147,6 +147,54 @@ export class TenantsService {
 
   async findBySlug(slug: string) {
     return this.tenantModel.findOne({ slug }).lean();
+  }
+
+  /** Get current tenant settings (for gym admin). */
+  async getMySettings(tenantId: string): Promise<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean }> {
+    const tenant = await this.tenantModel.findById(tenantId).select('settings').lean();
+    const settings = (tenant as { settings?: { notifyOwnerOnFaceFailure?: boolean; faceAlertEnrollKey?: string } } | null)?.settings;
+    const key = settings?.faceAlertEnrollKey;
+    return {
+      notifyOwnerOnFaceFailure: settings?.notifyOwnerOnFaceFailure !== false,
+      faceAlertEnrollKeySet: typeof key === 'string' && key.trim().length > 0,
+    };
+  }
+
+  /** Update current tenant settings (for gym admin). Merges into existing settings. Requires enrollment key when enabling face alerts if key is set. */
+  async updateMySettings(
+    tenantId: string,
+    patch: {
+      notifyOwnerOnFaceFailure?: boolean;
+      enrollKey?: string;
+      newFaceAlertEnrollKey?: string;
+    },
+  ): Promise<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean }> {
+    const tenant = await this.tenantModel.findById(tenantId).select('settings').lean();
+    const current = (tenant as { settings?: Record<string, unknown> } | null)?.settings ?? {};
+    const existingKey = (current.faceAlertEnrollKey as string) ?? '';
+
+    if (patch.newFaceAlertEnrollKey !== undefined) {
+      const trimmed = typeof patch.newFaceAlertEnrollKey === 'string' ? patch.newFaceAlertEnrollKey.trim() : '';
+      current.faceAlertEnrollKey = trimmed || undefined;
+    }
+
+    if (patch.notifyOwnerOnFaceFailure === true && existingKey.length > 0) {
+      const provided = typeof patch.enrollKey === 'string' ? patch.enrollKey.trim() : '';
+      if (provided !== existingKey) {
+        throw new BadRequestException('Invalid enrollment key. Enter the correct key to enable face check-in alerts.');
+      }
+    }
+
+    const next = {
+      ...current,
+      notifyOwnerOnFaceFailure: patch.notifyOwnerOnFaceFailure ?? current.notifyOwnerOnFaceFailure,
+    };
+    await this.tenantModel.updateOne({ _id: tenantId }, { $set: { settings: next } });
+    const keyNow = (next.faceAlertEnrollKey as string) ?? '';
+    return {
+      notifyOwnerOnFaceFailure: next.notifyOwnerOnFaceFailure !== false,
+      faceAlertEnrollKeySet: keyNow.length > 0,
+    };
   }
 
   async findBySubdomainOrDomain(host: string) {

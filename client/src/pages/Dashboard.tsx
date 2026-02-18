@@ -111,6 +111,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [allMembers, setAllMembers] = useState<Member[]>([]);
   const [checkinTable, setCheckinTable] = useState<Member[]>([]);
+  /** Valid-only members from checkInList (used for attendance dropdown when on check-in tab). */
+  const [checkInEligibleMembers, setCheckInEligibleMembers] = useState<Member[]>([]);
   const [finance, setFinance] = useState<{
     monthlyFees: number;
     overallFees: number;
@@ -137,6 +139,15 @@ export default function Dashboard() {
   const faceEnrollInputRef = useRef<HTMLInputElement>(null);
   const [faceEnrollMessage, setFaceEnrollMessage] = useState<string | null>(null);
   const [showEnrollSuccessPopup, setShowEnrollSuccessPopup] = useState(false);
+  const [notifyOwnerOnFaceFailure, setNotifyOwnerOnFaceFailure] = useState(true);
+  const [faceAlertEnrollKeySet, setFaceAlertEnrollKeySet] = useState(false);
+  const [faceAlertSettingsLoading, setFaceAlertSettingsLoading] = useState(false);
+  const [faceAlertSettingsSaving, setFaceAlertSettingsSaving] = useState(false);
+  const [showEnrollKeyModal, setShowEnrollKeyModal] = useState(false);
+  const [enrollKeyInput, setEnrollKeyInput] = useState('');
+  const [enrollKeyError, setEnrollKeyError] = useState<string | null>(null);
+  const [newEnrollKeyInput, setNewEnrollKeyInput] = useState('');
+  const [setEnrollKeySaving, setSetEnrollKeySaving] = useState(false);
   const [activeNav, setActiveNav] = useState<'dashboard' | 'main' | 'add' | 'checkin' | 'finance'>('main');
   const [filter, setFilter] = useState<'all' | 'men' | 'women'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
@@ -360,9 +371,13 @@ export default function Dashboard() {
   /** Face enroll autocomplete: filter by name or Reg No, show first 15, exact Reg No first when query is digits */
   const faceEnrollMatches = (() => {
     const q = faceEnrollQuery.trim().toLowerCase();
-    if (!q) return allMembers.slice(0, 15);
+    const source =
+      activeNav === 'checkin' && checkInEligibleMembers.length > 0
+        ? checkInEligibleMembers
+        : allMembers.filter((m) => (m.status as StatusType) !== 'expired');
+    if (!q) return source.slice(0, 15);
     const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
-    const filtered = allMembers.filter(
+    const filtered = source.filter(
       (m) =>
         String(m.NAME ?? '').toLowerCase().includes(q) ||
         String(m['Reg No:'] ?? '').includes(q),
@@ -409,6 +424,7 @@ export default function Dashboard() {
   const loadCheckIn = async () => {
     try {
       const data = (await api.legacy.checkInList()) as Member[];
+      setCheckInEligibleMembers(data);
       const withStatus = data
         .filter((r) => isCheckInToday(r.lastCheckInTime as string))
         .map((row) => {
@@ -420,7 +436,6 @@ export default function Dashboard() {
           const memberId = (row as Record<string, unknown>).memberId as string || `GYM-${new Date().getFullYear()}-${String(row['Reg No:']).padStart(5, '0')}`;
           return { ...row, status, dueDate: due, joinDate: join, memberId };
         })
-        .filter((r) => (r.status as StatusType) !== 'expired')
         .sort((a, b) =>
           new Date((b as Record<string, unknown>).lastCheckInTime as string).getTime() -
           new Date((a as Record<string, unknown>).lastCheckInTime as string).getTime());
@@ -447,6 +462,76 @@ export default function Dashboard() {
     if (activeNav === 'checkin') {
       loadCheckIn();
       api.attendance.qrPayload().then((p) => setQrPayload(p)).catch(() => setQrPayload(null));
+      setFaceAlertSettingsLoading(true);
+      api.tenant.getMySettings().then((r) => {
+        setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
+        setFaceAlertEnrollKeySet(r.faceAlertEnrollKeySet);
+      }).catch(() => {}).finally(() => setFaceAlertSettingsLoading(false));
+    }
+  }, [activeNav]);
+  const handleFaceFailureAlertToggle = async (checked: boolean) => {
+    if (!checked) {
+      setFaceAlertSettingsSaving(true);
+      try {
+        const r = await api.tenant.updateMySettings({ notifyOwnerOnFaceFailure: false });
+        setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
+      } catch {
+        // keep previous state
+      } finally {
+        setFaceAlertSettingsSaving(false);
+      }
+      return;
+    }
+    if (faceAlertEnrollKeySet) {
+      setEnrollKeyError(null);
+      setEnrollKeyInput('');
+      setShowEnrollKeyModal(true);
+      return;
+    }
+    setFaceAlertSettingsSaving(true);
+    try {
+      const r = await api.tenant.updateMySettings({ notifyOwnerOnFaceFailure: true });
+      setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
+      setFaceAlertEnrollKeySet(r.faceAlertEnrollKeySet);
+    } catch {
+      // keep previous state
+    } finally {
+      setFaceAlertSettingsSaving(false);
+    }
+  };
+
+  const submitEnrollKey = async () => {
+    setEnrollKeyError(null);
+    setFaceAlertSettingsSaving(true);
+    try {
+      const r = await api.tenant.updateMySettings({ notifyOwnerOnFaceFailure: true, enrollKey: enrollKeyInput });
+      setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
+      setShowEnrollKeyModal(false);
+      setEnrollKeyInput('');
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : 'Invalid enrollment key';
+      setEnrollKeyError(msg);
+    } finally {
+      setFaceAlertSettingsSaving(false);
+    }
+  };
+
+  const handleSetEnrollKey = async () => {
+    setSetEnrollKeySaving(true);
+    try {
+      const r = await api.tenant.updateMySettings({ newFaceAlertEnrollKey: newEnrollKeyInput });
+      setFaceAlertEnrollKeySet(r.faceAlertEnrollKeySet);
+      setNewEnrollKeyInput('');
+    } catch {
+      // keep previous state
+    } finally {
+      setSetEnrollKeySaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeNav === 'checkin') {
+      return;
     }
     if (activeNav === 'finance') {
       setDashboardLoading(false);
@@ -520,12 +605,15 @@ export default function Dashboard() {
     }
   };
 
-  /** Members matching check-in search (name, Reg No, or phone). Only valid members. Exact Reg No first when query is digits-only. */
+  /** Members matching check-in search (name, Reg No, or phone). On check-in tab use backend valid-only list; else valid from allMembers. */
   const checkinSearchMatches = (() => {
     if (!checkinSearchQuery.trim()) return [];
     const q = checkinSearchQuery.trim().toLowerCase();
     const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
-    const validMembers = allMembers.filter((m) => (m.status as StatusType) !== 'expired');
+    const validMembers =
+      activeNav === 'checkin' && checkInEligibleMembers.length > 0
+        ? checkInEligibleMembers
+        : allMembers.filter((m) => (m.status as StatusType) !== 'expired');
     const filtered = validMembers.filter(
       (m) =>
         (m.NAME as string)?.toLowerCase().includes(q) ||
@@ -1117,6 +1205,74 @@ export default function Dashboard() {
                 })
               )}
             </div>
+            {!faceAlertSettingsLoading && (
+              <div className="checkin-face-alerts-section">
+                <h3 className="checkin-face-alerts-title">Face check-in alerts</h3>
+                {faceAlertEnrollKeySet && (
+                  <p className="checkin-face-alerts-key-hint">Enrollment key is set. You must enter it to enable alerts.</p>
+                )}
+                <label className="checkin-face-alerts-label">
+                  <input
+                    type="checkbox"
+                    checked={notifyOwnerOnFaceFailure}
+                    onChange={(e) => handleFaceFailureAlertToggle(e.target.checked)}
+                    disabled={faceAlertSettingsSaving}
+                  />
+                  <span>Notify me when someone fails face recognition</span>
+                </label>
+                <p className="checkin-face-alerts-hint">
+                  When someone tries to check in by face and is not recognized, you&apos;ll get a push notification (enable push in the menu to receive it).
+                </p>
+                <div className="checkin-face-alerts-set-key">
+                  <label className="checkin-face-alerts-set-key-label">Special key for enrollment (required to turn on alerts)</label>
+                  <div className="checkin-face-enroll-row">
+                    <input
+                      type="password"
+                      className="checkin-face-enroll-input"
+                      placeholder="Set or change enrollment key"
+                      value={newEnrollKeyInput}
+                      onChange={(e) => setNewEnrollKeyInput(e.target.value)}
+                      aria-label="Enrollment key"
+                    />
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={handleSetEnrollKey}
+                      disabled={setEnrollKeySaving || !newEnrollKeyInput.trim()}
+                    >
+                      {setEnrollKeySaving ? 'Saving…' : 'Set key'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {showEnrollKeyModal && (
+              <div className="checkin-enroll-key-overlay" role="dialog" aria-labelledby="enroll-key-title" aria-modal="true">
+                <div className="checkin-enroll-key-modal">
+                  <h3 id="enroll-key-title" className="checkin-face-alerts-title">Enter enrollment key</h3>
+                  <p className="checkin-face-alerts-hint">Enter your special enrollment key to enable face check-in alerts.</p>
+                  <input
+                    type="password"
+                    className="checkin-face-enroll-input"
+                    placeholder="Enrollment key"
+                    value={enrollKeyInput}
+                    onChange={(e) => { setEnrollKeyInput(e.target.value); setEnrollKeyError(null); }}
+                    onKeyDown={(e) => e.key === 'Enter' && submitEnrollKey()}
+                    aria-label="Enrollment key"
+                    autoFocus
+                  />
+                  {enrollKeyError && <p className="checkin-face-enroll-msg error">{enrollKeyError}</p>}
+                  <div className="checkin-enroll-key-actions">
+                    <button type="button" className="btn-primary" onClick={submitEnrollKey} disabled={faceAlertSettingsSaving}>
+                      {faceAlertSettingsSaving ? 'Checking…' : 'Submit'}
+                    </button>
+                    <button type="button" className="face-capture-btn-cancel" onClick={() => { setShowEnrollKeyModal(false); setEnrollKeyError(null); setEnrollKeyInput(''); }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="checkin-face-enroll-section">
               <h3 className="checkin-face-enroll-title">Face recognition (check-in by face)</h3>
               <p className="checkin-face-enroll-hint">
@@ -1205,6 +1361,7 @@ export default function Dashboard() {
               <FaceCaptureModal
                 title="Position face in frame — then tap Capture"
                 captureButtonLabel="Capture & save"
+                failureMessage="Enrollment failed. Please try again or check your connection."
                 onCapture={async (descriptor) => {
                   try {
                     await api.attendance.faceEnroll(faceEnrollRegNo, descriptor);
@@ -1212,8 +1369,10 @@ export default function Dashboard() {
                     setShowFaceEnrollModal(false);
                     loadList();
                     setShowEnrollSuccessPopup(true);
+                    return { success: true as const };
                   } catch (err) {
                     setFaceEnrollMessage(err instanceof Error ? err.message : 'Enroll failed');
+                    return { success: false as const };
                   }
                 }}
                 onClose={() => setShowFaceEnrollModal(false)}

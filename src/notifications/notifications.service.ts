@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as webPush from 'web-push';
+import { AuthService } from '../auth/auth.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { MembersService } from '../members/members.service';
 import { AttendanceService } from '../attendance/attendance.service';
@@ -23,6 +24,7 @@ export class NotificationsService {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly authService: AuthService,
     private readonly tenantsService: TenantsService,
     private readonly membersService: MembersService,
     private readonly attendanceService: AttendanceService,
@@ -155,6 +157,18 @@ export class NotificationsService {
     if (chatId == null) return false;
     const text = rawText || ' ';
     const gymName = (t?.name as string) || 'this gym';
+
+    // /start or /chatid: reply with chat ID so gym owner can paste it in the app to receive alerts
+    const cmd = text.toLowerCase().trim();
+    if (cmd === '/start' || cmd === '/chatid') {
+      const reply =
+        `Your Telegram chat ID is: <b>${chatId}</b>\n\n` +
+        `Paste this in the app (Notifications → Telegram, or Platform Admin → your gym → Telegram) as <b>Gym owner chat ID</b> to receive:\n` +
+        `• Face recognition failure alerts\n• Expired membership check-in attempts`;
+      await this.telegramService.sendMessage(String(chatId), reply, botToken);
+      this.logger.log(`Telegram chatid sent tenantId=${tenantId} chatId=${chatId}`);
+      return true;
+    }
 
     // Already enrolled member: mark attendance when they send "attendance" / "present" etc.
     const existingMember = await this.membersService.findByTelegramChatId(tenantId, String(chatId));
@@ -376,6 +390,36 @@ export class NotificationsService {
     }
     this.logger.log(`Push broadcast tenantId=${tenantId} sent=${sent} failed=${failed} subscriberCount=${subscriberCount}`);
     return { sent, failed, subscriberCount };
+  }
+
+  /**
+   * Notify gym owner by push (if enabled) and Telegram (if tenant has telegramChatId set).
+   * Use for face recognition failure and expired check-in attempts.
+   */
+  async notifyGymOwner(
+    tenantId: string,
+    options: { pushTitle: string; pushBody?: string; pushUrl?: string; telegramText: string },
+  ): Promise<void> {
+    const tenant = await this.tenantsService.findById(tenantId);
+    const t = tenant as Record<string, unknown> | null;
+    if (!t) return;
+    const settings = (t.settings as { notifyOwnerOnFaceFailure?: boolean } | undefined) ?? {};
+    const notifyEnabled = settings.notifyOwnerOnFaceFailure !== false;
+    if (notifyEnabled) {
+      const ownerUserId = await this.authService.getTenantAdminUserId(tenantId);
+      if (ownerUserId) {
+        await this.sendPushToUser(tenantId, ownerUserId, {
+          title: options.pushTitle,
+          body: options.pushBody,
+          url: options.pushUrl ?? '/',
+        });
+      }
+    }
+    const chatId = (t.telegramChatId as string)?.trim();
+    const botToken = (t.telegramBotToken as string)?.trim();
+    if (chatId && botToken && options.telegramText) {
+      await this.telegramService.sendMessage(chatId, options.telegramText, botToken);
+    }
   }
 
   /** Get Telegram config for current tenant (group invite link for QR, hasBot). */

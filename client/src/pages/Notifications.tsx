@@ -13,10 +13,86 @@ export default function Notifications() {
   const [result, setResult] = useState<{ sent: number; failed: number; subscriberCount?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
+  const [notifyOwnerOnFaceFailure, setNotifyOwnerOnFaceFailure] = useState<boolean>(true);
+  const [faceAlertEnrollKeySet, setFaceAlertEnrollKeySet] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [showEnrollKeyModal, setShowEnrollKeyModal] = useState(false);
+  const [enrollKeyInput, setEnrollKeyInput] = useState('');
+  const [enrollKeyError, setEnrollKeyError] = useState<string | null>(null);
+  const [newEnrollKeyInput, setNewEnrollKeyInput] = useState('');
+  const [setEnrollKeySaving, setSetEnrollKeySaving] = useState(false);
 
   useEffect(() => {
     api.notifications.getSubscriberCount().then((r) => setSubscriberCount(r.subscriberCount)).catch(() => setSubscriberCount(null));
   }, [result]);
+
+  useEffect(() => {
+    api.tenant.getMySettings().then((r) => {
+      setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
+      setFaceAlertEnrollKeySet(r.faceAlertEnrollKeySet);
+    }).catch(() => {}).finally(() => setSettingsLoading(false));
+  }, []);
+
+  const handleFaceFailureToggle = async (checked: boolean) => {
+    if (!checked) {
+      setSettingsSaving(true);
+      try {
+        const r = await api.tenant.updateMySettings({ notifyOwnerOnFaceFailure: false });
+        setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
+      } catch {
+        // revert on error
+      } finally {
+        setSettingsSaving(false);
+      }
+      return;
+    }
+    if (faceAlertEnrollKeySet) {
+      setEnrollKeyError(null);
+      setEnrollKeyInput('');
+      setShowEnrollKeyModal(true);
+      return;
+    }
+    setSettingsSaving(true);
+    try {
+      const r = await api.tenant.updateMySettings({ notifyOwnerOnFaceFailure: true });
+      setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
+      setFaceAlertEnrollKeySet(r.faceAlertEnrollKeySet);
+    } catch {
+      // revert on error
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const submitEnrollKey = async () => {
+    setEnrollKeyError(null);
+    setSettingsSaving(true);
+    try {
+      const r = await api.tenant.updateMySettings({ notifyOwnerOnFaceFailure: true, enrollKey: enrollKeyInput });
+      setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
+      setShowEnrollKeyModal(false);
+      setEnrollKeyInput('');
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : 'Invalid enrollment key';
+      setEnrollKeyError(msg);
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const handleSetEnrollKey = async () => {
+    setSetEnrollKeySaving(true);
+    try {
+      const r = await api.tenant.updateMySettings({ newFaceAlertEnrollKey: newEnrollKeyInput });
+      setFaceAlertEnrollKeySet(r.faceAlertEnrollKeySet);
+      setNewEnrollKeyInput('');
+    } catch {
+      // keep previous state
+    } finally {
+      setSetEnrollKeySaving(false);
+    }
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +150,74 @@ export default function Notifications() {
     <Layout activeNav="notifications" onNavChange={handleNavChange} onLogout={() => { storage.clear(); navigate('/login'); }}>
       <div className="notifications-page">
         <h1 className="page-title">Send notification</h1>
+        {!settingsLoading && (
+          <div className="notifications-face-alerts">
+            <h2 className="notifications-face-alerts-title">Face check-in alerts</h2>
+            {faceAlertEnrollKeySet && (
+              <p className="notifications-face-alerts-key-hint">Enrollment key is set. You must enter it to enable alerts.</p>
+            )}
+            <label className="notifications-face-alerts-label">
+              <input
+                type="checkbox"
+                checked={notifyOwnerOnFaceFailure}
+                onChange={(e) => handleFaceFailureToggle(e.target.checked)}
+                disabled={settingsSaving}
+              />
+              <span>Notify me when someone fails face recognition</span>
+            </label>
+            <p className="notifications-face-alerts-hint">
+              When someone tries to check in by face and is not recognized, you’ll get a push notification (if you have push enabled in the menu).
+            </p>
+            <div className="notifications-face-alerts-set-key">
+              <label className="notifications-face-alerts-set-key-label">Special key for enrollment (required to turn on alerts)</label>
+              <div className="notifications-set-key-row">
+                <input
+                  type="password"
+                  className="notifications-set-key-input"
+                  placeholder="Set or change enrollment key"
+                  value={newEnrollKeyInput}
+                  onChange={(e) => setNewEnrollKeyInput(e.target.value)}
+                  aria-label="Enrollment key"
+                />
+                <button
+                  type="button"
+                  className="notifications-btn-primary"
+                  onClick={handleSetEnrollKey}
+                  disabled={setEnrollKeySaving || !newEnrollKeyInput.trim()}
+                >
+                  {setEnrollKeySaving ? 'Saving…' : 'Set key'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showEnrollKeyModal && (
+          <div className="notifications-enroll-key-overlay" role="dialog" aria-labelledby="notifications-enroll-key-title" aria-modal="true">
+            <div className="notifications-enroll-key-modal">
+              <h2 id="notifications-enroll-key-title" className="notifications-face-alerts-title">Enter enrollment key</h2>
+              <p className="notifications-face-alerts-hint">Enter your special enrollment key to enable face check-in alerts.</p>
+              <input
+                type="password"
+                className="notifications-set-key-input"
+                placeholder="Enrollment key"
+                value={enrollKeyInput}
+                onChange={(e) => { setEnrollKeyInput(e.target.value); setEnrollKeyError(null); }}
+                onKeyDown={(e) => e.key === 'Enter' && submitEnrollKey()}
+                aria-label="Enrollment key"
+                autoFocus
+              />
+              {enrollKeyError && <p className="notifications-enroll-key-error">{enrollKeyError}</p>}
+              <div className="notifications-enroll-key-actions">
+                <button type="button" className="notifications-btn-primary" onClick={submitEnrollKey} disabled={settingsSaving}>
+                  {settingsSaving ? 'Checking…' : 'Submit'}
+                </button>
+                <button type="button" className="notifications-btn-cancel" onClick={() => { setShowEnrollKeyModal(false); setEnrollKeyError(null); setEnrollKeyInput(''); }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <p className="notifications-intro">
           Send a push message to everyone in your gym who has enabled notifications (e.g. holiday, schedule change, announcement).
         </p>

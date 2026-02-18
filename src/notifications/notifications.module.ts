@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AuthModule } from '../auth/auth.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { MembersModule } from '../members/members.module';
 import { AttendanceModule } from '../attendance/attendance.module';
@@ -14,13 +15,14 @@ import { PushSubscriptionDoc, PushSubscriptionSchema } from './schemas/push-subs
 @Module({
   imports: [
     ConfigModule,
+    AuthModule,
     MongooseModule.forFeature([
       { name: TelegramOptIn.name, schema: TelegramOptInSchema },
       { name: PushSubscriptionDoc.name, schema: PushSubscriptionSchema },
     ]),
     TenantsModule,
     MembersModule,
-    AttendanceModule,
+    forwardRef(() => AttendanceModule),
   ],
   controllers: [NotificationsController, TelegramWebhookController],
   providers: [TelegramService, NotificationsService],
