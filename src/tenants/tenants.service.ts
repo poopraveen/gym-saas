@@ -185,7 +185,7 @@ export class TenantsService {
       }
     }
 
-    const next = {
+    const next: Record<string, unknown> = {
       ...current,
       notifyOwnerOnFaceFailure: patch.notifyOwnerOnFaceFailure ?? current.notifyOwnerOnFaceFailure,
     };
