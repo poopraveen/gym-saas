@@ -177,15 +177,20 @@ export class AttendanceService {
     return this.membersService.clearFaceDescriptor(tenantId, regNo);
   }
 
-  /** Find best-matching member by face descriptor. Uses stricter threshold and margin to avoid wrong-person match. */
+  /**
+   * Find best-matching member by face descriptor.
+   * Uses strict threshold and margin to minimize false positives (unenrolled matching wrong person).
+   * - THRESHOLD 0.38: same-person typically < 0.4; random/unknown faces usually > 0.5.
+   * - MARGIN 0.12: reject when 2nd-best is too close (ambiguous match).
+   */
   async findMemberByFace(tenantId: string, descriptor: number[]): Promise<{ regNo: number; name: string } | null> {
     if (!Array.isArray(descriptor) || descriptor.length !== 128) return null;
     const settings = await this.tenantsService.getMySettings(tenantId);
     if (!settings.faceRecognitionEnabled) return null;
     const members = await this.membersService.getMembersWithFaceDescriptors(tenantId);
     if (members.length === 0) return null;
-    const THRESHOLD = 0.5;
-    const MARGIN = 0.08;
+    const THRESHOLD = 0.38;
+    const MARGIN = 0.12;
     const distances: { regNo: number; name: string; distance: number }[] = [];
     for (const m of members) {
       const dist = AttendanceService.descriptorDistance(descriptor, m.faceDescriptor);
