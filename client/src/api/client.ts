@@ -256,6 +256,10 @@ export const api = {
       return request<Record<string, unknown> | null>(q ? `/legacy/lookup?${q}` : '/legacy/lookup');
     },
     list: () => request<unknown[]>('/legacy/list'),
+    cleanupDuplicates: () =>
+      request<{ deleted: number; details: Array<{ regNo: number; name?: string; deletedCount: number }> }>('/legacy/cleanup-duplicates', {
+        method: 'POST',
+      }),
     upsert: (newUserData: Record<string, unknown>, deleteFlag = false) =>
       request('/legacy', {
         method: 'POST',

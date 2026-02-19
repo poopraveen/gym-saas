@@ -89,6 +89,26 @@
   background: var(--primary-hover);
 }
 
+.btn-cleanup-duplicates {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-cleanup-duplicates:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+.btn-cleanup-duplicates:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .search-and-status-row {
   display: flex;
   flex-wrap: wrap;

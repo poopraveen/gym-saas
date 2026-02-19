@@ -46,6 +46,14 @@ export class LegacyController {
     return this.membersService.upsert(tenantId, body.newUserData || body, !!body.deleteFlag);
   }
 
+  @Post('cleanup-duplicates')
+  @Roles(Role.TENANT_ADMIN)
+  async cleanupDuplicates(@Req() req: any) {
+    const tenantId = this.tenantId(req);
+    if (!tenantId) throw new Error('X-Tenant-ID required');
+    return this.membersService.cleanupDuplicateRegNos(tenantId);
+  }
+
   @Get('list')
   async list(@Req() req: any) {
     try {

@@ -212,6 +212,40 @@ export class MembersService {
     return r?.regNo ?? 0;
   }
 
+  /**
+   * Remove duplicate reg numbers: keep only the latest member per regNo (by updatedAt).
+   * Returns count deleted and details.
+   */
+  async cleanupDuplicateRegNos(tenantId: string): Promise<{ deleted: number; details: Array<{ regNo: number; name?: string; deletedCount: number }> }> {
+    const members = await this.memberModel
+      .find({ tenantId })
+      .select('_id regNo name updatedAt')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const byRegNo = new Map<number, Array<{ _id: unknown; regNo: number; name?: string }>>();
+    for (const m of members) {
+      const doc = m as Record<string, unknown>;
+      const regNo = Number(doc.regNo);
+      if (!byRegNo.has(regNo)) byRegNo.set(regNo, []);
+      byRegNo.get(regNo)!.push({ _id: doc._id, regNo, name: doc.name as string | undefined });
+    }
+
+    let totalDeleted = 0;
+    const details: Array<{ regNo: number; name?: string; deletedCount: number }> = [];
+
+    for (const [regNo, docs] of byRegNo) {
+      if (docs.length <= 1) continue;
+      const toDelete = docs.slice(1);
+      const ids = toDelete.map((d) => d._id);
+      const result = await this.memberModel.deleteMany({ _id: { $in: ids } });
+      totalDeleted += result.deletedCount;
+      details.push({ regNo, name: docs[0]?.name, deletedCount: result.deletedCount });
+    }
+
+    return { deleted: totalDeleted, details };
+  }
+
   /** Check if a member exists by phone (for enquiry conversion duplicate check). */
   async findByPhone(tenantId: string, phoneNumber: string): Promise<Record<string, unknown> | null> {
     const normalized = String(phoneNumber || '').trim();

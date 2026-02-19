@@ -173,6 +173,7 @@ export default function Dashboard() {
   const [showRenewalsDueModal, setShowRenewalsDueModal] = useState(false);
   type DashboardSubView = 'home' | 'actions' | 'renewals' | 'absent' | 'missed';
   const [dashboardSubView, setDashboardSubView] = useState<DashboardSubView>('home');
+  const [cleanupLoading, setCleanupLoading] = useState(false);
 
   const loadList = async () => {
     try {
@@ -321,6 +322,7 @@ export default function Dashboard() {
   }, [filter, statusFilter, sortBy, searchQuery]);
 
   const canEditMember = storage.getRole() === 'TENANT_ADMIN' || storage.getRole() === 'MANAGER';
+  const canCleanDuplicates = storage.getRole() === 'TENANT_ADMIN';
   useEffect(() => {
     if (!showMemberEditModal) {
       setMemberUserForEdit('loading');
@@ -704,6 +706,24 @@ export default function Dashboard() {
   const closeAddModal = () => {
     setShowAddModal(false);
     setActiveNav('main');
+  };
+
+  const handleCleanupDuplicates = async () => {
+    if (!canCleanDuplicates) return;
+    setCleanupLoading(true);
+    try {
+      const res = await api.legacy.cleanupDuplicates();
+      if (res.deleted > 0) {
+        loadList();
+        loadFinance();
+      }
+      setError(res.deleted > 0 ? null : null);
+      alert(res.deleted > 0 ? `Cleaned up ${res.deleted} duplicate(s).` : 'No duplicates found.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Cleanup failed');
+    } finally {
+      setCleanupLoading(false);
+    }
   };
 
   const feesChartData = finance
@@ -1475,6 +1495,17 @@ export default function Dashboard() {
             <div className="people-header">
               <h1 className="page-title">Registered members ({regMembersTotal})</h1>
               <div className="people-actions">
+                {canCleanDuplicates && (
+                  <button
+                    type="button"
+                    className="btn-cleanup-duplicates"
+                    onClick={handleCleanupDuplicates}
+                    disabled={cleanupLoading}
+                    title="Remove duplicate register numbers (keep latest)"
+                  >
+                    {cleanupLoading ? 'Cleaning…' : 'Clean duplicates'}
+                  </button>
+                )}
                 <button onClick={() => handleNavChange('add')} className="btn-add" aria-label="Add member" data-tour="people-add-member">
                   +
                 </button>
