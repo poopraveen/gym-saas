@@ -141,8 +141,10 @@ export default function Dashboard() {
   const [showEnrollSuccessPopup, setShowEnrollSuccessPopup] = useState(false);
   const [notifyOwnerOnFaceFailure, setNotifyOwnerOnFaceFailure] = useState(true);
   const [faceAlertEnrollKeySet, setFaceAlertEnrollKeySet] = useState(false);
+  const [faceRecognitionEnabled, setFaceRecognitionEnabled] = useState(true);
   const [faceAlertSettingsLoading, setFaceAlertSettingsLoading] = useState(false);
   const [faceAlertSettingsSaving, setFaceAlertSettingsSaving] = useState(false);
+  const [faceOptOutSaving, setFaceOptOutSaving] = useState(false);
   const [showEnrollKeyModal, setShowEnrollKeyModal] = useState(false);
   const [enrollKeyInput, setEnrollKeyInput] = useState('');
   const [enrollKeyError, setEnrollKeyError] = useState<string | null>(null);
@@ -159,6 +161,7 @@ export default function Dashboard() {
   const [showFollowUpModal, setShowFollowUpModal] = useState<Member | null>(null);
   const [showPayFeesModal, setShowPayFeesModal] = useState<Member | null>(null);
   const [showMemberEditModal, setShowMemberEditModal] = useState<Member | null>(null);
+  const [showEditDetailsModal, setShowEditDetailsModal] = useState<Member | null>(null);
   const [memberUserForEdit, setMemberUserForEdit] = useState<{ id: string; email: string; name?: string; trainerUserId: string | null } | null | 'loading'>('loading');
   const [trainersList, setTrainersList] = useState<Array<{ id: string; email: string; name?: string }>>([]);
   const [editTrainerId, setEditTrainerId] = useState<string>('');
@@ -466,6 +469,7 @@ export default function Dashboard() {
       api.tenant.getMySettings().then((r) => {
         setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
         setFaceAlertEnrollKeySet(r.faceAlertEnrollKeySet);
+        setFaceRecognitionEnabled(r.faceRecognitionEnabled);
       }).catch(() => {}).finally(() => setFaceAlertSettingsLoading(false));
     }
   }, [activeNav]);
@@ -636,6 +640,13 @@ export default function Dashboard() {
     loadFinance();
   };
 
+  const handleEditMemberDetails = async (data: Record<string, unknown>) => {
+    await api.legacy.upsert(data, false);
+    loadList();
+    loadFinance();
+    setShowEditDetailsModal(null);
+  };
+
   const handlePayFees = async (data: Record<string, unknown>) => {
     await api.legacy.upsert(data, false);
     loadList();
@@ -706,6 +717,15 @@ export default function Dashboard() {
     <Layout activeNav={activeNav} onNavChange={handleNavChange} onLogout={handleLogout}>
       {showAddModal && (
         <AddMemberModal onClose={closeAddModal} onSubmit={handleAddMember} nextRegNo={nextRegNo} />
+      )}
+      {showEditDetailsModal && (
+        <AddMemberModal
+          onClose={() => setShowEditDetailsModal(null)}
+          onSubmit={handleEditMemberDetails}
+          nextRegNo={nextRegNo}
+          initialData={showEditDetailsModal as unknown as Record<string, unknown>}
+          regNo={Number(showEditDetailsModal['Reg No:']) || 0}
+        />
       )}
       {showPayFeesModal && (
         <PayFeesModal
@@ -1206,8 +1226,37 @@ export default function Dashboard() {
               )}
             </div>
             {!faceAlertSettingsLoading && (
-              <div className="checkin-face-alerts-section">
-                <h3 className="checkin-face-alerts-title">Face check-in alerts</h3>
+              <>
+                <div className="checkin-face-alerts-section">
+                  <h3 className="checkin-face-alerts-title">Face recognition</h3>
+                  <label className="checkin-face-alerts-label">
+                    <input
+                      type="checkbox"
+                      checked={faceRecognitionEnabled}
+                      onChange={async (e) => {
+                        const checked = e.target.checked;
+                        setFaceAlertSettingsSaving(true);
+                        try {
+                          const r = await api.tenant.updateMySettings({ faceRecognitionEnabled: checked });
+                          setFaceRecognitionEnabled(r.faceRecognitionEnabled);
+                        } catch {
+                          // keep previous state
+                        } finally {
+                          setFaceAlertSettingsSaving(false);
+                        }
+                      }}
+                      disabled={faceAlertSettingsSaving}
+                    />
+                    <span>Enable face registration and check-in by face</span>
+                  </label>
+                  <p className="checkin-face-alerts-hint">
+                    When enabled, you can enroll members for face check-in. When disabled, no one can enroll or check in by face; members use QR or name/Reg. No. only.
+                  </p>
+                </div>
+                {faceRecognitionEnabled && (
+              <>
+                <div className="checkin-face-alerts-section">
+                  <h3 className="checkin-face-alerts-title">Face check-in alerts</h3>
                 {faceAlertEnrollKeySet && (
                   <p className="checkin-face-alerts-key-hint">Enrollment key is set. You must enter it to enable alerts.</p>
                 )}
@@ -1245,7 +1294,6 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-            )}
             {showEnrollKeyModal && (
               <div className="checkin-enroll-key-overlay" role="dialog" aria-labelledby="enroll-key-title" aria-modal="true">
                 <div className="checkin-enroll-key-modal">
@@ -1342,14 +1390,48 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={!faceEnrollRegNo}
-                  onClick={() => setShowFaceEnrollModal(true)}
-                >
-                  Enroll face
-                </button>
+                {(() => {
+                  const source = activeNav === 'checkin' && checkInEligibleMembers.length > 0 ? checkInEligibleMembers : allMembers.filter((m) => (m.status as StatusType) !== 'expired');
+                  const selected = faceEnrollRegNo != null ? source.find((m) => Number(m['Reg No:']) === faceEnrollRegNo) : null;
+                  const hasFaceEnrolled = selected && Array.isArray(selected.faceDescriptor) && (selected.faceDescriptor as number[]).length === 128;
+                  return (
+                    <>
+                      {hasFaceEnrolled ? (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          disabled={faceOptOutSaving}
+                          onClick={async () => {
+                            if (faceEnrollRegNo == null) return;
+                            setFaceOptOutSaving(true);
+                            setFaceEnrollMessage(null);
+                            try {
+                              await api.attendance.removeFaceEnroll(faceEnrollRegNo);
+                              setFaceEnrollMessage('Face removed. Member can check in by QR or name/Reg. No.');
+                              loadList();
+                              loadCheckIn();
+                            } catch (err) {
+                              setFaceEnrollMessage(getApiErrorMessage(err) || 'Failed to remove face.');
+                            } finally {
+                              setFaceOptOutSaving(false);
+                            }
+                          }}
+                        >
+                          {faceOptOutSaving ? 'Removing…' : 'Remove face (opt out)'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          disabled={!faceEnrollRegNo}
+                          onClick={() => setShowFaceEnrollModal(true)}
+                        >
+                          Enroll face
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               {faceEnrollMessage && (
                 <p className={`checkin-face-enroll-msg ${faceEnrollMessage.startsWith('Saved') ? 'success' : 'error'}`}>
@@ -1378,6 +1460,10 @@ export default function Dashboard() {
                 }}
                 onClose={() => setShowFaceEnrollModal(false)}
               />
+            )}
+              </>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1630,6 +1716,13 @@ export default function Dashboard() {
                       onClick={(e) => { e.stopPropagation(); setShowPayFeesModal(selectedMember); }}
                     >
                       Pay fees
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-edit-member btn-edit-details"
+                      onClick={(e) => { e.stopPropagation(); setShowEditDetailsModal(selectedMember); }}
+                    >
+                      Edit details
                     </button>
                     {canEditMember && (
                       <button

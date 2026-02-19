@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Query,
   UseGuards,
@@ -104,6 +105,20 @@ export class AttendanceController {
       throw new BadRequestException('regNo and descriptor (128 numbers) required');
     }
     const ok = await this.attendanceService.faceEnroll(tenantId, Number(body.regNo), body.descriptor);
+    if (!ok) throw new BadRequestException('Member not found');
+    return { ok: true };
+  }
+
+  /** Admin: remove face enrollment for a member (opt out of face registration). */
+  @Delete('face-enroll')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.TENANT_ADMIN, Role.MANAGER, Role.STAFF)
+  async removeFaceEnroll(
+    @TenantId() tenantId: string,
+    @Body() body: { regNo: number },
+  ) {
+    if (body.regNo == null) throw new BadRequestException('regNo required');
+    const ok = await this.attendanceService.removeFaceEnrollment(tenantId, Number(body.regNo));
     if (!ok) throw new BadRequestException('Member not found');
     return { ok: true };
   }

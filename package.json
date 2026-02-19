@@ -12,6 +12,7 @@
     "reset-admin": "ts-node src/scripts/reset-admin.ts",
     "reset-trainer": "ts-node src/scripts/reset-trainer.ts",
     "check:telegram": "ts-node src/scripts/check-telegram-tenants.ts",
+    "cleanup-duplicate-member": "ts-node src/scripts/cleanup-duplicate-member.ts",
     "import:gym-users": "ts-node src/scripts/import-gym-users.ts",
     "capture-pitch-screenshots": "node scripts/capture-pitch-screenshots.mjs",
     "start": "node dist/main",

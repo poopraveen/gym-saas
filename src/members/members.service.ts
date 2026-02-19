@@ -352,6 +352,17 @@ export class MembersService {
   }
 
   /**
+   * Clear face descriptor for a member (opt out of face registration). They can then check in by QR/name/Reg No.
+   */
+  async clearFaceDescriptor(tenantId: string, regNo: number): Promise<boolean> {
+    const result = await this.memberModel.updateOne(
+      { tenantId, regNo },
+      { $unset: { faceDescriptor: 1 } },
+    );
+    return result.matchedCount === 1;
+  }
+
+  /**
    * Get members that have a face descriptor (for matching). Returns regNo, name, faceDescriptor.
    */
   async getMembersWithFaceDescriptors(tenantId: string): Promise<{ regNo: number; name: string; faceDescriptor: number[] }[]> {

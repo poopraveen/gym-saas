@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
 import { MembersService } from '../members/members.service';
+import { TenantsService } from '../tenants/tenants.service';
 import { Member } from '../members/schemas/member.schema';
 
 const QR_TOKEN_EXPIRY_HOURS = 24;
@@ -11,6 +12,7 @@ export class AttendanceService {
   constructor(
     private readonly membersService: MembersService,
     private readonly configService: ConfigService,
+    private readonly tenantsService: TenantsService,
   ) {}
 
   /** Check-in updates member and returns check-in list. checkedInBy = trainer name or "QR" for self check-in. Rejects expired membership. */
@@ -157,8 +159,12 @@ export class AttendanceService {
     return Math.sqrt(sum);
   }
 
-  /** Save face descriptor for a member (admin enrollment). Fails if member is already enrolled. */
+  /** Save face descriptor for a member (admin enrollment). Fails if member is already enrolled or face recognition is disabled for tenant. */
   async faceEnroll(tenantId: string, regNo: number, descriptor: number[]): Promise<boolean> {
+    const settings = await this.tenantsService.getMySettings(tenantId);
+    if (!settings.faceRecognitionEnabled) {
+      throw new BadRequestException('Face recognition is disabled for this gym. Enable it in Check-in settings to enroll faces.');
+    }
     const alreadyEnrolled = await this.membersService.hasFaceDescriptor(tenantId, regNo);
     if (alreadyEnrolled) {
       throw new BadRequestException('This member is already enrolled for face recognition. To re-enroll, clear the existing face first (or contact support).');
@@ -166,9 +172,16 @@ export class AttendanceService {
     return this.membersService.updateFaceDescriptor(tenantId, regNo, descriptor);
   }
 
+  /** Remove face enrollment for a member (opt out). They can check in by QR/name/Reg No again. */
+  async removeFaceEnrollment(tenantId: string, regNo: number): Promise<boolean> {
+    return this.membersService.clearFaceDescriptor(tenantId, regNo);
+  }
+
   /** Find best-matching member by face descriptor. Uses stricter threshold and margin to avoid wrong-person match. */
   async findMemberByFace(tenantId: string, descriptor: number[]): Promise<{ regNo: number; name: string } | null> {
     if (!Array.isArray(descriptor) || descriptor.length !== 128) return null;
+    const settings = await this.tenantsService.getMySettings(tenantId);
+    if (!settings.faceRecognitionEnabled) return null;
     const members = await this.membersService.getMembersWithFaceDescriptors(tenantId);
     if (members.length === 0) return null;
     const THRESHOLD = 0.5;
@@ -190,6 +203,8 @@ export class AttendanceService {
   async checkInByFace(token: string, descriptor: number[]): Promise<{ success: boolean; name?: string; memberSummary?: Record<string, unknown>; checkInTime?: string } | null> {
     const tenantId = this.verifyQRToken(token);
     if (!tenantId) return null;
+    const settings = await this.tenantsService.getMySettings(tenantId);
+    if (!settings.faceRecognitionEnabled) return null;
     const match = await this.findMemberByFace(tenantId, descriptor);
     if (!match) return null;
     const member = await this.checkIn(tenantId, match.regNo, 'Face');

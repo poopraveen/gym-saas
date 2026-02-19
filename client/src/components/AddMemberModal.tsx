@@ -33,16 +33,46 @@ const defaultForm: MemberFormData = {
   comments: '',
 };
 
+function toFormValue(val: unknown, fallback: number): number {
+  if (val == null) return fallback;
+  if (typeof val === 'number' && !isNaN(val)) return val;
+  const d = new Date(val as string | number | Date);
+  return isNaN(d.getTime()) ? fallback : d.getTime();
+}
+
+function initialDataToForm(row: Record<string, unknown>): MemberFormData {
+  return {
+    NAME: String(row.NAME ?? row.name ?? '').trim(),
+    Gender: String(row.Gender ?? row.gender ?? 'Male').trim() || 'Male',
+    'Date of Joining': toFormValue(row['Date of Joining'] ?? row.dateOfJoining, Date.now()),
+    'Phone Number': String(row['Phone Number'] ?? row.phoneNumber ?? ''),
+    Email: String(row.Email ?? row.email ?? ''),
+    'Typeof pack': String(row['Typeof pack'] ?? row.typeofPack ?? 'Gendral').trim() || 'Gendral',
+    'Fees Options': Number(row['Fees Options'] ?? row.feesOptions) || 1,
+    'Fees Amount': Number(row['Fees Amount'] ?? row.feesAmount) || 800,
+    'DUE DATE': toFormValue(row['DUE DATE'] ?? row.dueDate, addMonths(new Date(), 1).getTime()),
+    comments: String(row.comments ?? ''),
+  };
+}
+
 export default function AddMemberModal({
   onClose,
   onSubmit,
   nextRegNo,
+  initialData,
+  regNo: editRegNo,
 }: {
   onClose: () => void;
   onSubmit: (data: Record<string, unknown>) => Promise<void>;
   nextRegNo: number;
+  /** When set with regNo, modal is in edit mode (prefilled, title "Edit member"). */
+  initialData?: Record<string, unknown>;
+  regNo?: number;
 }) {
-  const [form, setForm] = useState<MemberFormData>(defaultForm);
+  const isEdit = initialData != null && editRegNo != null;
+  const [form, setForm] = useState<MemberFormData>(
+    () => (isEdit ? initialDataToForm(initialData) : defaultForm),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -69,16 +99,19 @@ export default function AddMemberModal({
     setSaving(true);
     try {
       const data: Record<string, unknown> = {
+        ...(isEdit ? initialData : {}),
         ...form,
-        'Reg No:': nextRegNo,
+        'Reg No:': isEdit ? editRegNo : nextRegNo,
         lastUpdateDateTime: String(Date.now()),
-        monthlyAttendance: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0 },
       };
+      if (!isEdit) {
+        data.monthlyAttendance = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0 };
+      }
       if (!form.Email.trim()) delete data.Email;
       await onSubmit(data);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add member');
+      setError(err instanceof Error ? err.message : 'Failed to save member');
     } finally {
       setSaving(false);
     }
@@ -88,7 +121,7 @@ export default function AddMemberModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Add member</h2>
+          <h2>{isEdit ? 'Edit member' : 'Add member'}</h2>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             ×
           </button>
@@ -191,7 +224,7 @@ export default function AddMemberModal({
               Cancel
             </button>
             <button type="submit" disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : 'Add Member'}
+              {saving ? 'Saving...' : isEdit ? 'Save changes' : 'Add Member'}
             </button>
           </div>
         </form>

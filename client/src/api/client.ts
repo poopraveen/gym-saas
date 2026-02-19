@@ -176,13 +176,14 @@ export const api = {
       }>(q ? `/tenants/config?${q}` : '/tenants/config');
     },
     getMySettings: () =>
-      request<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean }>('/tenants/my/settings'),
+      request<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean; faceRecognitionEnabled: boolean }>('/tenants/my/settings'),
     updateMySettings: (body: {
       notifyOwnerOnFaceFailure?: boolean;
+      faceRecognitionEnabled?: boolean;
       enrollKey?: string;
       newFaceAlertEnrollKey?: string;
     }) =>
-      request<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean }>('/tenants/my/settings', {
+      request<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean; faceRecognitionEnabled: boolean }>('/tenants/my/settings', {
         method: 'PATCH',
         body: JSON.stringify(body),
       }),
@@ -301,6 +302,11 @@ export const api = {
       request<{ ok: boolean }>('/attendance/face-enroll', {
         method: 'POST',
         body: JSON.stringify({ regNo, descriptor }),
+      }),
+    removeFaceEnroll: (regNo: number) =>
+      request<{ ok: boolean }>('/attendance/face-enroll', {
+        method: 'DELETE',
+        body: JSON.stringify({ regNo }),
       }),
     checkInByFace: (token: string, descriptor: number[]) =>
       requestPublic<{

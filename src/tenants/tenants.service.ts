@@ -150,13 +150,14 @@ export class TenantsService {
   }
 
   /** Get current tenant settings (for gym admin). */
-  async getMySettings(tenantId: string): Promise<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean }> {
+  async getMySettings(tenantId: string): Promise<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean; faceRecognitionEnabled: boolean }> {
     const tenant = await this.tenantModel.findById(tenantId).select('settings').lean();
-    const settings = (tenant as { settings?: { notifyOwnerOnFaceFailure?: boolean; faceAlertEnrollKey?: string } } | null)?.settings;
+    const settings = (tenant as { settings?: { notifyOwnerOnFaceFailure?: boolean; faceAlertEnrollKey?: string; faceRecognitionEnabled?: boolean } } | null)?.settings;
     const key = settings?.faceAlertEnrollKey;
     return {
       notifyOwnerOnFaceFailure: settings?.notifyOwnerOnFaceFailure !== false,
       faceAlertEnrollKeySet: typeof key === 'string' && key.trim().length > 0,
+      faceRecognitionEnabled: settings?.faceRecognitionEnabled !== false,
     };
   }
 
@@ -165,10 +166,11 @@ export class TenantsService {
     tenantId: string,
     patch: {
       notifyOwnerOnFaceFailure?: boolean;
+      faceRecognitionEnabled?: boolean;
       enrollKey?: string;
       newFaceAlertEnrollKey?: string;
     },
-  ): Promise<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean }> {
+  ): Promise<{ notifyOwnerOnFaceFailure: boolean; faceAlertEnrollKeySet: boolean; faceRecognitionEnabled: boolean }> {
     const tenant = await this.tenantModel.findById(tenantId).select('settings').lean();
     const current = (tenant as { settings?: Record<string, unknown> } | null)?.settings ?? {};
     const existingKey = (current.faceAlertEnrollKey as string) ?? '';
@@ -188,12 +190,14 @@ export class TenantsService {
     const next: Record<string, unknown> = {
       ...current,
       notifyOwnerOnFaceFailure: patch.notifyOwnerOnFaceFailure ?? current.notifyOwnerOnFaceFailure,
+      faceRecognitionEnabled: patch.faceRecognitionEnabled !== undefined ? patch.faceRecognitionEnabled : current.faceRecognitionEnabled,
     };
     await this.tenantModel.updateOne({ _id: tenantId }, { $set: { settings: next } });
     const keyNow = (next.faceAlertEnrollKey as string) ?? '';
     return {
       notifyOwnerOnFaceFailure: next.notifyOwnerOnFaceFailure !== false,
       faceAlertEnrollKeySet: keyNow.length > 0,
+      faceRecognitionEnabled: next.faceRecognitionEnabled !== false,
     };
   }
 

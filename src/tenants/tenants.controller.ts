@@ -50,6 +50,7 @@ export class TenantsController {
     @TenantId() tenantId: string,
     @Body() body: {
       notifyOwnerOnFaceFailure?: boolean;
+      faceRecognitionEnabled?: boolean;
       enrollKey?: string;
       newFaceAlertEnrollKey?: string;
     },

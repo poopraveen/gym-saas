@@ -166,6 +166,18 @@ export class AuthService {
     return String((user as { _id: unknown })._id);
   }
 
+  /** Get all tenant admin and manager user ids (for push notifications — each who has push enabled will receive). */
+  async getTenantAdminAndManagerUserIds(tenantId: string): Promise<string[]> {
+    const users = await this.userModel
+      .find({ tenantId, role: { $in: [Role.TENANT_ADMIN, Role.MANAGER] }, isActive: true })
+      .select('_id')
+      .lean();
+    return users
+      .map((u) => (u as { _id?: unknown })._id)
+      .filter((id) => id != null)
+      .map((id) => String(id));
+  }
+
   /** Super admin: reset user password by tenant + email */
   async resetUserPassword(tenantId: string, email: string, newPassword: string) {
     const hash = await bcrypt.hash(newPassword, 10);
