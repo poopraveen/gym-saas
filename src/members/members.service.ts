@@ -122,7 +122,7 @@ export class MembersService {
       const row = mapToLegacy(m as unknown as Member);
       const regNo = Number(row['Reg No:']) || 0;
       const year = new Date().getFullYear();
-      (row as Record<string, unknown>).memberId = `GYM-${year}-${String(regNo).padStart(5, '0')}`;
+      (row as Record<string, unknown>).memberId = `GYM-${year}-${regNo}`;
       return row;
     });
   }
@@ -239,7 +239,7 @@ export class MembersService {
     const m = await this.memberModel.findOne({ tenantId, regNo }).lean();
     if (!m) return null;
     const row = mapToLegacy(m as unknown as Member);
-    (row as Record<string, unknown>).memberId = `GYM-${year}-${String(regNo).padStart(5, '0')}`;
+    (row as Record<string, unknown>).memberId = `GYM-${year}-${regNo}`;
     return row;
   }
 

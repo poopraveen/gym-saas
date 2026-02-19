@@ -184,7 +184,7 @@ export default function Dashboard() {
         const due = dueRaw && isValid(dueRaw) ? dueRaw : null;
         const join = joinRaw && isValid(joinRaw) ? joinRaw : null;
         const status = getStatus(due, join);
-        const memberId = (row as Record<string, unknown>).memberId as string || `GYM-${new Date().getFullYear()}-${String(row['Reg No:']).padStart(5, '0')}`;
+        const memberId = (row as Record<string, unknown>).memberId as string || `GYM-${new Date().getFullYear()}-${Number(row['Reg No:']) ?? row['Reg No:']}`;
         return { ...row, status, dueDate: due, joinDate: join, memberId };
       });
       setAllMembers(processed);
@@ -436,7 +436,7 @@ export default function Dashboard() {
           const due = dueRaw && isValid(dueRaw) ? dueRaw : null;
           const join = joinRaw && isValid(joinRaw) ? joinRaw : null;
           const status = getStatus(due, join);
-          const memberId = (row as Record<string, unknown>).memberId as string || `GYM-${new Date().getFullYear()}-${String(row['Reg No:']).padStart(5, '0')}`;
+          const memberId = (row as Record<string, unknown>).memberId as string || `GYM-${new Date().getFullYear()}-${Number(row['Reg No:']) ?? row['Reg No:']}`;
           return { ...row, status, dueDate: due, joinDate: join, memberId };
         })
         .sort((a, b) =>
@@ -1584,7 +1584,7 @@ export default function Dashboard() {
                       >
                         <div className="pi-avatar">
                           {row['Reg No:'] != null && String(row['Reg No:']).trim() !== ''
-                            ? String(row['Reg No:']).padStart(3, '0').slice(-3)
+                            ? String(Number(row['Reg No:']) ?? row['Reg No:'])
                             : '?'}
                         </div>
                         <div className="pi-info">
@@ -1671,13 +1671,13 @@ export default function Dashboard() {
                 <aside ref={memberDetailRef} className="member-detail">
                   <div className="md-avatar">
                     {selectedMember['Reg No:'] != null && String(selectedMember['Reg No:']).trim() !== ''
-                      ? String(selectedMember['Reg No:']).padStart(3, '0').slice(-3)
+                      ? String(Number(selectedMember['Reg No:']) ?? selectedMember['Reg No:'])
                       : '?'}
                   </div>
                   <h3>{selectedMember.NAME}</h3>
                   <p className="md-meta">
                     Member ID:{(selectedMember as Record<string, unknown>).memberId ||
-                      `GYM-${new Date().getFullYear()}-${String(selectedMember['Reg No:']).padStart(5, '0')}`}
+                      `GYM-${new Date().getFullYear()}-${Number(selectedMember['Reg No:']) ?? selectedMember['Reg No:']}`}
                   </p>
                   <p className="md-meta">
                     Client since {safeFormat(selectedMember.joinDate as Date, 'MMM yyyy')}
