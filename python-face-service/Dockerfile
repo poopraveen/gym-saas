@@ -3,8 +3,13 @@
 
 FROM python:3.10-bookworm
 
-# Runtime libs often required by dlib/face_recognition wheels (manylinux)
+# Runtime libs + build deps so pip can build dlib when no wheel exists (cmake, BLAS/LAPACK)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    libopenblas-dev \
+    liblapack-dev \
+    libx11-dev \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
