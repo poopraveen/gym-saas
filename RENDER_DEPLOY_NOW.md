@@ -51,13 +51,15 @@ The Render dashboard should have opened. Follow these steps:
 
 ---
 
-## Build failed?
+## Build failed? (Exited with status 1)
 
-- **Node version:** The repo has `.nvmrc` (Node 20) and `engines` in `package.json`. On Render, set **Environment** → **Node Version** to **20** (or leave blank; Render may auto-detect from `.nvmrc`).
-- **Which service failed?**
-  - **gym-saas-api (NestJS):** Check the **Build logs** in Render for the exact error. Common: wrong Node version, `npm install` timeout → retry deploy or use a paid instance for a longer build.
-  - **Python face service (Docker):** Building dlib in Docker can take 15+ minutes and may run out of memory on free tier. Use a paid instance or skip the Python service (leave `FACE_SERVICE_URL` empty).
-- **Redeploy:** After fixing env or code, use **Manual Deploy** → **Deploy latest commit** so the latest push is built.
+1. **Get the real error:** In Render → your service → **Logs** tab, open the **Build** log and scroll to the bottom. The last 20–30 lines usually show the failing command (e.g. `npm install` or `nest build`) and the error message.
+2. **Node version:** In the service → **Environment** tab, set **Node Version** to **20** (dropdown). The repo has `.nvmrc` and `.node-version`; if Render doesn’t pick them up, setting it here fixes many “status 1” builds.
+3. **Other fixes:**
+   - **Clear build cache:** **Manual Deploy** → **Clear build cache & deploy**.
+   - **Build command:** Keep as `npm install && npm run build` (no `npm ci` unless you’re sure lockfile is in sync).
+   - If the log shows a **dependency** or **native module** error (e.g. sharp, bcrypt), retry once; sometimes the network or cache causes a one-off failure.
+4. **Python face service:** If the failed service is the face service (Docker), see `DEPLOY_PYTHON_FACE_SERVICE.md` — use **Runtime: Docker** and **Root Directory:** `python-face-service`.
 
 ---
 

@@ -26,12 +26,12 @@ If you want the Python face service (e.g. for better accuracy), deploy it **befo
    - **Region:** Same as your API (e.g. Oregon).
    - **Branch:** `main`
    - **Root Directory:** `python-face-service`  ← important
-   - **Runtime:** **Docker** (use the Dockerfile in `python-face-service`).
+   - **Runtime:** **Docker** ← required (so the Dockerfile’s Python 3.10 and pre-built dlib wheels are used; native Python can trigger a long dlib compile and timeout).
    - **Instance type:** Free or paid (free can spin down; first request may be slow).
 5. **Environment:**
    - `PORT` is set by Render; no need to add it.
    - Optional: `FACE_MATCH_THRESHOLD=0.45`
-6. **Create Web Service.** Wait for the first build (dlib compiles; can take 10–15 minutes).
+6. **Create Web Service.** First build usually finishes in a few minutes (no dlib compile).
 7. **Note the URL**, e.g. `https://gym-face-service.onrender.com`.  
    Test: `https://gym-face-service.onrender.com/health` → `{"status":"ok"}`.
 
@@ -63,6 +63,39 @@ If you want the Python face service (e.g. for better accuracy), deploy it **befo
 
 - **Railway:** New project → add service from repo, set **Root Directory** to `python-face-service`, use Docker.
 - **Fly.io:** From repo root, `fly launch`; then set root to `python-face-service` or run from `python-face-service` with a Dockerfile build. Set `PORT` / expose port as per Fly’s docs.
+
+**If the build failed with “Building wheel for dlib (pyproject.toml)…”**  
+You were likely using **Runtime: Python** (no Docker). That compiles dlib from source and often times out. Render often doesn’t let you change runtime on an existing service. **Create a new Web Service** with the settings below (Docker + Root Directory), then you can delete the old one.
+
+---
+
+## Create a new project (to fix runtime)
+
+Use this when the old service was created with the wrong runtime and you want a fresh one.
+
+1. Go to **[dashboard.render.com](https://dashboard.render.com)**.
+2. Click **New +** → **Web Service**.
+3. **Connect repository:** choose GitHub and select **gym-saas**. Click **Connect**.
+4. **Configure:**
+
+   | Field | Value |
+   |-------|--------|
+   | **Name** | `gym-face-service` (or any name) |
+   | **Region** | Same as your API, e.g. **Oregon (US West)** |
+   | **Branch** | `main` |
+   | **Root Directory** | `python-face-service` ← type exactly |
+   | **Runtime** | **Docker** ← must be Docker, not Python |
+   | **Instance Type** | Free or Starter |
+
+5. Leave **Build Command** and **Start Command** empty (Dockerfile handles them).
+6. **Environment:** optional – add `FACE_MATCH_THRESHOLD` = `0.45`. Do not set `PORT`.
+7. Click **Create Web Service**. Wait for the first build (about 2–5 minutes).
+8. Copy the service URL (e.g. `https://gym-face-service.onrender.com`). Test: `https://YOUR-URL/health` → `{"status":"ok"}`.
+9. In your **main backend** (gym-saas-api), add **`FACE_SERVICE_URL`** = `https://YOUR-URL` (no trailing slash), then redeploy the backend.
+
+You can delete the old failed service from the dashboard if you want.
+
+---
 
 The Python service exposes:
 
