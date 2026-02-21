@@ -79,6 +79,7 @@ function mapToLegacy(m: Member): Record<string, unknown> {
     lastUpdateDateTime: m.lastUpdateDateTime,
     telegramChatId: m.telegramChatId,
     faceDescriptor: m.faceDescriptor,
+    faceDescriptorDlib: m.faceDescriptorDlib,
     ...m.legacyFields,
   };
   return legacy;
@@ -361,16 +362,29 @@ export class MembersService {
     );
   }
 
+  /** True if member has dlib descriptor (enrolled for Python fallback). */
+  async hasFaceDescriptorDlib(tenantId: string, regNo: number): Promise<boolean> {
+    const doc = await this.memberModel
+      .findOne({ tenantId, regNo })
+      .select('faceDescriptorDlib')
+      .lean();
+    const fd = (doc as Record<string, unknown> | null)?.faceDescriptorDlib;
+    return Array.isArray(fd) && fd.length === 128;
+  }
+
   /**
    * Check if a member already has a face descriptor (already enrolled for face recognition).
+   * True if either faceDescriptor (face-api.js) or faceDescriptorDlib (Python) is set.
    */
   async hasFaceDescriptor(tenantId: string, regNo: number): Promise<boolean> {
     const doc = await this.memberModel
       .findOne({ tenantId, regNo })
-      .select('faceDescriptor')
+      .select('faceDescriptor faceDescriptorDlib')
       .lean();
-    const fd = (doc as Record<string, unknown> | null)?.faceDescriptor;
-    return Array.isArray(fd) && fd.length === 128;
+    const d = doc as Record<string, unknown> | null;
+    const fd = d?.faceDescriptor;
+    const fdDlib = d?.faceDescriptorDlib;
+    return (Array.isArray(fd) && fd.length === 128) || (Array.isArray(fdDlib) && fdDlib.length === 128);
   }
 
   /**
@@ -387,11 +401,12 @@ export class MembersService {
 
   /**
    * Clear face descriptor for a member (opt out of face registration). They can then check in by QR/name/Reg No.
+   * Clears both faceDescriptor and faceDescriptorDlib.
    */
   async clearFaceDescriptor(tenantId: string, regNo: number): Promise<boolean> {
     const result = await this.memberModel.updateOne(
       { tenantId, regNo },
-      { $unset: { faceDescriptor: 1 } },
+      { $unset: { faceDescriptor: 1, faceDescriptorDlib: 1 } },
     );
     return result.matchedCount === 1;
   }
@@ -418,6 +433,42 @@ export class MembersService {
         };
       })
       .filter((x) => x.regNo && x.name);
+  }
+
+  /**
+   * Get members that have dlib face descriptor (for Python fallback matching).
+   */
+  async getMembersWithFaceDescriptorsDlib(tenantId: string): Promise<{ regNo: number; name: string; faceDescriptorDlib: number[] }[]> {
+    const docs = await this.memberModel
+      .find({ tenantId, faceDescriptorDlib: { $exists: true, $ne: null } })
+      .select('regNo name faceDescriptorDlib')
+      .lean();
+    return docs
+      .filter((m) => {
+        const fd = (m as Record<string, unknown>).faceDescriptorDlib;
+        return Array.isArray(fd) && fd.length === 128;
+      })
+      .map((m) => {
+        const r = m as Record<string, unknown>;
+        return {
+          regNo: Number(r.regNo) || 0,
+          name: String(r.name ?? ''),
+          faceDescriptorDlib: r.faceDescriptorDlib as number[],
+        };
+      })
+      .filter((x) => x.regNo && x.name);
+  }
+
+  /**
+   * Save dlib face descriptor (128-d) for a member. Used when Python fallback is enabled.
+   */
+  async updateFaceDescriptorDlib(tenantId: string, regNo: number, descriptor: number[]): Promise<boolean> {
+    if (!Array.isArray(descriptor) || descriptor.length !== 128) return false;
+    const result = await this.memberModel.updateOne(
+      { tenantId, regNo },
+      { $set: { faceDescriptorDlib: descriptor } },
+    );
+    return result.matchedCount === 1;
   }
 
   /**

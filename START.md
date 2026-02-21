@@ -1,5 +1,19 @@
 # How to Run Gym SaaS (Step by Step)
 
+## Quick: Run backend + frontend together
+From the project root (with MongoDB running and `.env` set):
+
+```bash
+npm install
+npm run dev
+```
+
+This starts the API on **http://localhost:3000** and the app on **http://localhost:5173**. Open **http://localhost:5173** in your browser.
+
+**If you see 404 on `/api/legacy/list` or `/api/tenants/config`:** The backend (port 3000) is not running or not ready yet. Wait for the API to finish starting (look for “Application is running on: http://localhost:3000/api” in the terminal), then refresh the page. Or run backend and frontend in two terminals (see below).
+
+---
+
 ## Step 1: Start MongoDB
 Make sure MongoDB is running on `localhost:27017`.
 

@@ -15,6 +15,17 @@ export class AttendanceService {
     private readonly tenantsService: TenantsService,
   ) {}
 
+  /** Whether Python face service fallback is configured. When true, client should send image for match/enroll. */
+  getFaceConfig(): { useImageForMatch: boolean } {
+    const url = this.configService.get<string>('FACE_SERVICE_URL');
+    return { useImageForMatch: !!url?.trim() };
+  }
+
+  private getFaceServiceUrl(): string | null {
+    const url = this.configService.get<string>('FACE_SERVICE_URL');
+    return url?.trim() || null;
+  }
+
   /** Check-in updates member and returns check-in list. checkedInBy = trainer name or "QR" for self check-in. Rejects expired membership. */
   async checkIn(tenantId: string, regNo: number, checkedInBy?: string): Promise<Member | null> {
     const list = await this.membersService.list(tenantId);
@@ -26,7 +37,12 @@ export class AttendanceService {
     if (dueRaw != null) {
       const due = new Date(dueRaw as number | string);
       if (!isNaN(due.getTime()) && due < new Date()) {
-        throw new BadRequestException('Membership expired. Please contact gym admin to renew.');
+        const name = String(m.NAME ?? m.name ?? '—');
+        const phone = (m['Phone Number'] ?? m.phoneNumber) as string | undefined;
+        throw new BadRequestException({
+          message: 'Membership expired. Please contact gym admin to renew.',
+          member: { name, regNo, phone, dueDate: dueRaw },
+        });
       }
     }
 
@@ -51,6 +67,26 @@ export class AttendanceService {
     } as Record<string, unknown>, false);
 
     return member;
+  }
+
+  /** All gym members for attendance view (no due-date filter). */
+  async getAllMembersForAttendance(tenantId: string) {
+    return this.membersService.list(tenantId);
+  }
+
+  /** Members whose due date has passed (membership expired). */
+  async getExpiredMembers(tenantId: string): Promise<Member[]> {
+    const list = await this.membersService.list(tenantId);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return list.filter((row) => {
+      const r = row as unknown as Record<string, unknown>;
+      const dueRaw = r['DUE DATE'] ?? r.dueDate;
+      if (dueRaw == null) return false;
+      const due = new Date(dueRaw as number | string);
+      if (isNaN(due.getTime())) return false;
+      return due < todayStart;
+    }) as unknown as Member[];
   }
 
   /** List of members eligible for check-in (due date >= today only). Used for attendance screen and today's check-ins. */
@@ -159,7 +195,28 @@ export class AttendanceService {
     return Math.sqrt(sum);
   }
 
-  /** Save face descriptor for a member (admin enrollment). Fails if member is already enrolled or face recognition is disabled for tenant. */
+  /** Reject enrollment only when very confident same person (stricter than check-in to avoid false positives). */
+  private static readonly ENROLL_DUPLICATE_THRESHOLD = 0.28;
+
+  /** Skip corrupt/invalid stored descriptors that can cause false "already registered" matches. */
+  private static isDescriptorValid(descriptor: number[]): boolean {
+    if (!Array.isArray(descriptor) || descriptor.length !== 128) return false;
+    let sumSq = 0;
+    let first = descriptor[0];
+    let allSame = true;
+    for (let i = 0; i < 128; i++) {
+      const v = descriptor[i];
+      if (typeof v !== 'number' || Number.isNaN(v)) return false;
+      sumSq += v * v;
+      if (v !== first) allSame = false;
+    }
+    const norm = Math.sqrt(sumSq);
+    if (norm < 0.01) return false;
+    if (allSame) return false;
+    return true;
+  }
+
+  /** Save face descriptor for a member (admin enrollment). If already enrolled, replaces with the new face (re-enrollment). Rejects only when very confident this face is already another member's (strict threshold to avoid false positives). */
   async faceEnroll(tenantId: string, regNo: number, descriptor: number[]): Promise<boolean> {
     const settings = await this.tenantsService.getMySettings(tenantId);
     if (!settings.faceRecognitionEnabled) {
@@ -167,7 +224,18 @@ export class AttendanceService {
     }
     const alreadyEnrolled = await this.membersService.hasFaceDescriptor(tenantId, regNo);
     if (alreadyEnrolled) {
-      throw new BadRequestException('This member is already enrolled for face recognition. To re-enroll, clear the existing face first (or contact support).');
+      await this.membersService.clearFaceDescriptor(tenantId, regNo);
+    }
+    const others = await this.membersService.getMembersWithFaceDescriptors(tenantId);
+    for (const m of others) {
+      if (m.regNo === regNo) continue;
+      if (!AttendanceService.isDescriptorValid(m.faceDescriptor)) continue;
+      const dist = AttendanceService.descriptorDistance(descriptor, m.faceDescriptor);
+      if (dist < AttendanceService.ENROLL_DUPLICATE_THRESHOLD) {
+        throw new BadRequestException(
+          `This face is already registered to another member: #${m.regNo} ${m.name}. Use a different photo or remove the other member's face first.`,
+        );
+      }
     }
     return this.membersService.updateFaceDescriptor(tenantId, regNo, descriptor);
   }
@@ -229,5 +297,128 @@ export class AttendanceService {
       typeofPack: (m['Typeof pack'] ?? m.typeofPack) as string | undefined,
     };
     return { success: true, name, memberSummary, checkInTime };
+  }
+
+  /**
+   * Check-in by face using Python service (image). Used when FACE_SERVICE_URL is set.
+   */
+  async checkInByFaceImage(token: string, imageBuffer: Buffer): Promise<{ success: boolean; name?: string; memberSummary?: Record<string, unknown>; checkInTime?: string } | null> {
+    const tenantId = this.verifyQRToken(token);
+    if (!tenantId) return null;
+    const faceUrl = this.getFaceServiceUrl();
+    if (!faceUrl) return null;
+    const settings = await this.tenantsService.getMySettings(tenantId);
+    if (!settings.faceRecognitionEnabled) return null;
+    const members = await this.membersService.getMembersWithFaceDescriptorsDlib(tenantId);
+    if (members.length === 0) return null;
+    const enrolled = members.map((m) => ({ regNo: m.regNo, name: m.name, descriptor: m.faceDescriptorDlib }));
+    const form = new FormData();
+    form.append('image', new Blob([new Uint8Array(imageBuffer)], { type: 'image/jpeg' }), 'face.jpg');
+    form.append('enrolled', JSON.stringify(enrolled));
+    let res: Response;
+    try {
+      res = await fetch(`${faceUrl.replace(/\/$/, '')}/match-image`, { method: 'POST', body: form });
+    } catch {
+      return null;
+    }
+    const raw = await res.text();
+    let data: { regNo?: number; name?: string; match?: boolean; error?: string };
+    try {
+      data = raw && raw.trim() ? (JSON.parse(raw) as { regNo?: number; name?: string; match?: boolean; error?: string }) : {};
+    } catch {
+      return null;
+    }
+    if (data.error || (!data.regNo && data.match === false)) return null;
+    if (data.regNo == null) return null;
+    const member = await this.checkIn(tenantId, data.regNo, 'Face');
+    if (!member) return null;
+    const m = member as unknown as Record<string, unknown>;
+    const name = (m.name ?? m.NAME) as string;
+    const dueRaw = m['DUE DATE'] ?? m.dueDate;
+    const dueDate =
+      dueRaw != null && !isNaN(new Date(dueRaw as string | number).getTime())
+        ? new Date(dueRaw as string | number).toISOString()
+        : undefined;
+    const checkInTime = new Date().toISOString();
+    const memberSummary = {
+      name,
+      dueDate,
+      phoneNumber: (m['Phone Number'] ?? m.phoneNumber) as string | undefined,
+      typeofPack: (m['Typeof pack'] ?? m.typeofPack) as string | undefined,
+    };
+    return { success: true, name, memberSummary, checkInTime };
+  }
+
+  /**
+   * Enroll face via Python service (image → dlib descriptor). Used when FACE_SERVICE_URL is set.
+   */
+  async faceEnrollImage(tenantId: string, regNo: number, imageBuffer: Buffer): Promise<boolean> {
+    try {
+      const faceUrl = this.getFaceServiceUrl();
+      if (!faceUrl) {
+        throw new BadRequestException(
+          'Face enrollment by image is not configured. Set FACE_SERVICE_URL in the server .env (e.g. FACE_SERVICE_URL=http://localhost:8000) and restart the backend. Then start the Python face service: python -m uvicorn main:app --host 0.0.0.0 --port 8000',
+        );
+      }
+      const settings = await this.tenantsService.getMySettings(tenantId);
+      if (!settings.faceRecognitionEnabled) {
+        throw new BadRequestException('Face recognition is disabled for this gym. Enable it in Attendance → Face recognition settings.');
+      }
+      const alreadyDlib = await this.membersService.hasFaceDescriptorDlib(tenantId, regNo);
+      if (alreadyDlib) {
+        await this.membersService.clearFaceDescriptor(tenantId, regNo);
+      }
+      const form = new FormData();
+      form.append('image', new Blob([new Uint8Array(imageBuffer)], { type: 'image/jpeg' }), 'face.jpg');
+      let res: Response;
+      try {
+        res = await fetch(`${faceUrl.replace(/\/$/, '')}/encode-image`, { method: 'POST', body: form });
+      } catch {
+        throw new BadRequestException('Cannot reach the face recognition service. Check that the Python service is running (e.g. http://localhost:8000).');
+      }
+      let raw: string;
+      try {
+        raw = await res.text();
+      } catch {
+        throw new BadRequestException('Face service did not return a valid response. Please try again.');
+      }
+      let data: { descriptor?: number[]; error?: string };
+      try {
+        data = raw && raw.trim() ? (JSON.parse(raw) as { descriptor?: number[]; error?: string }) : {};
+      } catch {
+        const trimmed = (raw && raw.trim()) || '';
+        const isServerError = /internal server error|error 500|exception/i.test(trimmed);
+        const friendlyMsg = isServerError || !res.ok
+          ? 'Face recognition service is unavailable. Start the Python face service (e.g. run in python-face-service: python -m uvicorn main:app --host 0.0.0.0 --port 8000) and try again.'
+          : trimmed.length < 300 && /^[\x20-\x7e\s]+$/.test(trimmed)
+            ? trimmed
+            : 'Face service returned an invalid response. Check that the Python face service is running and try again.';
+        throw new BadRequestException(friendlyMsg);
+      }
+      if (data.error || !Array.isArray(data.descriptor) || data.descriptor.length !== 128) {
+        const errMsg = typeof data.error === 'string' && data.error.trim() ? data.error.trim() : 'No face detected in the image. Please try again with a clearer photo.';
+        throw new BadRequestException(errMsg);
+      }
+      const descriptor = data.descriptor;
+      const others = await this.membersService.getMembersWithFaceDescriptorsDlib(tenantId);
+      for (const m of others) {
+        if (m.regNo === regNo) continue;
+        if (!AttendanceService.isDescriptorValid(m.faceDescriptorDlib)) continue;
+        const dist = AttendanceService.descriptorDistance(descriptor, m.faceDescriptorDlib);
+        if (dist < AttendanceService.ENROLL_DUPLICATE_THRESHOLD) {
+          throw new BadRequestException(
+            `This face is already registered to another member: #${m.regNo} ${m.name}. Use a different photo or remove the other member's face first.`,
+          );
+        }
+      }
+      return this.membersService.updateFaceDescriptorDlib(tenantId, regNo, descriptor);
+    } catch (e) {
+      if (e instanceof BadRequestException) throw e;
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('Unexpected token') || message.includes('is not valid JSON')) {
+        throw new BadRequestException('Face recognition service returned an invalid response. Ensure the Python face service is running and try again.');
+      }
+      throw new BadRequestException(message && message.length < 200 ? message : 'Face enrollment failed. Please try again.');
+    }
   }
 }

@@ -802,6 +802,30 @@
   display: block;
 }
 
+.checkin-qr-url-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.checkin-qr-url-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg, var(--card-bg));
+  color: var(--text-primary);
+}
+
+.checkin-qr-copy-btn {
+  flex-shrink: 0;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -883,6 +907,107 @@
 
 .checkin-validity-note strong {
   color: var(--text-primary);
+}
+
+.checkin-expired-alert {
+  margin: 0 0 12px 0;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  background: rgba(220, 53, 69, 0.12);
+  border: 1px solid rgba(220, 53, 69, 0.4);
+  border-radius: 8px;
+  color: var(--text-primary);
+}
+
+.checkin-all-members-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.checkin-all-members-title {
+  margin: 0 0 10px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.checkin-all-members-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.checkin-all-members-empty {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.checkin-all-member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: var(--hover-bg);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.checkin-all-member-chip.chip-due-expired {
+  border-color: rgba(220, 53, 69, 0.5);
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.checkin-all-member-chip.chip-due-soon {
+  border-color: rgba(255, 193, 7, 0.5);
+  background: rgba(255, 193, 7, 0.08);
+}
+
+.checkin-all-member-name {
+  font-weight: 500;
+}
+
+.checkin-all-member-status {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.checkin-all-member-today {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--primary);
+  color: var(--primary-contrast, #fff);
+  font-weight: 600;
+}
+
+.checkin-all-member-remove-face {
+  margin-left: 4px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.checkin-all-member-remove-face:hover:not(:disabled) {
+  background: var(--hover-bg);
+  color: var(--error, #ef4444);
+  border-color: var(--error, #ef4444);
+}
+
+.checkin-all-member-remove-face:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .checkin-face-alerts-section {
@@ -1089,6 +1214,21 @@
 
 .checkin-face-enroll-msg.error {
   color: var(--error, #ef4444);
+}
+
+.checkin-face-enroll-msg-alert {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid var(--error, #ef4444);
+  font-weight: 500;
+}
+
+.checkin-face-enroll-msg-hint {
+  display: block;
+  margin-top: 6px;
+  font-weight: 400;
+  opacity: 0.95;
 }
 
 .chip-validity .chip-text {

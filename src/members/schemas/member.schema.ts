@@ -73,6 +73,10 @@ export class Member extends Document {
   @Prop({ type: [Number] })
   faceDescriptor?: number[];
 
+  /** Face recognition fallback: 128-d descriptor from Python/dlib (when FACE_SERVICE_URL is set). */
+  @Prop({ type: [Number] })
+  faceDescriptorDlib?: number[];
+
   @Prop({ type: Object })
   legacyFields?: Record<string, unknown>;
 }

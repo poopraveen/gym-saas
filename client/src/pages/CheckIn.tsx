@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, isValid } from 'date-fns';
-import { api, getApiErrorMessage } from '../api/client';
+import { api, getApiErrorMessage, getApiErrorResponseBody } from '../api/client';
 import FaceCaptureModal from '../components/FaceCaptureModal';
 import SuccessPopup from '../components/SuccessPopup';
 import './CheckIn.css';
@@ -13,6 +13,7 @@ type MemberSummary = {
   dueDate?: string;
   phoneNumber?: string;
   typeofPack?: string;
+  regNo?: number;
 };
 
 export default function CheckIn() {
@@ -31,6 +32,7 @@ export default function CheckIn() {
   } | null>(null);
   const [showFaceModal, setShowFaceModal] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [faceConfig, setFaceConfig] = useState<{ useImageForMatch: boolean } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -47,6 +49,7 @@ export default function CheckIn() {
       .then((r) => setMembers(r.members || []))
       .catch(() => setMembers([]))
       .finally(() => setMembersLoading(false));
+    api.attendance.getFaceConfig().then(setFaceConfig).catch(() => setFaceConfig({ useImageForMatch: false }));
   }, [token]);
 
   /** Show filtered list when typing, or first 15 when focused with no query (so tap/click shows list). */
@@ -87,7 +90,27 @@ export default function CheckIn() {
       setSelectedMember(null);
       setDropdownOpen(false);
     } catch (err) {
-      setMessage({ type: 'error', text: getApiErrorMessage(err) });
+      const msg = getApiErrorMessage(err);
+      if (msg.includes('Membership expired')) {
+        const body = getApiErrorResponseBody(err);
+        const m = body?.member;
+        setMessage({ type: 'success', text: msg });
+        if (m) {
+          setLastCheckInInfo({
+            memberSummary: {
+              name: m.name ?? 'Member',
+              phoneNumber: m.phone,
+              dueDate: m.dueDate,
+              regNo: m.regNo,
+            },
+          });
+        }
+        setSearchQuery('');
+        setSelectedMember(null);
+        setDropdownOpen(false);
+      } else {
+        setMessage({ type: 'error', text: msg });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -204,32 +227,102 @@ export default function CheckIn() {
                 captureButtonLabel="Capture & check in"
                 successWatermarkText="Welcome!"
                 failureMessage="Face not recognized. Gym owner has been notified. Use name/Reg. No. or try again."
-                onCapture={async (descriptor) => {
-                  setSubmitting(true);
-                  setMessage(null);
-                  setLastCheckInInfo(null);
-                  try {
-                    const res = await api.attendance.checkInByFace(token, descriptor);
-                    setShowFaceModal(false);
-                    setMessage({
-                      type: 'success',
-                      text: res.name ? `Welcome, ${res.name}! Check-in recorded.` : 'Check-in recorded.',
-                    });
-                    if (res.memberSummary) {
-                      setLastCheckInInfo({
-                        memberSummary: res.memberSummary,
-                        checkInTime: res.checkInTime,
-                      });
-                    }
-                    setShowSuccessPopup(true);
-                    return { success: true as const };
-                  } catch (err) {
-                    setMessage({ type: 'error', text: getApiErrorMessage(err) });
-                    return { success: false as const };
-                  } finally {
-                    setSubmitting(false);
-                  }
-                }}
+                onCaptureImage={
+                  faceConfig?.useImageForMatch
+                    ? async (blob) => {
+                        setSubmitting(true);
+                        setMessage(null);
+                        setLastCheckInInfo(null);
+                        try {
+                          const res = await api.attendance.checkInByFaceImage(token, blob);
+                          setShowFaceModal(false);
+                          setMessage({
+                            type: 'success',
+                            text: res.name ? `Welcome, ${res.name}! Check-in recorded.` : 'Check-in recorded.',
+                          });
+                          if (res.memberSummary) {
+                            setLastCheckInInfo({
+                              memberSummary: res.memberSummary,
+                              checkInTime: res.checkInTime,
+                            });
+                          }
+                          setShowSuccessPopup(true);
+                          return { success: true as const };
+                        } catch (err) {
+                          const msg = getApiErrorMessage(err);
+                          if (msg.includes('Membership expired')) {
+                            const body = getApiErrorResponseBody(err);
+                            const m = body?.member;
+                            setShowFaceModal(false);
+                            setMessage({ type: 'success', text: msg });
+                            if (m) {
+                              setLastCheckInInfo({
+                                memberSummary: {
+                                  name: m.name ?? 'Member',
+                                  phoneNumber: m.phone,
+                                  dueDate: m.dueDate,
+                                  regNo: m.regNo,
+                                },
+                              });
+                            }
+                            return { success: false as const };
+                          }
+                          setMessage({ type: 'error', text: msg });
+                          return { success: false as const };
+                        } finally {
+                          setSubmitting(false);
+                        }
+                      }
+                    : undefined
+                }
+                onCapture={
+                  !faceConfig?.useImageForMatch
+                    ? async (descriptor) => {
+                        setSubmitting(true);
+                        setMessage(null);
+                        setLastCheckInInfo(null);
+                        try {
+                          const res = await api.attendance.checkInByFace(token, descriptor);
+                          setShowFaceModal(false);
+                          setMessage({
+                            type: 'success',
+                            text: res.name ? `Welcome, ${res.name}! Check-in recorded.` : 'Check-in recorded.',
+                          });
+                          if (res.memberSummary) {
+                            setLastCheckInInfo({
+                              memberSummary: res.memberSummary,
+                              checkInTime: res.checkInTime,
+                            });
+                          }
+                          setShowSuccessPopup(true);
+                          return { success: true as const };
+                        } catch (err) {
+                          const msg = getApiErrorMessage(err);
+                          if (msg.includes('Membership expired')) {
+                            const body = getApiErrorResponseBody(err);
+                            const m = body?.member;
+                            setShowFaceModal(false);
+                            setMessage({ type: 'success', text: msg });
+                            if (m) {
+                              setLastCheckInInfo({
+                                memberSummary: {
+                                  name: m.name ?? 'Member',
+                                  phoneNumber: m.phone,
+                                  dueDate: m.dueDate,
+                                  regNo: m.regNo,
+                                },
+                              });
+                            }
+                            return { success: false as const };
+                          }
+                          setMessage({ type: 'error', text: msg });
+                          return { success: false as const };
+                        } finally {
+                          setSubmitting(false);
+                        }
+                      }
+                    : async () => ({ success: false as const })
+                }
                 onClose={() => setShowFaceModal(false)}
               />
             )}
@@ -244,6 +337,9 @@ export default function CheckIn() {
                 <h3 className="checkin-summary-title">Your details</h3>
                 <ul className="checkin-summary-list">
                   <li><strong>Name:</strong> {lastCheckInInfo.memberSummary.name}</li>
+                  {lastCheckInInfo.memberSummary.regNo != null && (
+                    <li><strong>Reg. No.:</strong> {lastCheckInInfo.memberSummary.regNo}</li>
+                  )}
                   {lastCheckInInfo.memberSummary.phoneNumber && (
                     <li><strong>Phone:</strong> {lastCheckInInfo.memberSummary.phoneNumber}</li>
                   )}

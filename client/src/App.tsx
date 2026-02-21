@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { storage } from './api/client';
 import GlobalLoader from './components/GlobalLoader';
+import ApiConnectionBanner from './components/ApiConnectionBanner';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -60,6 +61,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <GlobalLoader />
+      <ApiConnectionBanner />
       <PWAInstallPrompt />
       <Routes>
         <Route path="/login" element={<Login />} />

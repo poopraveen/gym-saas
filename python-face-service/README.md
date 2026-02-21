@@ -9,11 +9,74 @@ If the built-in face-api.js recognition still shows false positives (unenrolled 
 
 ## Quick Start (face_recognition)
 
+**Windows:** `face_recognition` depends on `dlib`, which needs **CMake** to build. Install CMake from [cmake.org](https://cmake.org/download/) and add it to your PATH, then:
+
+```bash
+cd python-face-service
+pip install -r requirements.txt
+pip install face_recognition
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+**Alternative (no Python needed):** Leave `FACE_SERVICE_URL` empty in the backend `.env`. The app will use the built-in flow (face-api.js in the browser) for face enrollment and check-in—no `face_recognition` or Python required.
+
+**Linux / macOS:**
+
 ```bash
 cd python-face-service
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
+
+## Run Python locally + backend locally (testing)
+
+You can run the Python service on your machine and point your **local** NestJS backend to it:
+
+1. **Terminal 1 – Python (this service)**  
+   ```bash
+   cd python-face-service
+   pip install -r requirements.txt
+   uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+   Leave this running (e.g. http://localhost:8000).
+
+2. **Terminal 2 – NestJS backend**  
+   In the **project root** (not python-face-service), create or edit `.env`:
+   ```env
+   FACE_SERVICE_URL=http://localhost:8000
+   MONGODB_URI=...   # your DB
+   ```
+   Then:
+   ```bash
+   npm run start:dev
+   ```
+
+3. **Terminal 3 – Frontend (optional)**  
+   ```bash
+   cd client && npm run dev
+   ```
+   Open the app, go to Check-in → use face check-in or face enrollment. Face recognition will use your **local** Python service.
+
+## Run Python on server, backend locally (testing against deployed Python)
+
+Deploy the Python service to Render/Railway and use it from your **local** backend:
+
+1. Deploy `python-face-service` to Render (or similar) and note the URL, e.g. `https://gym-face.onrender.com`.
+
+2. In your **local** `.env` (project root):
+   ```env
+   FACE_SERVICE_URL=https://gym-face.onrender.com
+   MONGODB_URI=...
+   ```
+
+3. Run backend and client locally:
+   ```bash
+   npm run start:dev
+   # and in another terminal: cd client && npm run dev
+   ```
+   Face recognition will use the **server** Python; everything else runs locally.
+
+**Production:** Run both NestJS and Python on the server. Set `FACE_SERVICE_URL` to your deployed Python URL in the NestJS service env (e.g. on Render).
 
 ## API
 

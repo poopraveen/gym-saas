@@ -12,7 +12,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
-import { api, storage, getApiErrorMessage } from '../api/client';
+import { api, storage, getApiErrorMessage, getApiErrorResponseBody, type ApiErrorResponseBody } from '../api/client';
 import { downloadMonthlyReportPDF } from '../utils/downloadMonthlyReport';
 import Layout from '../components/Layout';
 import AddMemberModal from '../components/AddMemberModal';
@@ -111,8 +111,12 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [allMembers, setAllMembers] = useState<Member[]>([]);
   const [checkinTable, setCheckinTable] = useState<Member[]>([]);
-  /** Valid-only members from checkInList (used for attendance dropdown when on check-in tab). */
+  /** Valid-only members from checkInList (used for today's check-ins). */
   const [checkInEligibleMembers, setCheckInEligibleMembers] = useState<Member[]>([]);
+  /** All gym members for attendance tab (dropdown + full list). */
+  const [attendanceAllMembers, setAttendanceAllMembers] = useState<Member[]>([]);
+  /** Count of members with expired membership (owner is alerted when opening Attendance). */
+  const [expiredSummaryCount, setExpiredSummaryCount] = useState(0);
   const [finance, setFinance] = useState<{
     monthlyFees: number;
     overallFees: number;
@@ -129,6 +133,8 @@ export default function Dashboard() {
   const [checkinSearchQuery, setCheckinSearchQuery] = useState('');
   const [selectedMemberForCheckIn, setSelectedMemberForCheckIn] = useState<Member | null>(null);
   const [checkinDropdownOpen, setCheckinDropdownOpen] = useState(false);
+  /** When set, show success-style popup for expired membership (message + member info). */
+  const [expiredCheckInPopup, setExpiredCheckInPopup] = useState<{ message: string; member?: ApiErrorResponseBody['member'] } | null>(null);
   const checkinInputRef = useRef<HTMLInputElement>(null);
   const checkinDropdownRef = useRef<HTMLDivElement>(null);
   const [showFaceEnrollModal, setShowFaceEnrollModal] = useState(false);
@@ -137,6 +143,7 @@ export default function Dashboard() {
   const [faceEnrollDropdownOpen, setFaceEnrollDropdownOpen] = useState(false);
   const faceEnrollDropdownRef = useRef<HTMLDivElement>(null);
   const faceEnrollInputRef = useRef<HTMLInputElement>(null);
+  const faceEnrollMessageRef = useRef<HTMLParagraphElement>(null);
   const [faceEnrollMessage, setFaceEnrollMessage] = useState<string | null>(null);
   const [showEnrollSuccessPopup, setShowEnrollSuccessPopup] = useState(false);
   const [notifyOwnerOnFaceFailure, setNotifyOwnerOnFaceFailure] = useState(true);
@@ -145,6 +152,9 @@ export default function Dashboard() {
   const [faceAlertSettingsLoading, setFaceAlertSettingsLoading] = useState(false);
   const [faceAlertSettingsSaving, setFaceAlertSettingsSaving] = useState(false);
   const [faceOptOutSaving, setFaceOptOutSaving] = useState(false);
+  const [faceRemoveRegNo, setFaceRemoveRegNo] = useState<number | null>(null);
+  const [copyUrlFeedback, setCopyUrlFeedback] = useState(false);
+  const [faceConfig, setFaceConfig] = useState<{ useImageForMatch: boolean } | null>(null);
   const [showEnrollKeyModal, setShowEnrollKeyModal] = useState(false);
   const [enrollKeyInput, setEnrollKeyInput] = useState('');
   const [enrollKeyError, setEnrollKeyError] = useState<string | null>(null);
@@ -373,20 +383,25 @@ export default function Dashboard() {
 
   const regMembersTotal = allMembers.length;
 
-  /** Face enroll autocomplete: filter by name or Reg No, show first 15, exact Reg No first when query is digits */
+  /** Face enroll autocomplete: filter by name or Reg No; supports "#4 shym" (reg + name). Tokenize query so each part can match name or reg. */
   const faceEnrollMatches = (() => {
-    const q = faceEnrollQuery.trim().toLowerCase();
+    const raw = faceEnrollQuery.trim().replace(/^#+/, '').trim();
+    const q = raw.toLowerCase();
     const source =
-      activeNav === 'checkin' && checkInEligibleMembers.length > 0
-        ? checkInEligibleMembers
-        : allMembers.filter((m) => (m.status as StatusType) !== 'expired');
+      activeNav === 'checkin' && attendanceAllMembers.length > 0
+        ? attendanceAllMembers
+        : activeNav === 'checkin' && checkInEligibleMembers.length > 0
+          ? checkInEligibleMembers
+          : allMembers.filter((m) => (m.status as StatusType) !== 'expired');
     if (!q) return source.slice(0, 15);
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const filtered = source.filter((m) => {
+      const name = String(m.NAME ?? '').toLowerCase();
+      const regStr = String(m['Reg No:'] ?? '');
+      if (tokens.length === 0) return true;
+      return tokens.every((t) => name.includes(t) || regStr.toLowerCase().includes(t) || (t === regStr) || (t === String(Number(m['Reg No:']))));
+    });
     const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
-    const filtered = source.filter(
-      (m) =>
-        String(m.NAME ?? '').toLowerCase().includes(q) ||
-        String(m['Reg No:'] ?? '').includes(q),
-    );
     const sorted =
       !isNaN(qNum) && !Number.isNaN(qNum)
         ? [...filtered].sort((a, b) => {
@@ -466,7 +481,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeNav === 'checkin') {
       loadCheckIn();
+      api.attendance.allMembers().then((data) => setAttendanceAllMembers((data ?? []) as Member[])).catch(() => setAttendanceAllMembers([]));
+      api.attendance.expiredSummary().then((r) => setExpiredSummaryCount(r?.count ?? 0)).catch(() => setExpiredSummaryCount(0));
       api.attendance.qrPayload().then((p) => setQrPayload(p)).catch(() => setQrPayload(null));
+      api.attendance.getFaceConfig().then(setFaceConfig).catch(() => setFaceConfig({ useImageForMatch: false }));
       setFaceAlertSettingsLoading(true);
       api.tenant.getMySettings().then((r) => {
         setNotifyOwnerOnFaceFailure(r.notifyOwnerOnFaceFailure);
@@ -607,19 +625,34 @@ export default function Dashboard() {
       loadList();
       loadCheckIn();
     } catch (err) {
-      alert('Check-in failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+      const msg = getApiErrorMessage(err);
+      if (msg.includes('Membership expired')) {
+        const body = getApiErrorResponseBody(err);
+        setExpiredCheckInPopup({
+          message: msg,
+          member: body?.member,
+        });
+        setSelectedMemberForCheckIn(null);
+        setCheckinSearchQuery('');
+        setCheckinDropdownOpen(false);
+      } else {
+        alert('Check-in failed: ' + msg);
+      }
     }
   };
 
-  /** Members matching check-in search (name, Reg No, or phone). On check-in tab use backend valid-only list; else valid from allMembers. */
+  /** Members matching check-in search (name, Reg No, or phone). On check-in tab use all gym users; else valid from allMembers. */
   const checkinSearchMatches = (() => {
     if (!checkinSearchQuery.trim()) return [];
     const q = checkinSearchQuery.trim().toLowerCase();
     const qNum = /^\d+$/.test(q) ? parseInt(q, 10) : NaN;
-    const validMembers =
-      activeNav === 'checkin' && checkInEligibleMembers.length > 0
-        ? checkInEligibleMembers
-        : allMembers.filter((m) => (m.status as StatusType) !== 'expired');
+    const sourceMembers =
+      activeNav === 'checkin' && attendanceAllMembers.length > 0
+        ? attendanceAllMembers
+        : activeNav === 'checkin' && checkInEligibleMembers.length > 0
+          ? checkInEligibleMembers
+          : allMembers.filter((m) => (m.status as StatusType) !== 'expired');
+    const validMembers = sourceMembers;
     const filtered = validMembers.filter(
       (m) =>
         (m.NAME as string)?.toLowerCase().includes(q) ||
@@ -1179,11 +1212,41 @@ export default function Dashboard() {
                     includeMargin
                   />
                 </div>
+                <div className="checkin-qr-url-row">
+                  <input
+                    type="text"
+                    readOnly
+                    className="checkin-qr-url-input"
+                    value={qrPayload.url.startsWith('http') ? qrPayload.url : `${window.location.origin}${qrPayload.url}`}
+                    aria-label="Check-in URL"
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary checkin-qr-copy-btn"
+                    onClick={async () => {
+                      const url = qrPayload.url.startsWith('http') ? qrPayload.url : `${window.location.origin}${qrPayload.url}`;
+                      try {
+                        await navigator.clipboard.writeText(url);
+                        setCopyUrlFeedback(true);
+                        setTimeout(() => setCopyUrlFeedback(false), 2000);
+                      } catch {
+                        setCopyUrlFeedback(false);
+                      }
+                    }}
+                  >
+                    {copyUrlFeedback ? 'Copied!' : 'Copy URL'}
+                  </button>
+                </div>
               </div>
             )}
             <p className="checkin-validity-note">
-              Only valid members are shown. <strong>Membership expired?</strong> Please contact gym admin to renew.
+              All gym members are shown. <strong>Membership expired?</strong> Check-in will be denied and you will be alerted.
             </p>
+            {expiredSummaryCount > 0 && (
+              <div className="checkin-expired-alert" role="alert">
+                <strong>{expiredSummaryCount} member(s)</strong> have expired membership. You have been notified (push/Telegram). Renew from People or Add Member.
+              </div>
+            )}
             <div className="chips chips-with-actions">
               {checkinTable.length === 0 ? (
                 <div className="empty-state">No check-ins today</div>
@@ -1244,6 +1307,61 @@ export default function Dashboard() {
                   );
                 })
               )}
+            </div>
+            <div className="checkin-all-members-section">
+              <h3 className="checkin-all-members-title">All gym members ({attendanceAllMembers.length})</h3>
+              <div className="checkin-all-members-list">
+                {attendanceAllMembers.length === 0 ? (
+                  <div className="checkin-all-members-empty">Loading…</div>
+                ) : (
+                  attendanceAllMembers.map((row) => {
+                    const dueRaw = row['DUE DATE'] != null ? new Date(row['DUE DATE'] as number) : null;
+                    const joinRaw = row['Date of Joining'] != null ? new Date(row['Date of Joining'] as string | number) : null;
+                    const due = dueRaw && isValid(dueRaw) ? dueRaw : null;
+                    const join = joinRaw && isValid(joinRaw) ? joinRaw : null;
+                    const status = getStatus(due, join);
+                    const regNo = Number(row['Reg No:']);
+                    const checkedInToday = checkinTable.some((r) => Number(r['Reg No:']) === regNo);
+                    const hasFace = (Array.isArray(row.faceDescriptor) && (row.faceDescriptor as number[]).length === 128) ||
+                      (Array.isArray((row as Record<string, unknown>).faceDescriptorDlib) && ((row as Record<string, unknown>).faceDescriptorDlib as number[]).length === 128);
+                    const removing = faceRemoveRegNo === regNo;
+                    return (
+                      <span key={String(row['Reg No:'])} className={`checkin-all-member-chip chip-due-${status}`}>
+                        <span className="checkin-all-member-name">#{String(row['Reg No:'])} {String(row.NAME ?? '—')}</span>
+                        <span className="checkin-all-member-status" title={status === 'expired' ? 'Membership expired' : status === 'soon' ? 'Due within 5 days' : 'Active'}>
+                          {status === 'expired' ? 'Expired' : status === 'soon' ? 'Soon' : 'Valid'}
+                        </span>
+                        {checkedInToday && <span className="checkin-all-member-today">Today</span>}
+                        {hasFace && (
+                          <button
+                            type="button"
+                            className="checkin-all-member-remove-face"
+                            disabled={removing}
+                            onClick={async () => {
+                              setFaceRemoveRegNo(regNo);
+                              setFaceEnrollMessage(null);
+                              try {
+                                await api.attendance.removeFaceEnroll(regNo);
+                                setFaceEnrollMessage('Face removed. Member can check in by QR or name/Reg. No.');
+                                loadList();
+                                loadCheckIn();
+                                api.attendance.allMembers().then((data) => setAttendanceAllMembers((data ?? []) as Member[])).catch(() => {});
+                              } catch (err) {
+                                setFaceEnrollMessage(getApiErrorMessage(err) || 'Failed to remove face.');
+                              } finally {
+                                setFaceRemoveRegNo(null);
+                              }
+                            }}
+                            title="Remove face enrollment so they use QR or Reg. No. only"
+                          >
+                            {removing ? 'Removing…' : 'Remove face'}
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })
+                )}
+              </div>
             </div>
             {!faceAlertSettingsLoading && (
               <>
@@ -1413,7 +1531,10 @@ export default function Dashboard() {
                 {(() => {
                   const source = activeNav === 'checkin' && checkInEligibleMembers.length > 0 ? checkInEligibleMembers : allMembers.filter((m) => (m.status as StatusType) !== 'expired');
                   const selected = faceEnrollRegNo != null ? source.find((m) => Number(m['Reg No:']) === faceEnrollRegNo) : null;
-                  const hasFaceEnrolled = selected && Array.isArray(selected.faceDescriptor) && (selected.faceDescriptor as number[]).length === 128;
+                  const hasFaceEnrolled = selected && (
+                    (Array.isArray(selected.faceDescriptor) && (selected.faceDescriptor as number[]).length === 128) ||
+                    (Array.isArray((selected as Record<string, unknown>).faceDescriptorDlib) && ((selected as Record<string, unknown>).faceDescriptorDlib as number[]).length === 128)
+                  );
                   return (
                     <>
                       {hasFaceEnrolled ? (
@@ -1430,6 +1551,7 @@ export default function Dashboard() {
                               setFaceEnrollMessage('Face removed. Member can check in by QR or name/Reg. No.');
                               loadList();
                               loadCheckIn();
+                              api.attendance.allMembers().then((data) => setAttendanceAllMembers((data ?? []) as Member[])).catch(() => {});
                             } catch (err) {
                               setFaceEnrollMessage(getApiErrorMessage(err) || 'Failed to remove face.');
                             } finally {
@@ -1454,8 +1576,15 @@ export default function Dashboard() {
                 })()}
               </div>
               {faceEnrollMessage && (
-                <p className={`checkin-face-enroll-msg ${faceEnrollMessage.startsWith('Saved') ? 'success' : 'error'}`}>
+                <p
+                  ref={faceEnrollMessageRef}
+                  role="alert"
+                  className={`checkin-face-enroll-msg ${faceEnrollMessage.startsWith('Saved') ? 'success' : 'error'} ${faceEnrollMessage.includes('already registered to another member') ? 'checkin-face-enroll-msg-alert' : ''}`}
+                >
                   {faceEnrollMessage}
+                  {faceEnrollMessage.includes('already registered to another member') && (
+                    <span className="checkin-face-enroll-msg-hint"> Find that member in the &quot;All gym members&quot; list above and click &quot;Remove face&quot;, then try enrolling again.</span>
+                  )}
                 </p>
               )}
             </div>
@@ -1464,20 +1593,44 @@ export default function Dashboard() {
                 title="Position face in frame — then tap Capture"
                 captureButtonLabel="Capture & save"
                 failureMessage="Enrollment failed. Please try again or check your connection."
-                onCapture={async (descriptor) => {
-                  try {
-                    await api.attendance.faceEnroll(faceEnrollRegNo, descriptor);
-                    setFaceEnrollMessage('Saved. Member can now check in by face.');
-                    setShowFaceEnrollModal(false);
-                    loadList();
-                    setShowEnrollSuccessPopup(true);
-                    return { success: true as const };
-                  } catch (err) {
-                    const msg = getApiErrorMessage(err);
-                    setFaceEnrollMessage(msg || 'Enrollment failed. Please try again.');
-                    return { success: false as const };
-                  }
-                }}
+                onCaptureImage={
+                  faceConfig?.useImageForMatch
+                    ? async (blob) => {
+                        try {
+                          await api.attendance.faceEnrollImage(faceEnrollRegNo, blob);
+                          setFaceEnrollMessage('Saved. Member can now check in by face.');
+                          setShowFaceEnrollModal(false);
+                          loadList();
+                          setShowEnrollSuccessPopup(true);
+                          return { success: true as const };
+                        } catch (err) {
+                          const msg = getApiErrorMessage(err);
+                          setFaceEnrollMessage(msg || 'Enrollment failed. Please try again.');
+                          setTimeout(() => faceEnrollMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+                          return { success: false as const };
+                        }
+                      }
+                    : undefined
+                }
+                onCapture={
+                  !faceConfig?.useImageForMatch
+                    ? async (descriptor) => {
+                        try {
+                          await api.attendance.faceEnroll(faceEnrollRegNo, descriptor);
+                          setFaceEnrollMessage('Saved. Member can now check in by face.');
+                          setShowFaceEnrollModal(false);
+                          loadList();
+                          setShowEnrollSuccessPopup(true);
+                          return { success: true as const };
+                        } catch (err) {
+                          const msg = getApiErrorMessage(err);
+                          setFaceEnrollMessage(msg || 'Enrollment failed. Please try again.');
+                          setTimeout(() => faceEnrollMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+                          return { success: false as const };
+                        }
+                      }
+                    : async () => ({ success: false as const })
+                }
                 onClose={() => setShowFaceEnrollModal(false)}
               />
             )}
@@ -1850,6 +2003,31 @@ export default function Dashboard() {
             setShowEnrollSuccessPopup(false);
             handleNavChange('checkin');
           }}
+        />
+      )}
+      {expiredCheckInPopup && (
+        <SuccessPopup
+          message={expiredCheckInPopup.message}
+          durationMs={0}
+          onClose={() => setExpiredCheckInPopup(null)}
+          details={
+            expiredCheckInPopup.member ? (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {expiredCheckInPopup.member.name != null && (
+                  <li><strong>Name:</strong> {expiredCheckInPopup.member.name}</li>
+                )}
+                {expiredCheckInPopup.member.regNo != null && (
+                  <li><strong>Reg. No.:</strong> {expiredCheckInPopup.member.regNo}</li>
+                )}
+                {expiredCheckInPopup.member.phone != null && expiredCheckInPopup.member.phone !== '' && (
+                  <li><strong>Phone:</strong> {expiredCheckInPopup.member.phone}</li>
+                )}
+                {expiredCheckInPopup.member.dueDate != null && (
+                  <li><strong>Due date:</strong> {expiredCheckInPopup.member.dueDate}</li>
+                )}
+              </ul>
+            ) : null
+          }
         />
       )}
     </Layout>

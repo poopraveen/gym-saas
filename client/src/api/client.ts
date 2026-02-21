@@ -34,6 +34,12 @@ export function setLoaderCallbacks(start: () => void, end: () => void) {
   loaderEnd = end;
 }
 
+/** Called when a request fails due to connection/network (e.g. backend not running). Set by ApiConnectionBanner. */
+let connectionErrorCallback: ((message: string) => void) | null = null;
+export function setConnectionErrorCallback(cb: ((message: string) => void) | null) {
+  connectionErrorCallback = cb;
+}
+
 export const storage = {
   getToken: () => localStorage.getItem('gym_token'),
   setToken: (t: string) => localStorage.setItem('gym_token', t),
@@ -75,19 +81,26 @@ async function request<T>(
       res = await fetch(`${API_BASE}${path}`, { ...options, headers });
       text = await res.text();
     } catch (e) {
-      if (isNetworkError(e)) throw new Error(networkErrorMessage());
+      if (isNetworkError(e)) {
+        const msg = networkErrorMessage();
+        connectionErrorCallback?.(msg);
+        throw new Error(msg);
+      }
       throw e;
     }
     if (!res.ok) {
       let errMessage = res.statusText || 'Request failed';
+      let json: Record<string, unknown> | null = null;
       try {
-        const json = text ? JSON.parse(text) : null;
+        json = text ? (JSON.parse(text) as Record<string, unknown>) : null;
         if (json && typeof json.message === 'string') errMessage = json.message;
-        else if (json && Array.isArray(json.message)) errMessage = json.message[0] ?? errMessage;
+        else if (json && Array.isArray(json.message)) errMessage = (json.message[0] as string) ?? errMessage;
       } catch {
         if (text && text.length < 200) errMessage = text;
       }
-      throw new Error(errMessage);
+      const err = new Error(errMessage) as Error & { responseBody?: Record<string, unknown> };
+      if (json) err.responseBody = json;
+      throw err;
     }
     if (!text || text.trim() === '') {
       return null as T;
@@ -95,7 +108,11 @@ async function request<T>(
     try {
       return JSON.parse(text) as T;
     } catch {
-      throw new Error('Invalid JSON response');
+      const trimmed = text.trim();
+      if (trimmed.length > 0 && trimmed.length < 300 && /^(Internal|Error|Exception|error|failed)/i.test(trimmed)) {
+        throw new Error(trimmed);
+      }
+      throw new Error('Server returned an invalid response. Please try again.');
     }
   } finally {
     loaderEnd?.();
@@ -116,25 +133,118 @@ async function requestPublic<T>(path: string, options: RequestInit = {}): Promis
     res = await fetch(`${API_BASE}${path}`, { ...options, headers });
     text = await res.text();
   } catch (e) {
-    if (isNetworkError(e)) throw new Error(networkErrorMessage());
+    if (isNetworkError(e)) {
+      const msg = networkErrorMessage();
+      connectionErrorCallback?.(msg);
+      throw new Error(msg);
+    }
     throw e;
   }
   if (!res.ok) {
     let errMessage = res.statusText || 'Request failed';
+    let json: Record<string, unknown> | null = null;
     try {
-      const json = text ? JSON.parse(text) : null;
+      json = text ? (JSON.parse(text) as Record<string, unknown>) : null;
       if (json && typeof json.message === 'string') errMessage = json.message;
-      else if (json && Array.isArray(json.message)) errMessage = json.message[0] ?? errMessage;
+      else if (json && Array.isArray(json.message)) errMessage = (json.message[0] as string) ?? errMessage;
     } catch {
       if (text && text.length < 200) errMessage = text;
     }
-    throw new Error(errMessage);
+    const err = new Error(errMessage) as Error & { responseBody?: Record<string, unknown> };
+    if (json) err.responseBody = json;
+    throw err;
   }
   if (!text || text.trim() === '') return null as T;
   try {
     return JSON.parse(text) as T;
   } catch {
     throw new Error('Invalid JSON response');
+  }
+}
+
+function buildFormData(fields: Record<string, string | number>, fileField: string, file: Blob): FormData {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) form.append(k, String(v));
+  form.append(fileField, file, file.type === 'image/png' ? 'face.png' : 'face.jpg');
+  return form;
+}
+
+/** Public multipart (e.g. check-in by face image). */
+async function requestPublicFormData<T>(
+  path: string,
+  fields: Record<string, string | number>,
+  fileField: string,
+  file: Blob,
+): Promise<T> {
+  loaderStart?.();
+  try {
+    const body = buildFormData(fields, fileField, file);
+    const res = await fetch(`${API_BASE}${path}`, { method: 'POST', body });
+    const text = await res.text();
+    if (!res.ok) {
+      let errMessage = res.statusText || 'Request failed';
+      let json: Record<string, unknown> | null = null;
+      try {
+        json = text ? (JSON.parse(text) as Record<string, unknown>) : null;
+        if (json && typeof json.message === 'string') errMessage = json.message;
+        else if (json && Array.isArray(json.message)) errMessage = (json.message[0] as string) ?? errMessage;
+      } catch {
+        if (text && text.length < 200) errMessage = text;
+      }
+      const err = new Error(errMessage) as Error & { responseBody?: Record<string, unknown> };
+      if (json) err.responseBody = json;
+      throw err;
+    }
+    if (!text || text.trim() === '') return null as T;
+    return JSON.parse(text) as T;
+  } finally {
+    loaderEnd?.();
+  }
+}
+
+/** Authenticated multipart (e.g. face enroll image). */
+async function requestFormData<T>(
+  path: string,
+  fields: Record<string, string | number>,
+  fileField: string,
+  file: Blob,
+): Promise<T> {
+  const tenantId = storage.getTenantId();
+  const token = storage.getToken();
+  const headers: Record<string, string> = {};
+  if (tenantId) headers['X-Tenant-ID'] = tenantId;
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  loaderStart?.();
+  try {
+    const body = buildFormData(fields, fileField, file);
+    const res = await fetch(`${API_BASE}${path}`, { method: 'POST', headers, body });
+    const text = await res.text();
+    if (!res.ok) {
+      let errMessage = res.statusText || 'Request failed';
+      let json: Record<string, unknown> | null = null;
+      try {
+        json = text ? (JSON.parse(text) as Record<string, unknown>) : null;
+        if (json && typeof json.message === 'string') errMessage = json.message;
+        else if (json && Array.isArray(json.message)) errMessage = (json.message[0] as string) ?? errMessage;
+      } catch {
+        if (text && text.length < 200) errMessage = text;
+      }
+      const err = new Error(errMessage) as Error & { responseBody?: Record<string, unknown> };
+      if (json) err.responseBody = json;
+      throw err;
+    }
+    if (!text || text.trim() === '') return null as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      const trimmed = text.trim();
+      if (trimmed.length > 0 && trimmed.length < 300 && /^(Internal|Error|Exception|error|failed)/i.test(trimmed)) {
+        throw new Error(trimmed);
+      }
+      throw new Error('Server returned an invalid response. Please try again.');
+    }
+  } finally {
+    loaderEnd?.();
   }
 }
 
@@ -155,6 +265,25 @@ export function getApiErrorMessage(error: unknown): string {
     // not JSON
   }
   return raw || 'Something went wrong.';
+}
+
+/** Response body from API error (e.g. 400 with message + member for expired membership). */
+export interface ApiErrorResponseBody {
+  message?: string;
+  member?: { name?: string; regNo?: number; phone?: string; dueDate?: string };
+}
+
+export function getApiErrorResponseBody(error: unknown): ApiErrorResponseBody | null {
+  const e = error as { responseBody?: Record<string, unknown> };
+  if (e?.responseBody && typeof e.responseBody === 'object' && e.responseBody !== null) {
+    const b = e.responseBody;
+    const member = b.member as ApiErrorResponseBody['member'] | undefined;
+    return {
+      message: typeof b.message === 'string' ? b.message : undefined,
+      member: member && typeof member === 'object' ? member : undefined,
+    };
+  }
+  return null;
 }
 
 export const api = {
@@ -286,8 +415,13 @@ export const api = {
       }>('/legacy/finance'),
   },
   attendance: {
+    allMembers: () => request<unknown[]>('/attendance/all-members'),
+    expiredSummary: () =>
+      request<{ expired: unknown[]; count: number }>('/attendance/expired-summary'),
     qrPayload: () =>
       request<{ url: string; token: string }>('/attendance/qr-payload'),
+    getFaceConfig: () =>
+      requestPublic<{ useImageForMatch: boolean }>('/attendance/face-config'),
     getCheckInQRMembers: (token: string) =>
       requestPublic<{ members: { regNo: number; name: string }[] }>(`/attendance/checkin-qr-members?t=${encodeURIComponent(token)}`),
     checkInByQR: (token: string, regNo: number) =>
@@ -322,6 +456,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ token, descriptor }),
       }),
+    checkInByFaceImage: (token: string, imageBlob: Blob) =>
+      requestPublicFormData<{
+        success: boolean;
+        name?: string;
+        memberSummary?: { name: string; dueDate?: string; phoneNumber?: string; typeofPack?: string };
+        checkInTime?: string;
+      }>('/attendance/checkin-face-image', { token }, 'image', imageBlob),
+    faceEnrollImage: (regNo: number, imageBlob: Blob) =>
+      requestFormData<{ ok: boolean }>(`/attendance/face-enroll-image?regNo=${encodeURIComponent(regNo)}`, { regNo }, 'image', imageBlob),
   },
   platform: {
     listTenants: () => request<unknown[]>('/platform/tenants'),

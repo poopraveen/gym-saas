@@ -45,6 +45,36 @@
   line-height: 1.4;
 }
 
+.success-popup-details {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #3f3f46);
+  text-align: left;
+  font-size: 0.95rem;
+  color: var(--text-secondary, #a1a1aa);
+  line-height: 1.5;
+}
+
+.success-popup-details strong {
+  color: var(--text-primary, #e4e4e7);
+}
+
+.success-popup-close-btn {
+  margin-top: 20px;
+  padding: 10px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary, #22c55e);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.success-popup-close-btn:hover {
+  opacity: 0.9;
+}
+
 @keyframes success-popup-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

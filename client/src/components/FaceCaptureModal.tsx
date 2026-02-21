@@ -14,9 +14,30 @@ type Props = {
   successWatermarkText?: string;
   /** Message when recognition failed (red state). */
   failureMessage?: string;
+  /** When set, capture is sent as image blob (Python fallback). Still validates face presence. */
+  onCaptureImage?: (blob: Blob) => Promise<FaceCaptureResult>;
 };
 
 const SUCCESS_DISPLAY_MS = 1800;
+
+function videoFrameToBlob(video: HTMLVideoElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      reject(new Error('Canvas context'));
+      return;
+    }
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))),
+      'image/jpeg',
+      0.92,
+    );
+  });
+}
 
 export default function FaceCaptureModal({
   onCapture,
@@ -25,6 +46,7 @@ export default function FaceCaptureModal({
   captureButtonLabel = 'Capture face',
   successWatermarkText = 'Recognized',
   failureMessage = 'Face not recognized. Gym owner has been notified.',
+  onCaptureImage,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -92,17 +114,27 @@ export default function FaceCaptureModal({
     setError(null);
     setRecognitionFailed(false);
     try {
-      const descriptor = await getDescriptorFromVideo(video);
-      if (!descriptor) {
-        setError('No face detected. Look at the camera and try again.');
-        setCapturing(false);
-        return;
-      }
-      const result = await onCapture(descriptor);
-      if (result.success) {
-        setShowSuccess(true);
+      if (onCaptureImage) {
+        const descriptor = await getDescriptorFromVideo(video);
+        if (!descriptor) {
+          setError('No face detected. Look at the camera and try again.');
+          setCapturing(false);
+          return;
+        }
+        const blob = await videoFrameToBlob(video);
+        const result = await onCaptureImage(blob);
+        if (result.success) setShowSuccess(true);
+        else setRecognitionFailed(true);
       } else {
-        setRecognitionFailed(true);
+        const descriptor = await getDescriptorFromVideo(video);
+        if (!descriptor) {
+          setError('No face detected. Look at the camera and try again.');
+          setCapturing(false);
+          return;
+        }
+        const result = await onCapture(descriptor);
+        if (result.success) setShowSuccess(true);
+        else setRecognitionFailed(true);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Face detection failed');

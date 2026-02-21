@@ -13,6 +13,7 @@ import { MembersService } from '../members/members.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { FollowUpsService } from '../follow-ups/follow-ups.service';
 import { CountersService } from '../counters/counters.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -33,6 +34,7 @@ export class LegacyController {
     private readonly attendanceService: AttendanceService,
     private readonly followUpsService: FollowUpsService,
     private readonly countersService: CountersService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private tenantId(req: any): string {
@@ -83,7 +85,26 @@ export class LegacyController {
     const tenantId = this.tenantId(req);
     const regNo = body.newUserData?.['Reg No:'] ?? body.regNo;
     if (regNo == null) throw new Error('regNo required');
-    return this.attendanceService.checkIn(tenantId, Number(regNo), body.checkedInBy);
+    try {
+      return await this.attendanceService.checkIn(tenantId, Number(regNo), body.checkedInBy);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('Membership expired')) {
+        const res = (err as { getResponse?: () => unknown })?.getResponse?.() as { member?: { name?: string; regNo?: number; phone?: string } } | undefined;
+        const member = res?.member;
+        const name = member?.name ?? 'Member';
+        const phone = member?.phone ?? '';
+        const pushBody = `${name} (Reg. No. ${regNo})${phone ? `, ${phone}` : ''} tried to check in but membership is expired.`;
+        const telegramText = `⚠️ <b>Expired membership check-in</b>\n<b>${name}</b> (Reg. No. <b>${regNo}</b>)${phone ? `, ${phone}` : ''} tried to check in but membership is expired.`;
+        await this.notificationsService.notifyGymOwner(tenantId, {
+          pushTitle: 'Expired membership check-in attempt',
+          pushBody,
+          pushUrl: '/',
+          telegramText,
+        });
+      }
+      throw err;
+    }
   }
 
   @Get('finance')
