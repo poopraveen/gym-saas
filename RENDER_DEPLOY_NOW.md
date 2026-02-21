@@ -51,6 +51,16 @@ The Render dashboard should have opened. Follow these steps:
 
 ---
 
+## Build failed?
+
+- **Node version:** The repo has `.nvmrc` (Node 20) and `engines` in `package.json`. On Render, set **Environment** → **Node Version** to **20** (or leave blank; Render may auto-detect from `.nvmrc`).
+- **Which service failed?**
+  - **gym-saas-api (NestJS):** Check the **Build logs** in Render for the exact error. Common: wrong Node version, `npm install` timeout → retry deploy or use a paid instance for a longer build.
+  - **Python face service (Docker):** Building dlib in Docker can take 15+ minutes and may run out of memory on free tier. Use a paid instance or skip the Python service (leave `FACE_SERVICE_URL` empty).
+- **Redeploy:** After fixing env or code, use **Manual Deploy** → **Deploy latest commit** so the latest push is built.
+
+---
+
 ## After Deploy
 
 - Your API URL will be like: `https://gym-saas-api.onrender.com`
