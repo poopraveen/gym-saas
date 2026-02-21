@@ -65,7 +65,7 @@ If you want the Python face service (e.g. for better accuracy), deploy it **befo
 - **Fly.io:** From repo root, `fly launch`; then set root to `python-face-service` or run from `python-face-service` with a Dockerfile build. Set `PORT` / expose port as per Fly’s docs.
 
 **If the build failed with “Building wheel for dlib (pyproject.toml)…”**  
-You were likely using **Runtime: Python** (no Docker). That compiles dlib from source and often times out. Render often doesn’t let you change runtime on an existing service. **Create a new Web Service** with the settings below (Docker + Root Directory), then you can delete the old one.
+You were likely using **Runtime: Python** (no Docker). That compiles dlib from source and often times out. Render often doesn’t let you change runtime on an existing service. **Create a new Web Service** with the settings below (Docker + Root Directory), then you can delete the old one. If you already use **Docker** and get `pip install` exit code 1: in Render **Settings** set **Dockerfile Path** to `Dockerfile.source-build` and redeploy (builds dlib from source, ~15–20 min).
 
 ---
 

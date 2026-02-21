@@ -1,0 +1,27 @@
+# Fallback: build dlib from source (use if Dockerfile fails with "no matching wheel").
+# Takes ~15–20 min on first build. On Render: use Starter plan and ensure build timeout is sufficient.
+# To use: rename to Dockerfile, or in Render set Dockerfile path to Dockerfile.source-build
+
+FROM python:3.10-slim-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git \
+    libopenblas-dev liblapack-dev libx11-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build dlib from source (single layer to reduce image size)
+RUN pip install --no-cache-dir numpy \
+    && cd /tmp \
+    && git clone -b v19.24 --single-branch https://github.com/davisking/dlib.git \
+    && cd dlib \
+    && python3 setup.py install \
+    && cd / && rm -rf /tmp/dlib
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY main.py .
+
+ENV PORT=8000
+EXPOSE 8000
+CMD sh -c 'uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'
