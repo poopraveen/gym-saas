@@ -31,7 +31,7 @@ If you want the Python face service (e.g. for better accuracy), deploy it **befo
 5. **Environment:**
    - `PORT` is set by Render; no need to add it.
    - Optional: `FACE_MATCH_THRESHOLD=0.45`
-6. **Create Web Service.** First build usually finishes in a few minutes (no dlib compile).
+6. **Create Web Service.** First build finishes in about 3–5 minutes (conda-forge pre-built dlib/face_recognition; no compilation).
 7. **Note the URL**, e.g. `https://gym-face-service.onrender.com`.  
    Test: `https://gym-face-service.onrender.com/health` → `{"status":"ok"}`.
 

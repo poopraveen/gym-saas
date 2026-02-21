@@ -1,32 +1,27 @@
-# Python Face Recognition Service - deployable to Render/Railway/Fly.io
-# Use full bookworm image + runtime libs so dlib wheel works; avoid building from source.
+# Python Face Recognition Service - no dlib compile; use conda-forge pre-built binaries.
+# Builds in ~3-5 min instead of 20+ min.
 
-FROM python:3.10-bookworm
-
-# Runtime libs + build deps so pip can build dlib when no wheel exists (cmake, BLAS/LAPACK)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    libopenblas-dev \
-    liblapack-dev \
-    libx11-dev \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+FROM continuumio/miniconda3:latest
 
 WORKDIR /app
-COPY requirements.txt .
 
-# Upgrade pip/wheel so pip prefers binary wheels; then install
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir -r requirements.txt
+# Pre-built dlib + face_recognition from conda-forge (no compilation)
+RUN conda install -c conda-forge -y --no-update-deps \
+    python=3.10 \
+    dlib \
+    face_recognition \
+    pillow \
+    numpy \
+    && conda clean -afy
+
+# FastAPI stack via pip (lightweight)
+RUN pip install --no-cache-dir \
+    "fastapi>=0.100.0" \
+    "uvicorn>=0.23.0" \
+    "python-multipart>=0.0.6"
 
 COPY main.py .
 
 ENV PORT=8000
 EXPOSE 8000
-CMD sh -c 'uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'
+CMD ["/bin/bash", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
