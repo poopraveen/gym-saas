@@ -61,6 +61,8 @@ function phoneToDigits(phone: string | undefined): string {
 /** Maps member to legacy API response format for frontend compatibility. */
 function mapToLegacy(m: Member): Record<string, unknown> {
   const legacy: Record<string, unknown> = {
+    // Spread legacyFields first so authoritative schema fields always override stale stored values.
+    ...m.legacyFields,
     _id: m._id,
     'Reg No:': m.regNo,
     NAME: m.name,
@@ -80,7 +82,6 @@ function mapToLegacy(m: Member): Record<string, unknown> {
     telegramChatId: m.telegramChatId,
     faceDescriptor: m.faceDescriptor,
     faceDescriptorDlib: m.faceDescriptorDlib,
-    ...m.legacyFields,
   };
   return legacy;
 }
@@ -215,15 +216,20 @@ export class MembersService {
 
   /**
    * Remove duplicate reg numbers: keep only the latest member per regNo (by updatedAt).
+   * Also removes orphaned duplicates that share the same name but have regNo=0 (failed import mapping).
    * Returns count deleted and details.
    */
   async cleanupDuplicateRegNos(tenantId: string): Promise<{ deleted: number; details: Array<{ regNo: number; name?: string; deletedCount: number }> }> {
     const members = await this.memberModel
       .find({ tenantId })
-      .select('_id regNo name updatedAt')
+      .select('_id regNo name phoneNumber updatedAt legacyFields')
       .sort({ updatedAt: -1 })
       .lean();
 
+    const toDeleteIds: unknown[] = [];
+    const details: Array<{ regNo: number; name?: string; deletedCount: number }> = [];
+
+    // Pass 1: group by regNo, delete extras (keep newest = first after sort desc)
     const byRegNo = new Map<number, Array<{ _id: unknown; regNo: number; name?: string }>>();
     for (const m of members) {
       const doc = m as Record<string, unknown>;
@@ -231,20 +237,32 @@ export class MembersService {
       if (!byRegNo.has(regNo)) byRegNo.set(regNo, []);
       byRegNo.get(regNo)!.push({ _id: doc._id, regNo, name: doc.name as string | undefined });
     }
-
-    let totalDeleted = 0;
-    const details: Array<{ regNo: number; name?: string; deletedCount: number }> = [];
-
     for (const [regNo, docs] of byRegNo) {
       if (docs.length <= 1) continue;
-      const toDelete = docs.slice(1);
-      const ids = toDelete.map((d) => d._id);
-      const result = await this.memberModel.deleteMany({ _id: { $in: ids } });
-      totalDeleted += result.deletedCount;
-      details.push({ regNo, name: docs[0]?.name, deletedCount: result.deletedCount });
+      const extras = docs.slice(1);
+      extras.forEach((d) => toDeleteIds.push(d._id));
+      details.push({ regNo, name: docs[0]?.name, deletedCount: extras.length });
     }
 
-    return { deleted: totalDeleted, details };
+    // Pass 2: find orphans with regNo=0 whose name matches a real member (non-zero regNo)
+    // These arise when the import failed to map 'Reg No:' into the schema field.
+    const realNames = new Set<string>();
+    for (const [regNo, docs] of byRegNo) {
+      if (regNo !== 0 && regNo !== null) docs.forEach((d) => { if (d.name) realNames.add(d.name.trim().toLowerCase()); });
+    }
+    const orphans = (byRegNo.get(0) ?? []).filter((d) => {
+      const name = (d.name ?? '').trim().toLowerCase();
+      return name && realNames.has(name) && !toDeleteIds.includes(d._id);
+    });
+    if (orphans.length > 0) {
+      orphans.forEach((d) => toDeleteIds.push(d._id));
+      details.push({ regNo: 0, name: orphans.map((o) => o.name).join(', '), deletedCount: orphans.length });
+    }
+
+    if (toDeleteIds.length === 0) return { deleted: 0, details: [] };
+
+    const result = await this.memberModel.deleteMany({ _id: { $in: toDeleteIds } });
+    return { deleted: result.deletedCount, details };
   }
 
   /** Check if a member exists by phone (for enquiry conversion duplicate check). */
